@@ -1,0 +1,95 @@
+{# Expects: balance_preview_requires_employee_id (bool) #}
+{% set _req_emp = balance_preview_requires_employee_id if balance_preview_requires_employee_id is defined else false %}
+<div class="card border-0 shadow-sm mb-3" id="balance-preview-card" style="display:none;">
+    <div class="card-body py-2 small">
+        <div class="fw-semibold mb-1 text-muted text-uppercase" style="letter-spacing:0.06em;">Balance for this leave</div>
+        <div class="text-muted mb-2" id="balance-preview-sub"></div>
+        <div id="balance-preview-body" class="mb-0"></div>
+    </div>
+</div>
+<script>
+(function() {
+    var balanceUrl = {{ url_for('leave.leave_balance_preview') | tojson }};
+    var requiresEmpPick = {{ _req_emp | tojson }};
+
+    function escapeHtml(s) {
+        if (s === undefined || s === null) return '';
+        var d = document.createElement('div');
+        d.textContent = String(s);
+        return d.innerHTML;
+    }
+
+    function refreshBalancePreview() {
+        var card = document.getElementById('balance-preview-card');
+        var body = document.getElementById('balance-preview-body');
+        var sub = document.getElementById('balance-preview-sub');
+        var sel = document.getElementById('leave_type_id');
+        var startEl = document.getElementById('start_date');
+        if (!card || !body || !sub) return;
+        if (!sel || !sel.value) {
+            card.style.display = 'none';
+            return;
+        }
+        var empId = '';
+        if (requiresEmpPick) {
+            var empEl = document.getElementById('admin_employee_id');
+            empId = empEl && empEl.value ? String(empEl.value) : '';
+            if (!empId) {
+                sub.textContent = '';
+                body.innerHTML = '<p class="mb-0 text-muted">Select an employee to see accrued and available days.</p>';
+                card.style.display = 'block';
+                return;
+            }
+        }
+        var qs = 'leave_type_id=' + encodeURIComponent(sel.value);
+        if (startEl && startEl.value) qs += '&start_date=' + encodeURIComponent(startEl.value);
+        if (requiresEmpPick && empId) qs += '&employee_id=' + encodeURIComponent(empId);
+        fetch(balanceUrl + '?' + qs, { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    card.style.display = 'none';
+                    return;
+                }
+                sub.textContent = 'Calendar year ' + data.year + ' — ' + (data.leave_type_name || '');
+                if (data.mode === 'ledger') {
+                    var rows = [];
+                    rows.push('<dl class="row small mb-0">');
+                    rows.push('<dt class="col-7 col-md-5 text-muted">Available now</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.available) + ' days</dd>');
+                    rows.push('<dt class="col-7 col-md-5 text-muted">Earned this year (YTD)</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.accrued) + ' days</dd>');
+                    rows.push('<dt class="col-7 col-md-5 text-muted">Opening / carry-in</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.opening_balance) + ' days</dd>');
+                    if (data.adjusted && data.adjusted !== '0') {
+                        rows.push('<dt class="col-7 col-md-5 text-muted">Adjustment</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.adjusted) + ' days</dd>');
+                    }
+                    rows.push('<dt class="col-7 col-md-5 text-muted">Used (approved)</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.used_approved) + ' days</dd>');
+                    if (data.days_per_year_cap) {
+                        rows.push('<dt class="col-7 col-md-5 text-muted">Year cap</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.days_per_year_cap) + ' days</dd>');
+                    }
+                    rows.push('</dl>');
+                    body.innerHTML = rows.join('');
+                } else if (data.mode === 'simple') {
+                    body.innerHTML = '<dl class="row small mb-0">' +
+                        '<dt class="col-7 col-md-5 text-muted">Available now</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.available) + ' days</dd>' +
+                        '<dt class="col-7 col-md-5 text-muted">Yearly entitlement</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.entitlement) + ' days</dd>' +
+                        '<dt class="col-7 col-md-5 text-muted">Used (approved)</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.used_approved) + ' days</dd>' +
+                        '</dl>';
+                } else {
+                    body.innerHTML = '<p class="mb-0 text-muted">This leave type has no fixed yearly entitlement in the system.</p>';
+                }
+                card.style.display = 'block';
+            })
+            .catch(function() { card.style.display = 'none'; });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var sel = document.getElementById('leave_type_id');
+        var startEl = document.getElementById('start_date');
+        var empEl = document.getElementById('admin_employee_id');
+        refreshBalancePreview();
+        if (sel) sel.addEventListener('change', refreshBalancePreview);
+        if (startEl) startEl.addEventListener('change', refreshBalancePreview);
+        if (startEl) startEl.addEventListener('blur', refreshBalancePreview);
+        if (empEl) empEl.addEventListener('change', refreshBalancePreview);
+    });
+})();
+</script>

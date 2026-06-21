@@ -1,0 +1,35 @@
+{% extends "layouts/auth_base.html" %}
+{% block title %}Create Account - {{ app_name }}{% endblock %}
+{% block auth_content %}
+<p class="text-muted small text-center mb-3">First-time setup: create the initial administrator account.</p>
+<form method="post" action="{{ url_for('auth.register') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="mb-3">
+        <label class="form-label">Organization name</label>
+        <input type="text" name="organization_name" class="form-control" required maxlength="200" value="{{ form.organization_name.data or '' }}" placeholder="Acme Ltd">
+        {% if form.organization_name.errors %}<div class="text-danger small">{{ form.organization_name.errors[0] }}</div>{% endif %}
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Primary country (ISO2)</label>
+        <input type="text" name="country_code" class="form-control" maxlength="2" value="{{ form.country_code.data or 'KE' }}" placeholder="KE" title="Two-letter country code for statutory defaults (e.g. KE)">
+        {% if form.country_code.errors %}<div class="text-danger small">{{ form.country_code.errors[0] }}</div>{% endif %}
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-control" required autofocus value="{{ form.email.data or '' }}" placeholder="admin@example.com">
+        {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors[0] }}</div>{% endif %}
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" required minlength="8" placeholder="At least 8 characters">
+        {% if form.password.errors %}<div class="text-danger small">{{ form.password.errors[0] }}</div>{% endif %}
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Confirm Password</label>
+        <input type="password" name="confirm" class="form-control" required>
+        {% if form.confirm.errors %}<div class="text-danger small">{{ form.confirm.errors[0] }}</div>{% endif %}
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Create Account</button>
+</form>
+<p class="text-center mt-3 mb-0"><a href="{{ url_for('auth.login') }}">Back to sign in</a></p>
+{% endblock %}

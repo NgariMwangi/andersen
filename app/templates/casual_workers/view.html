@@ -1,0 +1,105 @@
+{% extends "layouts/base.html" %}
+{% block title %}Casual Worker — {{ worker.full_name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-1">{{ worker.full_name }}</h1>
+        <p class="text-muted mb-0">{{ worker.worker_number or 'No number' }} · {{ worker.branch.name if worker.branch else 'No branch' }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('casual_workers.index') }}" class="btn btn-outline-secondary">Back</a>
+        <a href="{{ url_for('casual_workers.edit', id=worker.id) }}" class="btn btn-outline-primary">Edit</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="card card-body"><small class="text-muted">Phone</small><strong>{{ worker.phone or '—' }}</strong></div></div>
+    <div class="col-md-3"><div class="card card-body"><small class="text-muted">National ID</small><strong>{{ worker.national_id or '—' }}</strong></div></div>
+    <div class="col-md-3"><div class="card card-body"><small class="text-muted">Rate</small><strong>{{ "%.2f"|format(worker.daily_rate|float) }} / {{ worker.rate_unit or 'daily' }}</strong></div></div>
+    <div class="col-md-3"><div class="card card-body"><small class="text-muted">Status</small><strong>{{ worker.status|title }}</strong></div></div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">Add / Update payout line</div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('casual_workers.upsert_payment', id=worker.id) }}" class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="col-md-2">
+                <label class="form-label">Year</label>
+                <input type="number" class="form-control" min="2000" max="2100" name="period_year" value="{{ today.year }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Month</label>
+                <input type="number" class="form-control" min="1" max="12" name="period_month" value="{{ today.month }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Units worked</label>
+                <input type="number" class="form-control" min="0" step="0.01" name="units_worked" value="0">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Rate / unit</label>
+                <input type="number" class="form-control" min="0" step="0.01" name="rate_per_unit" value="{{ worker.daily_rate }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Adjustments</label>
+                <input type="number" class="form-control" step="0.01" name="adjustments" value="0">
+            </div>
+            <div class="col-md-12">
+                <label class="form-label">Notes</label>
+                <input type="text" class="form-control" name="notes" maxlength="500">
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary" type="submit">Save payout line</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Payout history</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Period</th>
+                    <th>Units</th>
+                    <th>Rate / unit</th>
+                    <th>Gross</th>
+                    <th>Adjustments</th>
+                    <th>Net</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td>{{ p.period_year }}-{{ "%02d"|format(p.period_month) }}</td>
+                    <td>{{ p.days_worked }} {{ worker.rate_unit or 'daily' }}</td>
+                    <td>{{ "%.2f"|format(p.rate_per_day|float) }}</td>
+                    <td>{{ "%.2f"|format(p.gross_amount|float) }}</td>
+                    <td>{{ "%.2f"|format(p.adjustments|float) }}</td>
+                    <td>{{ "%.2f"|format(p.net_amount|float) }}</td>
+                    <td><span class="badge {{ 'text-bg-success' if p.status == 'paid' else 'text-bg-warning' }}">{{ p.status|title }}</span></td>
+                    <td class="text-end">
+                        {% if p.status == 'pending' %}
+                        <form method="post" class="d-inline" action="{{ url_for('casual_workers.mark_paid', payment_id=p.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-success">Mark Paid</button>
+                        </form>
+                        {% else %}
+                        <form method="post" class="d-inline" action="{{ url_for('casual_workers.mark_pending', payment_id=p.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Mark Pending</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-muted px-3 py-2">No payout lines yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "layouts/base.html" %}
+{% block title %}Salary - {{ employee.full_name }} - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-4">Salary – {{ employee.employee_number }} {{ employee.full_name }}</h1>
+<p class="text-muted small mb-4">
+    Branch context: <strong>{{ employee.branch.name if employee.branch else 'Unassigned branch' }}</strong>
+    · Country <strong>{{ branch_country_code }}</strong>
+    · Currency <strong>{{ currency_code }}</strong>
+</p>
+
+<div class="card mb-4">
+    <div class="card-header">Basic salary</div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('employees.salary', id=employee.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="action" value="add_salary"/>
+            <div class="row g-3">
+                <div class="col-md-4">{{ form.basic_salary.label(class='form-label') }}{{ form.basic_salary(class='form-control') }}</div>
+                <div class="col-md-4">{{ form.effective_from.label(class='form-label') }}{{ form.effective_from(class='form-control') }}</div>
+                <div class="col-md-4">{{ form.pension_employee_percent.label(class='form-label') }}{{ form.pension_employee_percent(class='form-control') }}</div>
+                <div class="col-md-4">{{ form.pension_employee_fixed_amount.label(class='form-label') }}{{ form.pension_employee_fixed_amount(class='form-control') }}</div>
+                <div class="col-md-4">{{ form.pension_employer_percent.label(class='form-label') }}{{ form.pension_employer_percent(class='form-control') }}</div>
+                <div class="col-12">{{ form.notes.label(class='form-label') }}{{ form.notes(class='form-control', rows=2) }}</div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Add salary record</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Add allowance</div>
+    <div class="card-body">
+        <p class="text-muted small mb-3">Choose an allowance type (defined under Allowances) and the amount for this employee.</p>
+        <form method="post" action="{{ url_for('employees.salary', id=employee.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="action" value="add_allowance"/>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Allowance</label>
+                    <select name="allowance_id" class="form-select" required>
+                        <option value="">-- Select --</option>
+                        {% for a in allowances %}
+                        <option value="{{ a.id }}">{{ a.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Amount ({{ currency_code }})</label>
+                    <input type="number" name="amount" class="form-control" step="0.01" min="0" required placeholder="0">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Effective from</label>
+                    <input type="date" name="effective_from" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-outline-primary">Add allowance</button>
+                </div>
+            </div>
+        </form>
+        {% if not allowances %}
+        <p class="text-warning small mt-2 mb-0">No allowance types defined. <a href="{{ url_for('allowances.index') }}">Add allowances</a> first.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Employee allowances</div>
+    <div class="card-body">
+        {% if employee_allowances %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>Allowance</th><th>Amount ({{ currency_code }})</th><th>From</th><th>To</th><th class="text-end">Actions</th></tr></thead>
+                <tbody>
+                {% for ea in employee_allowances %}
+                <tr>
+                    <td>{{ ea.allowance.name }}</td>
+                    <td>{{ ea.amount|fmt_money(currency_code) }}</td>
+                    <td>{{ ea.effective_from.strftime('%d %b %Y') if ea.effective_from else '-' }}</td>
+                    <td>{{ ea.effective_to.strftime('%d %b %Y') if ea.effective_to else 'Current' }}</td>
+                    <td class="text-end text-nowrap">
+                        {% if not ea.effective_to %}
+                        <form method="post" action="{{ url_for('employees.salary', id=employee.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="action" value="end_allowance"/>
+                            <input type="hidden" name="employee_allowance_id" value="{{ ea.id }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">End</button>
+                        </form>
+                        {% endif %}
+                        <form method="post" action="{{ url_for('employees.salary', id=employee.id) }}" class="d-inline" onsubmit="return confirm('Delete this allowance assignment?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="action" value="delete_allowance"/>
+                            <input type="hidden" name="employee_allowance_id" value="{{ ea.id }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No allowances assigned yet. Add one above.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Salary history (basic)</div>
+    <div class="card-body">
+        {% if salary_records %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>Effective from</th><th>Basic ({{ currency_code }})</th><th>Pension %</th><th>Pension Fixed ({{ currency_code }})</th><th>Notes</th><th class="text-end">Actions</th></tr></thead>
+                <tbody>
+                {% for s in salary_records %}
+                <tr>
+                    <td>{{ s.effective_from.strftime('%d %b %Y') if s.effective_from else '-' }}</td>
+                    <td>{{ s.basic_salary|fmt_money(currency_code) }}</td>
+                    <td>{{ s.pension_employee_percent or 0 }} / {{ s.pension_employer_percent or 0 }}</td>
+                    <td>{{ (s.pension_employee_fixed_amount or 0)|fmt_money(currency_code) }}</td>
+                    <td>{{ s.notes or '-' }}</td>
+                    <td class="text-end">
+                        <a href="{{ url_for('employees.salary_edit', id=employee.id, salary_id=s.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <form method="post" action="{{ url_for('employees.salary_delete', id=employee.id, salary_id=s.id) }}" class="d-inline" onsubmit="return confirm('Delete this salary record?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No salary records yet. Add one above.</p>
+        {% endif %}
+    </div>
+</div>
+
+<p>
+    <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary">Back to employee</a>
+</p>
+{% endblock %}

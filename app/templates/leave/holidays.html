@@ -1,0 +1,90 @@
+{% extends "layouts/base.html" %}
+{% block title %}Public holidays - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Public holidays</h1>
+        <p class="text-muted small mb-0">
+            <strong>Fixed every year</strong> applies to all calendar years (typical national holidays).
+            <strong>One year only</strong> is for extra days in a single year (elections, ad-hoc closures).
+            Working-day leave skips weekends and these dates.
+        </p>
+    </div>
+    <a href="{{ url_for('leave.holiday_create') }}" class="btn btn-primary">Add holiday</a>
+</div>
+
+<form method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-auto">
+        <label class="form-label mb-0">Show one-off holidays for year</label>
+        <input type="number" name="year" class="form-control" value="{{ year }}" min="2000" max="2100" title="Filters the list below for one-off dates only">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">Show</button>
+    </div>
+</form>
+
+<h2 class="h6 text-uppercase text-muted mb-2">Fixed every year</h2>
+<p class="text-muted small mb-3">Same month and day each year (e.g. Labour Day 1 May). Counted automatically in every year’s leave math.</p>
+<div class="table-responsive mb-5">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Month / day</th>
+                <th>Name</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in recurring %}
+            <tr>
+                <td><strong>{{ h.recurring_month }}-{{ h.recurring_day }}</strong> <span class="text-muted">(repeats yearly)</span></td>
+                <td>{{ h.name }}</td>
+                <td class="text-end text-nowrap">
+                    <a href="{{ url_for('leave.holiday_edit', id=h.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <form method="post" action="{{ url_for('leave.holiday_delete', id=h.id) }}" class="d-inline" onsubmit="return confirm('Remove this fixed holiday? It will no longer apply in any year.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="return_year" value="{{ year }}"/>
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-muted">No fixed annual holidays yet. Add national holidays that repeat every year.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<h2 class="h6 text-uppercase text-muted mb-2">One year only ({{ year }})</h2>
+<p class="text-muted small mb-3">Specific calendar dates that apply only in the selected year.</p>
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Name</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in one_offs %}
+            <tr>
+                <td>{{ h.date.strftime('%d %b %Y') }} <span class="text-muted">({{ h.date.strftime('%A') }})</span></td>
+                <td>{{ h.name }}</td>
+                <td class="text-end text-nowrap">
+                    <a href="{{ url_for('leave.holiday_edit', id=h.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <form method="post" action="{{ url_for('leave.holiday_delete', id=h.id) }}" class="d-inline" onsubmit="return confirm('Remove this one-off holiday?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="return_year" value="{{ year }}"/>
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-muted">No one-off holidays for {{ year }}.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p class="text-muted small mb-0"><a href="{{ url_for('leave.index') }}">← Back to leave requests</a></p>
+{% endblock %}

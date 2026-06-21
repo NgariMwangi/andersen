@@ -1,0 +1,111 @@
+{% extends "layouts/base.html" %}
+{% block title %}Leave balances - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Leave balances</h1>
+<p class="text-muted small mb-4">
+    Set <strong>opening balance</strong> for mid-year go-live (carry-in from before this system, or prior employer).
+    Monthly <strong>earned</strong> days come from each leave type’s accrual settings. Use <strong>adjustment</strong> for one-off corrections.
+    At year-end, run <strong>rollover</strong> to copy capped unused days into the next year’s opening (see max carry on each leave type).
+</p>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label">Employee</label>
+                <select name="employee_id" class="form-select" onchange="this.form.submit()">
+                    <option value="">— Select —</option>
+                    {% for e in employees %}
+                    <option value="{{ e.id }}" {% if employee and e.id == employee.id %}selected{% endif %}>{{ e.employee_number }} — {{ e.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Year</label>
+                <input type="number" name="year" class="form-control" value="{{ year }}" min="2000" max="2100">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-outline-primary">Load</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if not ledger_types %}
+<div class="alert alert-warning">No leave types use the balance ledger yet. Enable <strong>Accrues monthly</strong> and/or set <strong>Max days carry forward</strong> on a leave type, then return here.</div>
+{% elif employee %}
+<form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="hidden" name="employee_id" value="{{ employee.id }}"/>
+    <input type="hidden" name="year" value="{{ year }}"/>
+    <input type="hidden" name="save_balances" value="1"/>
+
+    <div class="table-responsive mb-3">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Leave type</th>
+                    <th class="text-end">Opening / carry-in</th>
+                    <th class="text-end">Earned YTD</th>
+                    <th class="text-end">Adjustment</th>
+                    <th class="text-end">Used (approved)</th>
+                    <th class="text-end">Remaining</th>
+                    <th class="text-muted small">Carry cap</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for br in balance_rows %}
+                {% set lt = br.leave_type %}
+                {% set sn = br.snapshot %}
+                <tr>
+                    <td>
+                        <div class="fw-semibold">{{ lt.name }}</div>
+                        <div class="text-muted small">{{ lt.code }} · {{ lt.days_per_month or '—' }} days/mo{% if lt.days_per_year %} · cap {{ lt.days_per_year }}/yr{% endif %}</div>
+                    </td>
+                    <td class="text-end" style="max-width:7rem;">
+                        <input type="text" class="form-control form-control-sm text-end" name="opening_{{ lt.id }}" value="{{ br.opening_field }}"/>
+                    </td>
+                    <td class="text-end">{{ sn.accrued | fmt_days if sn else '—' }}</td>
+                    <td class="text-end" style="max-width:7rem;">
+                        <input type="text" class="form-control form-control-sm text-end" name="adjusted_{{ lt.id }}" value="{{ br.adjusted_field }}"/>
+                    </td>
+                    <td class="text-end">{{ sn.used | fmt_days if sn else '—' }}</td>
+                    <td class="text-end fw-semibold">{{ br.closing | fmt_days }}</td>
+                    <td class="text-muted small text-end">{{ lt.carry_forward_max if lt.carry_forward_max is not none else 0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <button type="submit" class="btn btn-primary">Save balances</button>
+</form>
+{% elif ledger_types %}
+<p class="text-muted">Select an employee to edit opening balances and adjustments.</p>
+{% endif %}
+
+<div class="card border-0 shadow-sm mt-5">
+    <div class="card-header">Year rollover (automatic carry)</div>
+    <div class="card-body">
+        <p class="small text-muted mb-3">
+            For each active employee and each ledger leave type, sets next year’s <strong>opening balance</strong> to
+            <code>min(prior year closing, max carry-forward)</code>. Run once when moving into a new calendar year (after finalizing the old year’s leave).
+        </p>
+        <form method="post">
+            {{ rollover_form.hidden_tag() }}
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">{{ rollover_form.from_year.label }}</label>
+                    {{ rollover_form.from_year(class_='form-control') }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ rollover_form.to_year.label }}</label>
+                    {{ rollover_form.to_year(class_='form-control') }}
+                </div>
+                <div class="col-md-4">
+                    {{ rollover_form.rollover_submit(class_='btn btn-outline-primary') }}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

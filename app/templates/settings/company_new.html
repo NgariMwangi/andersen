@@ -1,0 +1,50 @@
+{% extends "layouts/base.html" %}
+{% block title %}New company - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">New company</h1>
+<p class="text-muted mb-4">Creates a new tenant: company record, default branch, employer profile, default leave types and document categories, and (for supported countries) statutory seed data. The administrator below is the first login for that organization and is created as a <strong>superuser</strong> (same elevated access as the first account from registration).</p>
+<div class="card shadow-sm border-0" style="max-width: 640px;">
+    <div class="card-body">
+        <form method="post" action="{{ url_for('settings.companies_new') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <h2 class="h6 text-secondary mb-3">Organization</h2>
+            <div class="mb-3">
+                {{ form.company_name.label(class='form-label') }}
+                {{ form.company_name(class='form-control') }}
+                {% if form.company_name.errors %}<div class="text-danger small">{{ form.company_name.errors[0] }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+                {{ form.branch_name.label(class='form-label') }}
+                {{ form.branch_name(class='form-control', placeholder='Head Office') }}
+                {% if form.branch_name.errors %}<div class="text-danger small">{{ form.branch_name.errors[0] }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+                {{ form.country_code.label(class='form-label') }}
+                {{ form.country_code(class='form-control text-uppercase', maxlength='2', placeholder='KE') }}
+                <div class="form-text">Used for statutory defaults and public holidays (e.g. KE for Kenya).</div>
+                {% if form.country_code.errors %}<div class="text-danger small">{{ form.country_code.errors[0] }}</div>{% endif %}
+            </div>
+            <h2 class="h6 text-secondary mb-3 mt-4">First administrator</h2>
+            <div class="mb-3">
+                {{ form.admin_email.label(class='form-label') }}
+                {{ form.admin_email(class='form-control') }}
+                {% if form.admin_email.errors %}<div class="text-danger small">{{ form.admin_email.errors[0] }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+                {{ form.admin_password.label(class='form-label') }}
+                {{ form.admin_password(class='form-control') }}
+                {% if form.admin_password.errors %}<div class="text-danger small">{{ form.admin_password.errors[0] }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+                {{ form.admin_password_confirm.label(class='form-label') }}
+                {{ form.admin_password_confirm(class='form-control') }}
+                {% if form.admin_password_confirm.errors %}<div class="text-danger small">{{ form.admin_password_confirm.errors[0] }}</div>{% endif %}
+            </div>
+            <div class="d-flex gap-2 mt-4">
+                {{ form.submit(class='btn btn-primary') }}
+                <a href="{{ url_for('settings.companies_list') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

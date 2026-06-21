@@ -1,0 +1,44 @@
+{% extends "layouts/base.html" %}
+{% block title %}Asset categories - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h4 mb-0 fw-600 text-dark">Asset categories</h1>
+    <a href="{{ url_for('company_assets.index') }}" class="btn btn-outline-secondary btn-sm">Back to assets</a>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">Add category</div>
+            <div class="card-body">
+                <form method="post">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        <label class="form-label" for="code">Code</label>
+                        {{ form.code(class='form-control', placeholder='e.g. laptop') }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="name">Name</label>
+                        {{ form.name(class='form-control', placeholder='e.g. Laptop') }}
+                    </div>
+                    {{ form.submit(class='btn btn-primary btn-sm') }}
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-body p-0">
+                <table class="table mb-0">
+                    <thead><tr><th>Code</th><th>Name</th></tr></thead>
+                    <tbody>
+                    {% for cat in categories %}
+                    <tr><td><code>{{ cat.code }}</code></td><td>{{ cat.name }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

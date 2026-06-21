@@ -1,0 +1,42 @@
+{% extends "layouts/base.html" %}
+{% block title %}Job Titles - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h4 mb-0 fw-600 text-dark">Job Titles</h1>
+    {% if has_permission('manage_departments') %}
+    <a href="{{ url_for('job_titles.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add Job Title</a>
+    {% endif %}
+</div>
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr><th>Name</th><th>Grade</th><th>Description</th><th class="text-end">Actions</th></tr>
+                </thead>
+                <tbody>
+                {% for j in job_titles %}
+                <tr>
+                    <td><a href="{{ url_for('job_titles.view', id=j.id) }}" class="text-decoration-none">{{ j.name }}</a></td>
+                    <td>{{ j.grade or '—' }}</td>
+                    <td class="text-muted small">{{ (j.description or '—')[:60] }}{% if j.description and j.description|length > 60 %}…{% endif %}</td>
+                    <td class="text-end">
+                        <a href="{{ url_for('job_titles.view', id=j.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                        {% if has_permission('manage_departments') %}
+                        <a href="{{ url_for('job_titles.edit', id=j.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <form method="post" action="{{ url_for('job_titles.delete', id=j.id) }}" class="d-inline" onsubmit="return confirm('Delete this job title?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-muted py-4 text-center">No job titles. {% if has_permission('manage_departments') %}Add one to get started.{% endif %}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

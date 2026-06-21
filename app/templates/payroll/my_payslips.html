@@ -1,0 +1,49 @@
+{% extends "layouts/base.html" %}
+{% block title %}My payslips - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+    <div>
+        <h1 class="h4 mb-1">My payslips</h1>
+        <p class="text-muted small mb-0">Final payslips from <strong>approved</strong> or <strong>paid</strong> payroll runs. Draft payroll is not shown.</p>
+    </div>
+    <form method="get" class="d-flex align-items-end gap-2">
+        <div>
+            <label for="payslip-year" class="form-label small text-muted mb-1">Year</label>
+            <select name="year" id="payslip-year" class="form-select form-select-sm" style="min-width: 7rem;" onchange="this.form.submit()" aria-label="Filter by year">
+                {% for y in year_options %}
+                <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+{% if items %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Period</th>
+                <th class="text-end">Gross</th>
+                <th class="text-end">Net pay</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.payroll_run.pay_month }}/{{ item.payroll_run.pay_year }}</td>
+                <td class="text-end">{{ "{:,.2f}".format(item.gross_pay|float) }}</td>
+                <td class="text-end fw-semibold">{{ "{:,.2f}".format(item.net_pay|float) }}</td>
+                <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('payroll.view_payslip', run_id=item.payroll_run_id, employee_id=item.employee_id) }}">View payslip</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info mb-0">No finalized payslips for <strong>{{ selected_year }}</strong>. Choose another year or check back after payroll is approved.</div>
+{% endif %}
+{% endblock %}

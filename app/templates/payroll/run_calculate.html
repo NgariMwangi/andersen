@@ -1,0 +1,202 @@
+{% extends "layouts/base.html" %}
+{% block title %}Calculate Payroll - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Calculate Payroll: {{ run_country_code }} {{ run.pay_month }}/{{ run.pay_year }}</h1>
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input
+            type="text"
+            name="q"
+            class="form-control"
+            placeholder="Search employee name or number"
+            value="{{ q or '' }}"
+        />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">Search</button>
+    </div>
+    {% if q %}
+    <div class="col-auto">
+        <a href="{{ url_for('payroll.run_calculate', id=run.id) }}" class="btn btn-outline-secondary">Clear</a>
+    </div>
+    {% endif %}
+</form>
+<div class="card mb-3">
+    <div class="card-body">
+        <p class="mb-1"><strong>Country:</strong> {{ run_country_code }} ({{ run_currency }})</p>
+        <p class="mb-1"><strong>Employees in this pay period:</strong> {{ active_employee_count }}</p>
+        <p class="mb-0 small text-muted">Includes staff terminated during this month (prorated through last working day).</p>
+        <p class="mb-0"><strong>Eligible for payroll (salary set for this period):</strong> {{ eligible_count }}</p>
+        <p class="mb-0"><strong>Excluded from this run:</strong> {{ excluded_count }}</p>
+        <p class="mb-0"><strong>Will be processed on calculate:</strong> {{ included_count }}</p>
+        <hr class="my-2"/>
+        <p class="mb-1"><strong>Active consultants:</strong> {{ active_consultant_count }}</p>
+        <p class="mb-1"><strong>Eligible consultants (compensation set):</strong> {{ consultant_eligible_count }}</p>
+        <p class="mb-1"><strong>Consultants excluded:</strong> {{ consultant_excluded_count }}</p>
+        <p class="mb-0"><strong>Consultants to process:</strong> {{ consultant_included_count }}</p>
+        <p class="mb-0 mt-2 small text-muted">
+            <strong>Overtime:</strong> approved overtime requests for this payroll month and year are included automatically
+            (earnings code <code>OVERTIME</code>), using (gross before overtime × 12 ÷ 365) per day.
+        </p>
+    </div>
+</div>
+<div class="card mb-3">
+    <div class="card-header">Exclude employees from this payroll run</div>
+    <div class="card-body">
+        {# Exclusion fields use form= so they are not wrapped around the per-row Recalculate forms (nested <form> is invalid HTML and breaks Recalculate). #}
+        <form id="payroll-exclusions-form" method="post" action="{{ url_for('payroll.run_calculate', id=run.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="action" value="save_exclusions"/>
+            {% if q %}<input type="hidden" name="q" value="{{ q }}"/>{% endif %}
+        </form>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr><th style="width: 56px;">Exclude</th><th>Employee</th><th>Status</th><th class="text-end">Gross (saved)</th><th>Recalculate</th></tr>
+                </thead>
+                <tbody>
+                {% for e in employees %}
+                    {% set has_salary = e.id not in missing_salary_ids %}
+                    <tr>
+                        <td>
+                            <input type="hidden" name="exclusion_table_employee_ids" value="{{ e.id }}" form="payroll-exclusions-form"/>
+                            {% if has_salary %}
+                            <input
+                                type="checkbox"
+                                name="excluded_employee_ids"
+                                value="{{ e.id }}"
+                                form="payroll-exclusions-form"
+                                {% if e.id in excluded_employee_ids %}checked{% endif %}
+                            />
+                            {% endif %}
+                        </td>
+                        <td>{{ e.employee_number }} - {{ e.full_name }}</td>
+                        <td>
+                            {% if has_salary %}
+                                {% if e.status == 'terminated' and e.termination_date %}
+                                <span class="badge text-bg-warning text-dark">Terminated {{ e.termination_date.strftime('%d %b %Y') }}</span>
+                                {% else %}
+                                <span class="badge text-bg-light">Eligible</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge text-bg-secondary">Missing salary</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-muted small">
+                            {% if e.id in payroll_gross_by_employee %}
+                            {{ "{:,.2f}".format(payroll_gross_by_employee[e.id]|float) }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if has_salary and (e.id not in excluded_employee_ids) %}
+                            <form method="post" action="{{ url_for('payroll.run_calculate', id=run.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="action" value="recalculate_employee"/>
+                                <input type="hidden" name="employee_id" value="{{ e.id }}"/>
+                                {% if q %}<input type="hidden" name="q" value="{{ q }}"/>{% endif %}
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Recalculate</button>
+                            </form>
+                            {% else %}
+                            <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                            <td colspan="5" class="text-muted">
+                            {% if q %}No employees match your search.{% else %}No active employees in this country.{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" form="payroll-exclusions-form" class="btn btn-outline-secondary">Save exclusions</button>
+    </div>
+</div>
+<div class="card mb-3">
+    <div class="card-header">Exclude consultants from this payroll run</div>
+    <div class="card-body">
+        <form id="consultant-exclusions-form" method="post" action="{{ url_for('payroll.run_calculate', id=run.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="action" value="save_consultant_exclusions"/>
+            {% if q %}<input type="hidden" name="q" value="{{ q }}"/>{% endif %}
+        </form>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr><th style="width: 56px;">Exclude</th><th>Consultant</th><th>Status</th><th class="text-end">Gross (saved)</th><th>Recalculate</th></tr>
+                </thead>
+                <tbody>
+                {% for c in consultants %}
+                    {% set has_comp = c.id not in missing_compensation_ids %}
+                    <tr>
+                        <td>
+                            <input type="hidden" name="exclusion_table_consultant_ids" value="{{ c.id }}" form="consultant-exclusions-form"/>
+                            {% if has_comp %}
+                            <input type="checkbox" name="excluded_consultant_ids" value="{{ c.id }}" form="consultant-exclusions-form" {% if c.id in excluded_consultant_ids %}checked{% endif %}/>
+                            {% endif %}
+                        </td>
+                        <td>{{ c.consultant_number or '—' }} - {{ c.full_name }}</td>
+                        <td>
+                            {% if has_comp %}<span class="badge text-bg-light">Eligible</span>{% else %}<span class="badge text-bg-secondary">Missing compensation</span>{% endif %}
+                        </td>
+                        <td class="text-end text-muted small">
+                            {% if c.id in payroll_gross_by_consultant %}{{ "{:,.2f}".format(payroll_gross_by_consultant[c.id]|float) }}{% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if has_comp and (c.id not in excluded_consultant_ids) %}
+                            <form method="post" action="{{ url_for('payroll.run_calculate', id=run.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="action" value="recalculate_consultant"/>
+                                <input type="hidden" name="consultant_id" value="{{ c.id }}"/>
+                                {% if q %}<input type="hidden" name="q" value="{{ q }}"/>{% endif %}
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Recalculate</button>
+                            </form>
+                            {% else %}<span class="text-muted small">—</span>{% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5" class="text-muted">{% if q %}No consultants match your search.{% else %}No active consultants in this country.{% endif %}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" form="consultant-exclusions-form" class="btn btn-outline-secondary">Save consultant exclusions</button>
+    </div>
+</div>
+<form method="post" action="{{ url_for('payroll.run_calculate', id=run.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="hidden" name="action" value="calculate"/>
+    <button type="submit" class="btn btn-primary">Calculate Payroll</button>
+</form>
+{% if missing_salary %}
+<div class="card mt-3">
+    <div class="card-header">Employees missing salary setup</div>
+    <div class="card-body">
+        <p class="text-muted small mb-2">These active employees will be skipped until you add salary for the run period.</p>
+        <ul class="mb-0">
+            {% for e in missing_salary %}
+            <li>{{ e.employee_number }} - {{ e.full_name }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+{% if missing_compensation %}
+<div class="card mt-3">
+    <div class="card-header">Consultants missing compensation</div>
+    <div class="card-body">
+        <p class="text-muted small mb-2">These active consultants will be skipped until you add compensation for the run period.</p>
+        <ul class="mb-0">
+            {% for c in missing_compensation %}
+            <li>{{ c.consultant_number or '—' }} - {{ c.full_name }} · <a href="{{ url_for('consultants.compensation', id=c.id) }}">Set compensation</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+<p class="mt-2"><a href="{{ url_for('payroll.view_run', id=run.id) }}">View run</a></p>
+{% endblock %}

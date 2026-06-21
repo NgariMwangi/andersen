@@ -1,0 +1,74 @@
+{% extends "layouts/base.html" %}
+{% block title %}Consultant Payslip - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="payslip-page">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+        <div>
+            <h1 class="h4 mb-1">Consultant payslip</h1>
+            <p class="text-muted mb-0">
+                {{ period_date.strftime('%B %Y') }} · amounts in <strong>{{ payslip_currency }}</strong>
+            </p>
+        </div>
+        <a href="{{ url_for('payroll.view_run', id=item.payroll_run_id, tab='consultants') }}" class="btn btn-outline-secondary btn-sm">Back to run</a>
+    </div>
+    <div class="card payslip-card mb-3">
+        <div class="card-body py-3 px-3 px-md-4">
+            <div class="row g-3 align-items-center pb-3 mb-3 border-bottom">
+                <div class="col-md-8">
+                    <div class="text-muted small">Consultant</div>
+                    <div class="fs-5 fw-semibold">{{ consultant.full_name if consultant else '—' }}</div>
+                    {% if consultant and consultant.consultant_number %}
+                    <div class="text-muted small">#{{ consultant.consultant_number }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <div class="payslip-net-highlight">
+                        <div class="label">Net pay</div>
+                        <div class="amount">{{ item.net_pay|fmt_money(payslip_currency) }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="row row-cols-1 row-cols-sm-2 g-3 mb-3 small">
+                <div class="col"><span class="text-muted">KRA PIN</span><br>{{ consultant.kra_pin if consultant and consultant.kra_pin else '—' }}</div>
+                <div class="col"><span class="text-muted">Withholding rate</span><br>{{ consultant.withholding_rate if consultant else '—' }}%</div>
+                <div class="col"><span class="text-muted">Bank</span><br>{{ consultant.bank_name if consultant and consultant.bank_name else '—' }}</div>
+                <div class="col"><span class="text-muted">Account</span><br>{{ consultant.bank_account_number|mask_bank_account if consultant and consultant.bank_account_number else '—' }}</div>
+            </div>
+            <h2 class="h6">Earnings</h2>
+            <table class="table table-sm mb-3">
+                <tbody>
+                {% for line in earnings_lines %}
+                <tr>
+                    <td>{{ line.name or line.code }}</td>
+                    <td class="text-end">{{ line.amount|fmt_money(payslip_currency) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="2" class="text-muted">No earnings lines</td></tr>
+                {% endfor %}
+                <tr class="fw-semibold">
+                    <td>Gross pay</td>
+                    <td class="text-end">{{ item.gross_pay|fmt_money(payslip_currency) }}</td>
+                </tr>
+                </tbody>
+            </table>
+            <h2 class="h6">Deductions</h2>
+            <table class="table table-sm mb-0">
+                <tbody>
+                {% for line in deduction_lines %}
+                <tr>
+                    <td>{{ line.name or line.code }}</td>
+                    <td class="text-end">{{ line.amount|fmt_money(payslip_currency) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="2" class="text-muted">No deductions</td></tr>
+                {% endfor %}
+                <tr class="fw-semibold">
+                    <td>Net pay</td>
+                    <td class="text-end">{{ item.net_pay|fmt_money(payslip_currency) }}</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

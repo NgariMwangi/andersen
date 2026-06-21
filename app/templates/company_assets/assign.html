@@ -1,0 +1,31 @@
+{% extends "layouts/base.html" %}
+{% block title %}Assign {{ asset.asset_tag }} - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-4 fw-600 text-dark">Assign {{ asset.asset_tag }}</h1>
+<div class="card">
+    <div class="card-body">
+        <p class="text-muted">{{ asset.name or asset.asset_tag }}{% if asset.category %} · {{ asset.category.name }}{% endif %}</p>
+        <form method="post">
+            {{ form.hidden_tag() }}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="employee_id">Employee *</label>
+                    {{ form.employee_id(class='form-select') }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="condition_on_issue">Condition on issue</label>
+                    {{ form.condition_on_issue(class='form-control', placeholder='e.g. Good, minor scratches') }}
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="notes">Notes</label>
+                    {{ form.notes(class='form-control', rows='3') }}
+                </div>
+            </div>
+            <div class="mt-3">
+                {{ form.submit(class='btn btn-primary') }}
+                <a href="{{ url_for('company_assets.view', id=asset.id) }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

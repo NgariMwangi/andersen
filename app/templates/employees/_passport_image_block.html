@@ -1,0 +1,36 @@
+{# Passport / profile photo (stored in employee.photo_url). Requires: employee, upload_action #}
+<div class="passport-image-block">
+    {% if employee.photo_url %}
+    <div class="passport-image-preview mb-3">
+        <a href="{{ url_for('employees.photo', id=employee.id) }}" target="_blank" rel="noopener" class="d-inline-block">
+            <img
+                src="{{ url_for('employees.photo', id=employee.id) }}"
+                alt="Passport image"
+                class="passport-image-thumb img-thumbnail"
+            >
+        </a>
+        <p class="text-muted small mb-0 mt-2">Click image to open full size. Same file as your profile photo above.</p>
+    </div>
+    {% else %}
+    <p class="text-muted small mb-3">No passport image uploaded yet.</p>
+    {% endif %}
+    <form method="post" action="{{ upload_action }}" enctype="multipart/form-data" class="passport-image-upload-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <label class="form-label small fw-semibold mb-1">
+            {% if employee.photo_url %}Replace passport image{% else %}Upload passport image{% endif %}
+        </label>
+        <div class="input-group input-group-sm">
+            <input
+                type="file"
+                name="photo"
+                class="form-control"
+                accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                required
+            >
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-upload me-1"></i>{% if employee.photo_url %}Update{% else %}Upload{% endif %}
+            </button>
+        </div>
+        <div class="form-text">JPG or PNG only. Saved as your profile photo.</div>
+    </form>
+</div>

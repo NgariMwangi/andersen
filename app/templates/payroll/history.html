@@ -1,0 +1,41 @@
+{% extends "layouts/base.html" %}
+{% block title %}Payroll - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Payroll History</h1>
+<ul class="nav nav-tabs mb-3 flex-wrap">
+    {% for c in countries_nav %}
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if c == selected_country else '' }}" href="{{ url_for('payroll.index', country_code=c) }}">{{ c }}</a>
+    </li>
+    {% endfor %}
+</ul>
+{% if has_permission('process_payroll') %}
+<a href="{{ url_for('payroll.run', country_code=selected_country) }}" class="btn btn-primary mb-3">New Payroll Run</a>
+{% endif %}
+<div class="table-responsive">
+    <table class="table">
+        <thead><tr><th>Country</th><th>Month/Year</th><th>Status</th><th>Processed</th><th>Actions</th></tr></thead>
+        <tbody>
+        {% for r in runs %}
+        <tr>
+            <td>{{ r.country_code or 'KE' }}</td>
+            <td>{{ r.pay_month }}/{{ r.pay_year }}</td>
+            <td><span class="badge bg-{{ 'secondary' if r.status == 'draft' else 'info' if r.status == 'approved' else 'success' }}">{{ r.status }}</span></td>
+            <td>{{ r.processed_at.strftime('%d %b %Y %H:%M') if r.processed_at else '-' }}</td>
+            <td>
+                <a href="{{ url_for('payroll.view_run', id=r.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                {% if r.status == 'draft' and has_permission('process_payroll') %}
+                <form method="post" action="{{ url_for('payroll.delete_run', id=r.id) }}" class="d-inline" onsubmit="return confirm('Delete this payroll run? All calculated items will be removed.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-muted">No payroll runs yet for {{ selected_country }}.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

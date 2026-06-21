@@ -1,0 +1,49 @@
+{% for msg in messages %}
+{% set is_mine = msg.sender_user_id == current_user.id %}
+{% set preview = msg.body[:160] ~ ('…' if msg.body|length > 160 else '') %}
+<div
+    class="chat-msg-row {% if is_mine %}chat-msg-row--mine{% else %}chat-msg-row--other{% endif %}"
+    id="message-{{ msg.id }}"
+    data-message-id="{{ msg.id }}"
+    data-sender-name="{{ chat_sender_name(msg.sender_user_id) | e }}"
+    data-body-preview="{{ preview | e }}"
+>
+    <div class="chat-bubble-wrap">
+        <div class="chat-bubble {% if is_mine %}chat-bubble--mine{% else %}chat-bubble--other{% endif %}">
+            {% if show_sender_names and not is_mine %}
+            <div class="chat-sender-name">{{ chat_sender_name(msg.sender_user_id) }}</div>
+            {% endif %}
+
+            {% if msg.parent_message_id %}
+            {% set quoted = msg.parent or messages_by_id.get(msg.parent_message_id) %}
+            {% if quoted %}
+            {% set parent_is_mine = quoted.sender_user_id == current_user.id %}
+            <a
+                href="#message-{{ quoted.id }}"
+                class="chat-quote {% if parent_is_mine %}chat-quote--ref-mine{% else %}chat-quote--ref-other{% endif %}"
+                data-scroll-to="message-{{ quoted.id }}"
+                title="Jump to quoted message"
+            >
+                <span class="chat-quote-author">{{ chat_sender_name(quoted.sender_user_id) }}</span>
+                <span class="chat-quote-text">{{ quoted.body[:120] }}{% if quoted.body|length > 120 %}…{% endif %}</span>
+            </a>
+            {% endif %}
+            {% endif %}
+
+            <div class="chat-bubble-content">
+                <div class="chat-body">
+                    {{ msg.body | e | replace('\n', '<br>') | safe }}<span class="chat-meta"><time datetime="{{ msg.created_at.isoformat() }}">{{ msg.created_at.strftime('%H:%M') }}</time>{% if is_mine %}{% include 'messages/_read_receipt.html' %}{% endif %}</span>
+                </div>
+            </div>
+            <button
+                type="button"
+                class="chat-reply-btn"
+                aria-label="Reply to this message"
+                title="Reply"
+            >
+                <i class="bi bi-reply"></i>
+            </button>
+        </div>
+    </div>
+</div>
+{% endfor %}

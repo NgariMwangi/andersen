@@ -1,0 +1,113 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ asset.asset_tag }} - Assets - {{ app_name }}{% endblock %}
+{% block content %}
+{% set active = asset.active_assignment %}
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-1 fw-600 text-dark">{{ asset.asset_tag }}</h1>
+        <p class="text-muted mb-0">{{ asset.name or (asset.brand ~ ' ' ~ asset.model if asset.brand or asset.model else 'Company asset') }}</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        {% if can_manage %}
+        <a href="{{ url_for('company_assets.edit', id=asset.id) }}" class="btn btn-outline-secondary btn-sm">Edit</a>
+        {% if not active and asset.status in ['not_assigned', 'repair'] %}
+        <a href="{{ url_for('company_assets.assign', id=asset.id) }}" class="btn btn-primary btn-sm">Assign to employee</a>
+        {% endif %}
+        {% endif %}
+        <a href="{{ url_for('company_assets.index') }}" class="btn btn-outline-secondary btn-sm">Back to list</a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card mb-3">
+            <div class="card-header">Asset details</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Status</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge {% if asset.status == 'assigned' %}bg-primary{% elif asset.status == 'not_assigned' %}bg-secondary{% elif asset.status == 'repair' %}bg-warning text-dark{% elif asset.status == 'lost' %}bg-danger{% else %}bg-dark{% endif %}">
+                            {{ status_labels.get(asset.status, asset.status) }}
+                        </span>
+                    </dd>
+                    <dt class="col-sm-4">Category</dt>
+                    <dd class="col-sm-8">{{ asset.category.name if asset.category else '—' }}</dd>
+                    <dt class="col-sm-4">Brand / model</dt>
+                    <dd class="col-sm-8">{{ asset.brand or '—' }}{% if asset.model %} / {{ asset.model }}{% endif %}</dd>
+                    <dt class="col-sm-4">Serial number</dt>
+                    <dd class="col-sm-8">{{ asset.serial_number or '—' }}</dd>
+                    <dt class="col-sm-4">Purchase date</dt>
+                    <dd class="col-sm-8">{{ asset.purchase_date.strftime('%d %b %Y') if asset.purchase_date else '—' }}</dd>
+                    <dt class="col-sm-4">Purchase value</dt>
+                    <dd class="col-sm-8">
+                        {% if asset.purchase_value is not none %}
+                        {{ asset.purchase_value|fmt_money(tenant_nav.currency or currency) }}
+                        {% else %}—{% endif %}
+                    </dd>
+                    <dt class="col-sm-4">Description</dt>
+                    <dd class="col-sm-8">{{ asset.description or '—' }}</dd>
+                    <dt class="col-sm-4">Notes</dt>
+                    <dd class="col-sm-8">{{ asset.notes or '—' }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Assignment history</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr><th>Employee</th><th>Assigned</th><th>Returned</th><th>Notes</th></tr>
+                        </thead>
+                        <tbody>
+                        {% for row in asset.assignments %}
+                        <tr>
+                            <td><a href="{{ url_for('employees.view', id=row.employee_id) }}">{{ row.employee.full_name if row.employee else '—' }}</a></td>
+                            <td>{{ row.assigned_at.strftime('%d %b %Y') }}</td>
+                            <td>{{ row.returned_at.strftime('%d %b %Y') if row.returned_at else '—' }}</td>
+                            <td class="small text-muted">{{ row.notes or '—' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-muted text-center py-3">No assignments yet.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">Current assignment</div>
+            <div class="card-body">
+                {% if active and active.employee %}
+                <p class="mb-2"><strong>{{ active.employee.full_name }}</strong></p>
+                <p class="small text-muted mb-2">Since {{ active.assigned_at.strftime('%d %b %Y %H:%M') }}</p>
+                {% if active.condition_on_issue %}<p class="small mb-2">Condition on issue: {{ active.condition_on_issue }}</p>{% endif %}
+                {% if can_manage %}
+                <form method="post" action="{{ url_for('company_assets.return_asset_view', id=asset.id) }}" class="mt-3 border-top pt-3">
+                    {{ return_form.hidden_tag() }}
+                    <div class="mb-2">
+                        <label class="form-label small">Condition on return</label>
+                        {{ return_form.condition_on_return(class='form-control form-control-sm') }}
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Return notes</label>
+                        {{ return_form.notes(class='form-control form-control-sm', rows='2') }}
+                    </div>
+                    {{ return_form.submit(class='btn btn-sm btn-outline-primary') }}
+                </form>
+                {% endif %}
+                {% else %}
+                <p class="text-muted mb-0">Not assigned to anyone.</p>
+                {% if can_manage and asset.status in ['not_assigned', 'repair'] %}
+                <a href="{{ url_for('company_assets.assign', id=asset.id) }}" class="btn btn-sm btn-primary mt-3">Assign to employee</a>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

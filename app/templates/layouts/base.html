@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='brand/andersen-logo.jpg') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="app-body">
+    {% if current_user.is_authenticated %}
+    <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
+    <aside class="app-sidebar" id="sidebar">
+        <a class="sidebar-brand" href="{{ url_for(home_endpoint) }}">
+            <span class="sidebar-brand-panel">
+                <img src="{{ url_for('static', filename='brand/andersen-logo.jpg') }}" alt="Andersen" class="sidebar-brand-logo">
+            </span>
+            <span class="sidebar-brand-tagline">Human Resource Management</span>
+        </a>
+        <nav class="nav flex-column">
+            {% set ep = request.endpoint %}
+            {% set org_active = ep and (ep.startswith('departments') or (branches_enabled and ep.startswith('branches')) or ep.startswith('job_titles') or (payroll_enabled and ep.startswith('allowances')) or ep.startswith('company_assets')) %}
+            {% set leave_types_active = ep in ('leave.types_index', 'leave.type_create', 'leave.type_edit', 'leave.type_delete', 'leave.balances', 'leave.admin_request_leave', 'leave.holidays_index', 'leave.holiday_create', 'leave.holiday_edit') %}
+            {% set leave_main_active = ep and ep.startswith('leave') and not leave_types_active %}
+            {% set leave_section_active = ep and ep.startswith('leave') %}
+            {% set payroll_section_active = ep and ep.startswith('payroll') %}
+            {% set overtime_active = ep and ep.startswith('overtime') %}
+            {% set employees_section_active = ep and (ep.startswith('employees') or (payroll_enabled and (ep.startswith('casual_workers') or ep.startswith('consultants')))) %}
+            {% set show_payroll_group = payroll_enabled and current_user.employee_id and has_permission('view_payroll') %}
+            {% if not is_employee_self_service %}
+            <a class="nav-link {{ 'active' if ep == 'dashboard.index' else '' }}" href="{{ url_for('dashboard.index') }}">
+                <i class="bi bi-grid-1x2"></i> Dashboard
+            </a>
+            {% endif %}
+            {% if current_user.employee_id %}
+            <a class="nav-link {{ 'active' if ep == 'employees.profile' else '' }}" href="{{ url_for('employees.profile') }}">
+                <i class="bi bi-person-circle"></i> My profile
+            </a>
+            {% endif %}
+            {% if has_permission('view_employees') %}
+            <div class="sidebar-nav-group">
+                <button class="sidebar-nav-toggle {{ 'collapsed' if not employees_section_active else '' }}" type="button" data-bs-toggle="collapse" data-bs-target="#nav-sidebar-employees" aria-expanded="{{ 'true' if employees_section_active else 'false' }}" aria-controls="nav-sidebar-employees">
+                    <span>Employees</span>
+                    <span class="toggle-chevron" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
+                </button>
+                <div id="nav-sidebar-employees" class="collapse {{ 'show' if employees_section_active else '' }}">
+                    <div class="collapse-inner">
+                        <a class="nav-link {{ 'active' if ep == 'employees.list' else '' }}" href="{{ url_for('employees.list') }}">
+                            <i class="bi bi-people"></i> Employee List
+                        </a>
+                        {% if payroll_enabled %}
+                        <a class="nav-link {{ 'active' if ep == 'employees.benefits_index' else '' }}" href="{{ url_for('employees.benefits_index') }}">
+                            <i class="bi bi-wallet2"></i> Employee Benefits
+                        </a>
+                        <a class="nav-link {{ 'active' if ep == 'employees.deductions_index' else '' }}" href="{{ url_for('employees.deductions_index') }}">
+                            <i class="bi bi-dash-circle"></i> Employee Deductions
+                        </a>
+                        <a class="nav-link {{ 'active' if ep and ep.startswith('casual_workers') else '' }}" href="{{ url_for('casual_workers.index') }}">
+                            <i class="bi bi-person-workspace"></i> Casual Workers
+                        </a>
+                        <a class="nav-link {{ 'active' if ep and ep.startswith('consultants') else '' }}" href="{{ url_for('consultants.index') }}">
+                            <i class="bi bi-briefcase"></i> Consultants
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if has_permission('view_departments') or has_permission('view_assets') %}
+            <div class="sidebar-nav-group">
+                <button class="sidebar-nav-toggle {{ 'collapsed' if not org_active else '' }}" type="button" data-bs-toggle="collapse" data-bs-target="#nav-sidebar-org" aria-expanded="{{ 'true' if org_active else 'false' }}" aria-controls="nav-sidebar-org">
+                    <span>Organization</span>
+                    <span class="toggle-chevron" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
+                </button>
+                <div id="nav-sidebar-org" class="collapse {{ 'show' if org_active else '' }}">
+                    <div class="collapse-inner">
+                        {% if has_permission('view_departments') %}
+                        <a class="nav-link {{ 'active' if ep and ep.startswith('departments') else '' }}" href="{{ url_for('departments.index') }}">
+                            <i class="bi bi-diagram-3"></i> Departments
+                        </a>
+                        {% endif %}
+                        {% if branches_enabled and has_permission('view_departments') %}
+                        <a class="nav-link {{ 'active' if ep and ep.startswith('branches') else '' }}" href="{{ url_for('branches.index') }}">
+                            <i class="bi bi-geo-alt"></i> Branches
+                        </a>
+                        {% endif %}
+                        {% if has_permission('view_departments') %}
+                        <a class="nav-link {{ 'active' if ep and ep.startswith('job_titles') else '' }}" href="/job-titles/">
+                            <i class="bi bi-briefcase"></i> Job Titles
+                        </a>
+                        {% endif %}
+                        {% if payroll_enabled and has_permission('view_departments') %}
+                        <a class="nav-link {{ 'active' if ep and ep.startswith('allowances') else '' }}" href="/allowances/">
+                            <i class="bi bi-cash-coin"></i> Allowances
+                        </a>
+                        {% endif %}
+                        {% if has_permission('view_assets') %}
+                        <a class="nav-link {{ 'active' if ep and ep.startswith('company_assets') else '' }}" href="{{ url_for('company_assets.index') }}">
+                            <i class="bi bi-laptop"></i> Company assets
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if has_permission('manage_leave_types') %}
+            <div class="sidebar-nav-group">
+                <button class="sidebar-nav-toggle {{ 'collapsed' if not leave_section_active else '' }}" type="button" data-bs-toggle="collapse" data-bs-target="#nav-sidebar-leave" aria-expanded="{{ 'true' if leave_section_active else 'false' }}" aria-controls="nav-sidebar-leave">
+                    <span>Leave</span>
+                    <span class="toggle-chevron" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
+                </button>
+                <div id="nav-sidebar-leave" class="collapse {{ 'show' if leave_section_active else '' }}">
+                    <div class="collapse-inner">
+                        <a class="nav-link {{ 'active' if leave_main_active else '' }}" href="{{ url_for('leave.index') }}">
+                            <i class="bi bi-calendar-check"></i> Calendar &amp; requests
+                        </a>
+                        <a class="nav-link {{ 'active' if leave_types_active else '' }}" href="{{ url_for('leave.types_index') }}">
+                            <i class="bi bi-tags"></i> Leave types
+                        </a>
+                        <a class="nav-link {{ 'active' if ep == 'leave.balances' else '' }}" href="{{ url_for('leave.balances') }}">
+                            <i class="bi bi-sliders"></i> Leave balances
+                        </a>
+                        <a class="nav-link {{ 'active' if ep == 'leave.admin_request_leave' else '' }}" href="{{ url_for('leave.admin_request_leave') }}">
+                            <i class="bi bi-person-plus"></i> Apply leave for employee
+                        </a>
+                        <a class="nav-link {{ 'active' if ep in ('leave.holidays_index', 'leave.holiday_create', 'leave.holiday_edit') else '' }}" href="{{ url_for('leave.holidays_index') }}">
+                            <i class="bi bi-flag"></i> Public holidays
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% elif has_permission('view_leave') %}
+            <a class="nav-link {{ 'active' if leave_main_active else '' }}" href="{{ url_for('leave.index') }}">
+                <i class="bi bi-calendar-check"></i> Leave
+            </a>
+            {% endif %}
+            {% set messages_active = ep and ep.startswith('messages') %}
+            <a class="nav-link {{ 'active' if messages_active else '' }}" href="{{ url_for('messages.index') }}" id="messagesNavLink">
+                <i class="bi bi-chat-dots"></i> Messages
+                <span class="badge bg-warning text-dark ms-1{% if not unread_message_threads or unread_message_threads <= 0 %} d-none{% endif %}" id="messagesNavBadge">{{ unread_message_threads or 0 }}</span>
+            </a>
+            {% set it_tickets_active = ep and ep.startswith('it_tickets') %}
+            {% if has_permission('submit_tickets') or has_permission('view_tickets') %}
+            <div class="sidebar-nav-group">
+                <button class="sidebar-nav-toggle {{ 'collapsed' if not it_tickets_active else '' }}" type="button" data-bs-toggle="collapse" data-bs-target="#nav-sidebar-it" aria-expanded="{{ 'true' if it_tickets_active else 'false' }}" aria-controls="nav-sidebar-it">
+                    <span>IT Support</span>
+                    <span class="toggle-chevron" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
+                </button>
+                <div id="nav-sidebar-it" class="collapse {{ 'show' if it_tickets_active else '' }}">
+                    <div class="collapse-inner">
+                        {% if has_permission('submit_tickets') %}
+                        <a class="nav-link {{ 'active' if ep in ('it_tickets.my_tickets', 'it_tickets.create', 'it_tickets.view') else '' }}" href="{{ url_for('it_tickets.my_tickets') }}">
+                            <i class="bi bi-ticket-perforated"></i> My tickets
+                        </a>
+                        <a class="nav-link {{ 'active' if ep == 'it_tickets.create' else '' }}" href="{{ url_for('it_tickets.create') }}">
+                            <i class="bi bi-plus-circle"></i> New ticket
+                        </a>
+                        {% endif %}
+                        {% if has_permission('view_tickets') %}
+                        <a class="nav-link {{ 'active' if ep in ('it_tickets.queue', 'it_tickets.categories') else '' }}" href="{{ url_for('it_tickets.queue') }}">
+                            <i class="bi bi-headset"></i> IT queue
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if overtime_enabled and (has_permission('request_overtime') or has_permission('submit_overtime_same_dept') or has_permission('approve_overtime')) %}
+            <a class="nav-link {{ 'active' if overtime_active else '' }}" href="{{ url_for('overtime.index') }}">
+                <i class="bi bi-clock-history"></i> Overtime
+            </a>
+            {% endif %}
+            {% if payroll_enabled %}
+            {% if show_payroll_group %}
+            <div class="sidebar-nav-group">
+                <button class="sidebar-nav-toggle {{ 'collapsed' if not payroll_section_active else '' }}" type="button" data-bs-toggle="collapse" data-bs-target="#nav-sidebar-payroll" aria-expanded="{{ 'true' if payroll_section_active else 'false' }}" aria-controls="nav-sidebar-payroll">
+                    <span>Payroll</span>
+                    <span class="toggle-chevron" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
+                </button>
+                <div id="nav-sidebar-payroll" class="collapse {{ 'show' if payroll_section_active else '' }}">
+                    <div class="collapse-inner">
+                        <a class="nav-link {{ 'active' if ep == 'payroll.my_payslips' else '' }}" href="{{ url_for('payroll.my_payslips') }}">
+                            <i class="bi bi-receipt-cutoff"></i> My payslips
+                        </a>
+                        {% if current_user.employee_id and not has_permission('view_reports') %}
+                        <a class="nav-link {{ 'active' if ep == 'reports.p9_report' else '' }}" href="{{ url_for('reports.p9_report') }}">
+                            <i class="bi bi-file-earmark-text"></i> My P9
+                        </a>
+                        {% endif %}
+                        <a class="nav-link {{ 'active' if ep and ep.startswith('payroll') and ep != 'payroll.my_payslips' else '' }}" href="{{ url_for('payroll.index') }}">
+                            <i class="bi bi-cash-stack"></i> Payroll runs
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% elif current_user.employee_id %}
+            <a class="nav-link {{ 'active' if ep == 'payroll.my_payslips' else '' }}" href="{{ url_for('payroll.my_payslips') }}">
+                <i class="bi bi-receipt-cutoff"></i> My payslips
+            </a>
+            {% if not has_permission('view_reports') %}
+            <a class="nav-link {{ 'active' if ep == 'reports.p9_report' else '' }}" href="{{ url_for('reports.p9_report') }}">
+                <i class="bi bi-file-earmark-text"></i> My P9
+            </a>
+            {% endif %}
+            {% elif has_permission('view_payroll') %}
+            <a class="nav-link {{ 'active' if ep and ep.startswith('payroll') else '' }}" href="{{ url_for('payroll.index') }}">
+                <i class="bi bi-cash-stack"></i> Payroll
+            </a>
+            {% endif %}
+            {% endif %}
+            {% if attendance_enabled and has_permission('view_attendance') %}
+            <a class="nav-link {{ 'active' if ep and ep.startswith('attendance') else '' }}" href="{{ url_for('attendance.index') }}">
+                <i class="bi bi-clock-history"></i> Attendance
+            </a>
+            {% endif %}
+            {% if payroll_enabled and has_permission('manage_statutory') %}
+            <a class="nav-link {{ 'active' if ep and ep.startswith('statutory') else '' }}" href="{{ url_for('statutory.index') }}">
+                <i class="bi bi-percent"></i> Statutory
+            </a>
+            {% endif %}
+            {% if has_permission('view_reports') %}
+            <a class="nav-link {{ 'active' if ep and ep.startswith('reports') else '' }}" href="{{ url_for('reports.index') }}">
+                <i class="bi bi-graph-up"></i> Reports
+            </a>
+            {% endif %}
+            {% if has_permission('manage_settings') %}
+            <a class="nav-link {{ 'active' if ep and ep.startswith('settings') else '' }}" href="{{ url_for('settings.index') }}">
+                <i class="bi bi-gear"></i> Settings
+            </a>
+            {% endif %}
+        </nav>
+        <div class="sidebar-footer">
+            <div class="dropdown">
+                <a href="#" class="d-flex align-items-center text-decoration-none text-white dropdown-toggle" data-bs-toggle="dropdown">
+                    <span class="rounded-circle bg-primary d-flex align-items-center justify-content-center me-2" style="width:36px;height:36px;font-size:0.875rem">
+                        {{ current_user.email[0]|upper }}
+                    </span>
+                    <span class="user-email">{{ current_user.email }}</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-start shadow">
+                    {% if current_user.employee_id %}
+                    <li><a class="dropdown-item" href="{{ url_for('employees.profile') }}"><i class="bi bi-person-circle me-2"></i>My profile</a></li>
+                    {% endif %}
+                    <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key me-2"></i>Change password</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </aside>
+    {% endif %}
+
+    <div class="app-main">
+        {% if current_user.is_authenticated %}
+        <header class="app-topbar">
+            <div class="app-topbar-inner{% if signed_in_context %} app-topbar-inner--with-user{% endif %}">
+                <div class="topbar-left d-flex align-items-center min-w-0">
+                    <button type="button" class="btn btn-link text-secondary d-lg-none me-2 p-0 rounded-3 flex-shrink-0" id="sidebarToggle" aria-label="Toggle sidebar">
+                        <i class="bi bi-list fs-4"></i>
+                    </button>
+                    {% block breadcrumb %}
+                    {% set nav_section %}{% block page_nav_section %}{{ page_nav.section if page_nav else '' }}{% endblock %}{% endset %}
+                    {% set nav_title %}{% block page_nav_title %}{{ page_nav.title if page_nav else '' }}{% endblock %}{% endset %}
+                    {% if nav_section.strip() or nav_title.strip() %}
+                    <nav class="topbar-page-nav" aria-label="Current page">
+                        {% if nav_section.strip() %}
+                        <span class="topbar-page-section">{{ nav_section.strip() }}</span>
+                        <i class="bi bi-chevron-right topbar-page-sep" aria-hidden="true"></i>
+                        {% endif %}
+                        {% if nav_title.strip() %}
+                        <span class="topbar-page-title">{{ nav_title.strip() }}</span>
+                        {% endif %}
+                    </nav>
+                    {% endif %}
+                    {% endblock %}
+                </div>
+                {% if signed_in_context %}
+                <div class="topbar-center d-none d-md-flex">
+                    <a href="{{ url_for('employees.profile') }}" class="topbar-user-context" title="View my profile">
+                        {% if signed_in_context.has_photo %}
+                        <img
+                            src="{{ url_for('employees.photo', id=signed_in_context.employee_id) }}"
+                            alt=""
+                            class="topbar-user-avatar topbar-user-avatar--photo"
+                        >
+                        {% else %}
+                        <span class="topbar-user-avatar" aria-hidden="true">{{ signed_in_context.initials }}</span>
+                        {% endif %}
+                        <span class="topbar-user-text min-w-0">
+                            <span class="topbar-user-name">{{ signed_in_context.name }}</span>
+                            {% if signed_in_context.meta %}
+                            <span class="topbar-user-meta d-none d-xl-block">{{ signed_in_context.meta }}</span>
+                            {% endif %}
+                        </span>
+                    </a>
+                </div>
+                {% endif %}
+                <div class="topbar-right-meta d-flex align-items-center flex-wrap gap-2 justify-content-end">
+                    <time class="tenant-topbar-pill tenant-topbar-pill--date" datetime="{{ today_iso }}" title="Today's date">
+                        <i class="bi bi-calendar3"></i>
+                        <span class="tenant-topbar-pill-text d-none d-md-inline">{{ today_display }}</span>
+                        <span class="tenant-topbar-pill-text d-md-none">{{ today_short }}</span>
+                    </time>
+                    {% set show_tenant_meta = (branches_enabled and tenant_nav.branch) or (payroll_enabled and tenant_nav.currency and not is_employee_self_service) %}
+                    {% if show_tenant_meta %}
+                    <div class="tenant-topbar-meta d-flex align-items-center flex-wrap gap-2">
+                        {% if branches_enabled and tenant_nav.branch %}
+                        <span class="tenant-topbar-pill tenant-topbar-pill--branch" title="{% if tenant_nav.branch_is_personal %}From your linked employee record.{% else %}Primary site for your organization (first branch by name). Link your user to an employee under Settings → Users to show your own assignment.{% endif %}">
+                            <i class="bi bi-geo-alt"></i>
+                            <span class="tenant-topbar-pill-text">{{ tenant_nav.branch }}</span>
+                        </span>
+                        {% elif branches_enabled %}
+                        <span class="text-muted small d-none d-sm-inline" title="Add a branch under Organization → Branches">No branches configured</span>
+                        {% endif %}
+                        {% if payroll_enabled and tenant_nav.currency and not is_employee_self_service %}
+                        <span class="tenant-topbar-pill tenant-topbar-pill--currency" title="Payroll display currency (from your branch or app default)">
+                            <i class="bi bi-currency-exchange"></i>
+                            <span class="tenant-topbar-pill-text">{{ tenant_nav.currency }}</span>
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if pending_approvals and pending_approvals.total > 0 %}
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge text-bg-warning text-dark">
+                            {{ pending_approvals.total }} pending approval{{ '' if pending_approvals.total == 1 else 's' }}
+                        </span>
+                        {% if pending_approvals.leave > 0 %}
+                        <a href="{{ url_for('leave.index') }}" class="btn btn-sm btn-outline-secondary">
+                            Leave {{ pending_approvals.leave }}
+                        </a>
+                        {% endif %}
+                        {% if overtime_enabled and pending_approvals.overtime > 0 %}
+                        <a href="{{ url_for('overtime.index') }}" class="btn btn-sm btn-outline-secondary">
+                            Overtime {{ pending_approvals.overtime }}
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </header>
+        {% endif %}
+
+        <main class="app-content">
+            <div class="flash-messages" id="flashMessages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show flash-alert" role="alert" data-auto-dismiss="4000">
+                <span class="flash-icon">{% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>{% elif category == 'danger' %}<i class="bi bi-x-circle-fill"></i>{% elif category == 'warning' %}<i class="bi bi-exclamation-triangle-fill"></i>{% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}</span>
+                <span class="flash-text">{{ message }}</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+            </div>
+            {% block content %}{% endblock %}
+        </main>
+
+        {% if current_user.is_authenticated %}
+        <footer class="app-footer">
+            &copy; 2026 Andersen · Human Resource Management System
+        </footer>
+        {% endif %}
+    </div>
+
+    {% if current_user.is_authenticated %}
+    <div id="messageToastContainer" class="message-toast-container" aria-live="polite" aria-atomic="true"></div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var sidebar = document.getElementById('sidebar');
+            var overlay = document.getElementById('sidebarOverlay');
+            var toggle = document.getElementById('sidebarToggle');
+            if (sidebar && overlay && toggle) {
+                var hideSidebar = function() {
+                    sidebar.classList.remove('show');
+                    overlay.classList.remove('show');
+                    overlay.setAttribute('aria-hidden', 'true');
+                };
+                var showSidebar = function() {
+                    sidebar.classList.add('show');
+                    overlay.classList.add('show');
+                    overlay.setAttribute('aria-hidden', 'false');
+                };
+                // Defensive reset: if previous interaction left overlay active, clear it.
+                hideSidebar();
+                toggle.addEventListener('click', function() { showSidebar(); });
+                overlay.addEventListener('click', function() { hideSidebar(); });
+                window.addEventListener('resize', function() {
+                    if (window.innerWidth >= 992) hideSidebar();
+                });
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') hideSidebar();
+                });
+                // On mobile, close sidebar after clicking any nav link.
+                sidebar.querySelectorAll('a.nav-link').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        if (window.innerWidth < 992) hideSidebar();
+                    });
+                });
+            }
+            // Auto-dismiss flash messages
+            var flashContainer = document.getElementById('flashMessages');
+            if (flashContainer) {
+                var alerts = flashContainer.querySelectorAll('.flash-alert[data-auto-dismiss]');
+                alerts.forEach(function(alert) {
+                    var delay = parseInt(alert.getAttribute('data-auto-dismiss'), 10) || 4000;
+                    setTimeout(function() {
+                        var btn = alert.querySelector('.btn-close');
+                        if (btn) btn.click();
+                    }, delay);
+                });
+            }
+        });
+    </script>
+    {% if current_user.is_authenticated %}
+    <script>
+    (function () {
+        const pollUrl = {{ url_for('messages.notifications_poll') | tojson }};
+        const pollIntervalMs = 3000;
+        const badge = document.getElementById('messagesNavBadge');
+        let lastMessageId = 0;
+        let pollTimer = null;
+
+        function activeThreadId() {
+            const el = document.querySelector('[data-message-thread-id]');
+            return el ? parseInt(el.dataset.messageThreadId, 10) || null : null;
+        }
+
+        function updateBadge(count) {
+            if (!badge) return;
+            const n = parseInt(count, 10) || 0;
+            if (n > 0) {
+                badge.textContent = n > 99 ? '99+' : String(n);
+                badge.classList.remove('d-none');
+            } else {
+                badge.classList.add('d-none');
+            }
+        }
+
+        function threadUrl(threadId) {
+            return pollUrl.replace('/notifications/poll', '/' + threadId);
+        }
+
+        function showMessageToast(item) {
+            const container = document.getElementById('messageToastContainer');
+            if (!container || !item) return;
+
+            const toast = document.createElement('div');
+            toast.className = 'message-toast';
+            toast.innerHTML =
+                '<button type="button" class="message-toast-close" aria-label="Dismiss">' +
+                '<i class="bi bi-x-lg"></i></button>' +
+                '<div class="message-toast-title">' +
+                '<i class="bi bi-chat-dots-fill"></i> New message</div>' +
+                '<div class="message-toast-sender"></div>' +
+                '<div class="message-toast-subject"></div>' +
+                '<div class="message-toast-preview"></div>';
+
+            toast.querySelector('.message-toast-sender').textContent = item.sender_name || 'Someone';
+            toast.querySelector('.message-toast-subject').textContent = item.thread_subject || 'Conversation';
+            toast.querySelector('.message-toast-preview').textContent = item.preview || '';
+
+            function openThread() {
+                window.location.href = threadUrl(item.thread_id);
+            }
+
+            toast.addEventListener('click', function (e) {
+                if (e.target.closest('.message-toast-close')) return;
+                openThread();
+            });
+            toast.querySelector('.message-toast-close').addEventListener('click', function (e) {
+                e.stopPropagation();
+                toast.classList.add('message-toast--hide');
+                window.setTimeout(function () { toast.remove(); }, 220);
+            });
+
+            container.appendChild(toast);
+            window.setTimeout(function () {
+                toast.classList.add('message-toast--hide');
+                window.setTimeout(function () { toast.remove(); }, 220);
+            }, 7000);
+        }
+
+        async function pollNotifications(init) {
+            if (document.hidden) return;
+            try {
+                const params = new URLSearchParams();
+                if (init) {
+                    params.set('init', '1');
+                } else {
+                    params.set('after', String(lastMessageId));
+                    const exclude = activeThreadId();
+                    if (exclude) params.set('exclude_thread', String(exclude));
+                }
+
+                const response = await fetch(pollUrl + '?' + params.toString(), {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (!data.ok) return;
+
+                updateBadge(data.unread_threads);
+                if (typeof data.latest_message_id === 'number') {
+                    lastMessageId = Math.max(lastMessageId, data.latest_message_id);
+                }
+                if (!init && data.notifications && data.notifications.length) {
+                    data.notifications.forEach(showMessageToast);
+                }
+            } catch (err) {
+                /* ignore transient poll errors */
+            }
+        }
+
+        function startPolling() {
+            if (!badge || pollTimer) return;
+            pollNotifications(true).then(function () {
+                pollTimer = window.setInterval(function () {
+                    pollNotifications(false);
+                }, pollIntervalMs);
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startPolling);
+        } else {
+            startPolling();
+        }
+    })();
+    </script>
+    {% endif %}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

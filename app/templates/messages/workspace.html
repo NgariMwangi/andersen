@@ -1,0 +1,40 @@
+{% extends "layouts/base.html" %}
+{% block title %}{% if selected_thread_id and thread %}{{ thread.subject }} - {% endif %}Messages - {{ app_name }}{% endblock %}
+{% block page_nav_section %}Messages{% endblock %}
+{% block page_nav_title %}{% if selected_thread_id and thread %}{{ thread.subject }}{% else %}Inbox{% endif %}{% endblock %}
+{% block content %}
+<div
+    class="messages-workspace{% if selected_thread_id %} messages-workspace--thread-open{% endif %}"
+    id="messagesWorkspace"
+    data-inbox-poll-url="{{ url_for('messages.inbox_poll') }}"
+    data-poll-interval="{{ poll_interval_ms }}"
+    data-selected-thread="{{ selected_thread_id or '' }}"
+    data-messages-base="{{ url_for('messages.index') }}"
+>
+    <aside class="messages-workspace-sidebar">
+        <div class="chat-inbox-header">
+            <h1 class="chat-inbox-title">Chats</h1>
+            <a href="{{ url_for('messages.compose') }}" class="chat-inbox-compose-btn" aria-label="New message">
+                <i class="bi bi-pencil-square"></i>
+            </a>
+        </div>
+        <div class="messages-workspace-inbox" id="chatInboxContent">
+            {% include 'messages/_inbox_content.html' %}
+        </div>
+    </aside>
+
+    <main class="messages-workspace-main" id="chatWorkspacePanel">
+        {% if selected_thread_id and thread %}
+        {% include 'messages/_thread_panel.html' %}
+        {% else %}
+        {% include 'messages/_workspace_empty.html' %}
+        {% endif %}
+    </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/messages_compose.js') }}"></script>
+<script src="{{ url_for('static', filename='js/messages_keyboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/messages_workspace.js') }}"></script>
+{% endblock %}

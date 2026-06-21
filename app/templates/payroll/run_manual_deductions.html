@@ -1,0 +1,84 @@
+{% extends "layouts/base.html" %}
+{% block title %}Manual deductions - Payroll {{ run_country_code }} {{ run.pay_month }}/{{ run.pay_year }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Manual deductions (one-off)</h1>
+<p class="text-muted small mb-4">
+    Payroll <strong>{{ run_country_code }} {{ run.pay_month }}/{{ run.pay_year }}</strong> (draft).
+    Add amounts that apply only to this run (e.g. ad-hoc loan catch-up). Then <a href="{{ url_for('payroll.run_calculate', id=run.id) }}">recalculate payroll</a>.
+    For recurring deductions every month, use the employee’s <strong>Deductions</strong> page.
+</p>
+<div class="d-flex flex-wrap gap-2 mb-4">
+    <a href="{{ url_for('payroll.view_run', id=run.id) }}" class="btn btn-outline-secondary">Back to payroll</a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Add manual deduction</div>
+    <div class="card-body">
+        <form method="post" class="row g-2 align-items-end">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="action" value="add"/>
+            <div class="col-md-4">
+                <label class="form-label">Employee</label>
+                <select name="employee_id" class="form-select" required>
+                    <option value="">—</option>
+                    {% for e in employees %}
+                    <option value="{{ e.id }}">{{ e.employee_number }} — {{ e.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Label</label>
+                <input type="text" name="label" class="form-control" placeholder="e.g. Loan top-up" required maxlength="200"/>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Amount ({{ run_currency }})</label>
+                <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required/>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Notes (optional)</label>
+                <input type="text" name="notes" class="form-control" maxlength="500"/>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">This run</div>
+    <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Label</th>
+                    <th class="text-end">Amount</th>
+                    <th>Notes</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td>{{ r.employee.full_name if r.employee else r.employee_id }}</td>
+                    <td>{{ r.label }}</td>
+                    <td class="text-end">{{ "%.2f"|format(r.amount|float) }}</td>
+                    <td class="text-muted small">{{ r.notes or '—' }}</td>
+                    <td>
+                        <form method="post" class="d-inline" onsubmit="return confirm('Remove this line?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="action" value="delete"/>
+                            <input type="hidden" name="id" value="{{ r.id }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-muted px-3 py-2">No manual deductions yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,188 @@
+{% extends "layouts/base.html" %}
+{% block title %}Career history — {{ employee.full_name }}{% endblock %}
+{% block page_nav_section %}Employees{% endblock %}
+{% block page_nav_title %}Career history{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-2">Career history</h1>
+        <p class="text-muted mb-0">
+            <strong>{{ employee.employee_number or 'No Number' }}</strong> — {{ employee.full_name }}
+        </p>
+    </div>
+    <a href="{{ url_for('employees.profile') if current_user.employee_id == employee.id else url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary shrink-0">
+        <i class="bi bi-arrow-left me-1"></i>Back to profile
+    </a>
+</div>
+
+{# Quick jump — each type stays in its own block below #}
+<nav class="card mb-4" aria-label="Jump to section">
+    <div class="card-body py-2 px-3">
+        <span class="text-muted small me-2">Jump to:</span>
+        <a href="#section-assignments" class="btn btn-sm btn-outline-primary me-1 mb-1">Role &amp; organization</a>
+        {% if payroll_enabled %}
+        <a href="#section-salary" class="btn btn-sm btn-outline-success me-1 mb-1">Salary</a>
+        <a href="#section-benefits" class="btn btn-sm btn-outline-secondary mb-1">Benefits</a>
+        {% endif %}
+    </div>
+</nav>
+
+{# --- 1. Assignment / role history --- #}
+<section id="section-assignments" class="mb-4">
+    <div class="card border-primary border-opacity-25 shadow-sm">
+        <div class="card-header bg-primary bg-opacity-10 d-flex align-items-center gap-2 py-3">
+            <i class="bi bi-diagram-3 fs-5 text-primary"></i>
+            <div>
+                <h2 class="h6 mb-0">Role &amp; organization</h2>
+                <small class="text-muted">{% if branches_enabled %}Branch, {% endif %}department, job title, manager, status, employment type — by effective dates</small>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if segments %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-nowrap">From</th>
+                            <th class="text-nowrap">To</th>
+                            {% if branches_enabled %}<th>Branch</th>{% endif %}
+                            <th>Department</th>
+                            <th>Job title</th>
+                            <th>Manager</th>
+                            <th>Status</th>
+                            <th>Employment type</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in segments %}
+                        <tr>
+                            <td class="text-nowrap">{{ s.effective_from.strftime('%d %b %Y') if s.effective_from else '—' }}</td>
+                            <td class="text-nowrap">
+                                {% if s.effective_to %}
+                                {{ s.effective_to.strftime('%d %b %Y') }}
+                                {% else %}
+                                <span class="badge text-bg-success">Current</span>
+                                {% endif %}
+                            </td>
+                            {% if branches_enabled %}<td>{{ s.branch.name if s.branch else '—' }}</td>{% endif %}
+                            <td>{{ s.department.name if s.department else '—' }}</td>
+                            <td>{{ s.job_title.name if s.job_title else '—' }}</td>
+                            <td>{{ s.manager.full_name if s.manager else '—' }}</td>
+                            <td><span class="text-nowrap">{{ s.status or '—' }}</span></td>
+                            <td>{{ s.employment_type or '—' }}</td>
+                            <td class="small text-muted">{{ s.change_reason or '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0 px-3 py-4">No assignment segments yet. Changes to {% if branches_enabled %}branch, {% endif %}department, title, manager, status, or employment type are recorded when you edit the employee.</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+{# --- 2. Salary history --- #}
+{% if payroll_enabled %}
+<section id="section-salary" class="mb-4">
+    <div class="card border-success border-opacity-25 shadow-sm">
+        <div class="card-header bg-success bg-opacity-10 d-flex align-items-center gap-2 py-3">
+            <i class="bi bi-cash-stack fs-5 text-success"></i>
+            <div>
+                <h2 class="h6 mb-0">Salary history</h2>
+                <small class="text-muted">Basic pay and pension settings — from the Salary page</small>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if salary_records %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-nowrap">Effective from</th>
+                            <th class="text-end">Basic salary</th>
+                            <th class="text-end text-nowrap">Pension emp %</th>
+                            <th class="text-end text-nowrap">Pension fixed</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in salary_records %}
+                        <tr>
+                            <td class="text-nowrap">{{ r.effective_from.strftime('%d %b %Y') if r.effective_from else '—' }}</td>
+                            <td class="text-end fw-medium">{{ r.basic_salary|fmt_money(currency_code) }}</td>
+                            <td class="text-end text-muted">{{ r.pension_employee_percent if r.pension_employee_percent is not none else '—' }}</td>
+                            <td class="text-end text-muted">
+                                {% if r.pension_employee_fixed_amount is not none and r.pension_employee_fixed_amount != 0 %}
+                                {{ r.pension_employee_fixed_amount|fmt_money(currency_code) }}
+                                {% else %}
+                                —
+                                {% endif %}
+                            </td>
+                            <td class="small text-muted">{{ r.notes or '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0 px-3 py-4">No salary records yet. Add them under <a href="{{ url_for('employees.salary', id=employee.id) }}">Salary</a>.</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{# --- 3. Benefits --- #}
+{% if payroll_enabled %}
+<section id="section-benefits" class="mb-2">
+    <div class="card border-secondary shadow-sm">
+        <div class="card-header bg-body-secondary d-flex align-items-center gap-2 py-3">
+            <i class="bi bi-wallet2 fs-5"></i>
+            <div>
+                <h2 class="h6 mb-0">Employee benefits</h2>
+                <small class="text-muted">Benefits scheduled to be included in payroll</small>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if benefits %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Title</th>
+                            <th class="text-end">Amount</th>
+                            <th>Frequency</th>
+                            <th class="text-nowrap">Payroll period</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in benefits %}
+                        <tr>
+                            <td class="fw-medium">{{ b.title }}</td>
+                            <td class="text-end">{{ "%.2f"|format(b.amount|float) }} {{ currency_code }}</td>
+                            <td>{{ (b.frequency or 'one_off').replace('_', ' ') }}</td>
+                            <td class="text-nowrap">
+                                {% if b.payroll_year and b.payroll_month %}
+                                {{ b.payroll_year }}-{{ "%02d"|format(b.payroll_month) }}
+                                {% else %}
+                                —
+                                {% endif %}
+                            </td>
+                            <td class="small text-muted">{{ b.notes or '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0 px-3 py-4">No benefits recorded yet. Add them under <a href="{{ url_for('employees.employee_benefits', id=employee.id) }}">Benefits</a>.</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

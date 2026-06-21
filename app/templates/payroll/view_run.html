@@ -1,0 +1,211 @@
+{% extends "layouts/base.html" %}
+{% block title %}Payroll {{ run.country_code or 'KE' }} {{ run.pay_month }}/{{ run.pay_year }} - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Payroll {{ run.country_code or 'KE' }} {{ run.pay_month }}/{{ run.pay_year }} - {{ run.status }}</h1>
+<div class="d-flex flex-wrap gap-2 mb-3">
+    {% if run.status == 'draft' %}
+    <a href="{{ url_for('payroll.run_calculate', id=run.id) }}" class="btn btn-primary">Calculate Payroll</a>
+    {% endif %}
+    {% if run.status == 'draft' and has_permission('process_payroll') %}
+    <a href="{{ url_for('payroll.run_manual_deductions', id=run.id) }}" class="btn btn-outline-secondary">Manual deductions</a>
+    {% endif %}
+    {% if run.status == 'draft' and has_permission('approve_payroll') %}
+    <form method="post" action="{{ url_for('payroll.approve_run', id=run.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn btn-success">Approve Payroll</button>
+    </form>
+    {% endif %}
+    {% if run.status in ('approved', 'finance_reviewed') and has_permission('approve_payroll') %}
+    <form
+        method="post"
+        action="{{ url_for('payroll.unapprove_run', id=run.id) }}"
+        class="d-inline"
+        onsubmit="return confirm('Revert this payroll to draft? Statutory remittance records will be removed and you can recalculate.');"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn btn-outline-warning">Un-approve (revert to draft)</button>
+    </form>
+    {% endif %}
+    {% if run.status == 'draft' and has_permission('process_payroll') %}
+    <form method="post" action="{{ url_for('payroll.delete_run', id=run.id) }}" class="d-inline" onsubmit="return confirm('Delete this payroll run? All calculated items will be removed.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn btn-outline-danger">Delete Payroll</button>
+    </form>
+    {% endif %}
+    {% if run.status == 'approved' and has_permission('review_payroll_finance') %}
+    <form method="post" action="{{ url_for('payroll.finance_review_run', id=run.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn btn-warning">Mark Finance Reviewed</button>
+    </form>
+    {% endif %}
+    {% if run.status in ('approved', 'finance_reviewed') and has_permission('mark_payroll_paid') %}
+    <form method="post" action="{{ url_for('payroll.mark_paid_run', id=run.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="text" name="payment_reference" class="form-control d-inline-block" style="width: 220px;" placeholder="Payment ref (optional)" />
+        <button type="submit" class="btn btn-success">Mark Paid</button>
+    </form>
+    {% endif %}
+    {% if run.status in ('approved', 'finance_reviewed', 'paid') and has_permission('view_payroll') %}
+    <a href="{{ url_for('payroll.view_statutory_remitances', id=run.id) }}" class="btn btn-outline-primary">Statutory remittances</a>
+    {% endif %}
+    {% if (run.country_code or 'KE')|upper == 'KE' and (items or consultant_items) and has_permission('view_payroll') %}
+    <a href="{{ url_for('payroll.export_kenya_payroll_xlsx', id=run.id) }}" class="btn btn-outline-success">Export Excel (Kenya)</a>
+    {% endif %}
+    {% if (run.country_code or '')|upper == 'UG' and items and has_permission('view_payroll') %}
+    <a href="{{ url_for('payroll.export_uganda_payroll_xlsx', id=run.id) }}" class="btn btn-outline-success">Export Excel (Uganda)</a>
+    {% endif %}
+    {% if run.status in ('approved', 'finance_reviewed', 'paid') and items and has_permission('process_payroll') %}
+    <form
+        method="post"
+        action="{{ url_for('payroll.email_payslips_for_run', id=run.id) }}"
+        class="d-inline"
+        onsubmit="return confirm('Email payslips to all staff with an email address on file?');"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="confirm" value="1"/>
+        <button type="submit" class="btn btn-outline-primary">
+            <i class="bi bi-envelope me-1"></i>Email all payslips
+        </button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('payroll.index') }}" class="btn btn-outline-secondary">Back to list</a>
+</div>
+<form method="get" class="row g-2 mb-3">
+    <input type="hidden" name="tab" value="{{ tab }}"/>
+    <div class="col-md-4">
+        <input
+            type="text"
+            name="q"
+            class="form-control"
+            placeholder="Search name or number"
+            value="{{ q or '' }}"
+        />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">Search</button>
+    </div>
+    {% if q %}
+    <div class="col-auto">
+        <a href="{{ url_for('payroll.view_run', id=run.id, tab=tab) }}" class="btn btn-outline-secondary">Clear</a>
+    </div>
+    {% endif %}
+</form>
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if tab == 'staff' else '' }}" href="{{ url_for('payroll.view_run', id=run.id, tab='staff', q=q or none) }}">
+            Staff ({{ items|length }})
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if tab == 'consultants' else '' }}" href="{{ url_for('payroll.view_run', id=run.id, tab='consultants', q=q or none) }}">
+            Consultants ({{ consultant_items|length }})
+        </a>
+    </li>
+</ul>
+{% if run.finance_reviewed_at or run.paid_at %}
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="small text-muted">
+            {% if run.finance_reviewed_at %}
+            Finance reviewed at {{ run.finance_reviewed_at.strftime('%Y-%m-%d %H:%M') }}{% if run.finance_reviewed_by_id %} (user #{{ run.finance_reviewed_by_id }}){% endif %}.
+            {% endif %}
+            {% if run.paid_at %}
+            Paid at {{ run.paid_at.strftime('%Y-%m-%d %H:%M') }}{% if run.paid_by_id %} (user #{{ run.paid_by_id }}){% endif %}{% if run.payment_reference %} · Ref: {{ run.payment_reference }}{% endif %}.
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% if run.status == 'draft' and not items and not consultant_items %}
+<div class="alert alert-warning">
+    This payroll run has no calculated items yet. Click <strong>Calculate Payroll</strong> first, then return to this page.
+</div>
+{% endif %}
+
+{% if items or consultant_items %}
+<div class="card mb-3 border-primary">
+    <div class="card-body py-2">
+        <strong>Combined Totals (Staff + Consultants):</strong>
+        Gross <strong>{{ combined_totals.gross|fmt_money(run_currency) }}</strong> ·
+        Net <strong>{{ combined_totals.net|fmt_money(run_currency) }}</strong>
+    </div>
+</div>
+{% endif %}
+
+{% if tab == 'staff' %}
+<div class="card mb-3">
+    <div class="card-body py-2 small">
+        <strong>Staff Totals:</strong> Gross {{ staff_totals.gross|fmt_money(run_currency) }} · Net {{ staff_totals.net|fmt_money(run_currency) }}
+    </div>
+</div>
+<div class="table-responsive">
+    <table class="table">
+        <thead><tr><th>Employee</th><th>Gross</th><th>PAYE</th><th>NSSF</th><th>SHIF</th><th>Housing</th><th>Other ded.</th><th>Net</th><th></th></tr></thead>
+        <tbody>
+        {% for item in items %}
+        <tr>
+            <td>
+                {% if item.employee %}
+                <a href="{{ url_for('employees.view', id=item.employee.id) }}" class="text-decoration-none">
+                    {{ item.employee.full_name }}
+                </a>
+                {% else %}
+                -
+                {% endif %}
+            </td>
+            <td>{{ "{:,.2f}".format(item.gross_pay|float) }}</td>
+            <td>{{ "{:,.2f}".format(item.paye|float) }}</td>
+            <td>{{ "{:,.2f}".format(item.nssf_employee|float) }}</td>
+            <td>{{ "{:,.2f}".format(item.shif|float) }}</td>
+            <td>{{ "{:,.2f}".format(item.housing_levy|float) }}</td>
+            <td>{{ "{:,.2f}".format(item.other_deductions|float) }}</td>
+            <td>{{ "{:,.2f}".format(item.net_pay|float) }}</td>
+            <td class="text-nowrap">
+                <a href="{{ url_for('payroll.view_payslip', run_id=run.id, employee_id=item.employee_id) }}" class="btn btn-sm btn-outline-primary">Payslip</a>
+                {% if run.status in ('approved', 'finance_reviewed', 'paid') and has_permission('process_payroll') %}
+                <form
+                    method="post"
+                    action="{{ url_for('payroll.email_payslip', run_id=run.id, employee_id=item.employee_id) }}"
+                    class="d-inline"
+                >
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="next" value="{{ url_for('payroll.view_run', id=run.id, tab=tab, q=q or none) }}"/>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Email payslip to employee">
+                        <i class="bi bi-envelope"></i>
+                    </button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-muted">No staff items. Run calculation first.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card mb-3">
+    <div class="card-body py-2 small">
+        <strong>Consultant Totals:</strong> Gross {{ consultant_totals.gross|fmt_money(run_currency) }} · WHT {{ consultant_totals.wht|fmt_money(run_currency) }} · Net {{ consultant_totals.net|fmt_money(run_currency) }}
+    </div>
+</div>
+<div class="table-responsive">
+    <table class="table">
+        <thead><tr><th>Consultant</th><th>Gross</th><th>Withholding</th><th>Net</th><th></th></tr></thead>
+        <tbody>
+        {% for item in consultant_items %}
+        <tr>
+            <td>{{ item.consultant.full_name if item.consultant else '-' }}</td>
+            <td>{{ "{:,.2f}".format(item.gross_pay|float) }}</td>
+            <td>{{ "{:,.2f}".format(item.withholding_tax|float) }}</td>
+            <td>{{ "{:,.2f}".format(item.net_pay|float) }}</td>
+            <td><a href="{{ url_for('payroll.view_consultant_payslip', run_id=run.id, consultant_id=item.consultant_id) }}" class="btn btn-sm btn-outline-primary">Payslip</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-muted">No consultant items. Run calculation first.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

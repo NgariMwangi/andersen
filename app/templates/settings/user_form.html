@@ -1,0 +1,54 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ 'Edit User' if user else 'New User' }} - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">{{ 'Edit User' if user else 'New User' }}</h1>
+<div class="card">
+    <div class="card-body">
+        <form method="post" action="{{ url_for('settings.user_edit', user_id=user.id) if user else url_for('settings.user_create') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    {{ form.email.label(class='form-label') }}
+                    {{ form.email(class='form-control') }}
+                </div>
+                <div class="col-md-6">
+                    {{ form.password.label(class='form-label') }}
+                    {{ form.password(class='form-control') }}
+                    <div class="form-text">
+                        {% if user %}
+                            Leave blank to keep the current password.
+                        {% else %}
+                            Required; at least 8 characters.
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check mt-4">
+                        {{ form.is_active(class='form-check-input') }}
+                        {{ form.is_active.label(class='form-check-label') }}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check mt-4">
+                        {{ form.is_superuser(class='form-check-input') }}
+                        {{ form.is_superuser.label(class='form-check-label') }}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    {{ form.employee_id.label(class='form-label') }}
+                    {{ form.employee_id(class='form-select') }}
+                </div>
+                <div class="col-md-6">
+                    {{ form.role_ids.label(class='form-label') }}
+                    {{ form.role_ids(class='form-select', multiple=True, size=4) }}
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">{{ 'Save changes' if user else 'Create user' }}</button>
+                    <a href="{{ url_for('settings.users') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

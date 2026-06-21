@@ -1,0 +1,220 @@
+{% extends "layouts/base.html" %}
+{% block title %}Payslip - {{ app_name }}{% endblock %}
+{% block content %}
+{% macro payslip_detail(label, value) %}
+<div class="payslip-detail">
+    <div class="payslip-detail-label">{{ label }}</div>
+    <div class="payslip-detail-value">{{ value if value is not none and value != '' else '—' }}</div>
+</div>
+{% endmacro %}
+
+<div class="payslip-page">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+        <div>
+            <h1 class="h4 mb-1">Payslip</h1>
+            <p class="text-muted mb-0">
+                {{ period_date.strftime('%B %Y') }} · {{ statutory_country_code }} · amounts in <strong>{{ payslip_currency }}</strong>
+            </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a
+                href="{{ url_for('payroll.export_payslip_pdf', run_id=item.payroll_run_id, employee_id=item.employee_id) }}"
+                class="btn btn-primary btn-sm"
+            >
+                <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
+            </a>
+            {% if has_permission('process_payroll') and item.payroll_run.status in ('approved', 'finance_reviewed', 'paid') %}
+            <form
+                method="post"
+                action="{{ url_for('payroll.email_payslip', run_id=item.payroll_run_id, employee_id=item.employee_id) }}"
+                class="d-inline"
+            >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-envelope me-1"></i>Email payslip
+                </button>
+            </form>
+            {% endif %}
+            {% if has_permission('view_payroll') %}
+            <a href="{{ url_for('payroll.view_run', id=item.payroll_run_id) }}" class="btn btn-outline-secondary btn-sm">Back to run</a>
+            {% elif current_user.employee_id == item.employee_id %}
+            <a href="{{ url_for('payroll.my_payslips') }}" class="btn btn-outline-secondary btn-sm">My payslips</a>
+            {% else %}
+            <a href="{{ url_for(home_endpoint) }}" class="btn btn-outline-secondary btn-sm">Back</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card payslip-card mb-3">
+        <div class="card-body py-3 px-3 px-md-4">
+            <div class="row g-3 align-items-center pb-3 mb-3 border-bottom">
+                <div class="col-md-7 col-lg-8">
+                    <div class="payslip-detail-label">Employee</div>
+                    <div class="fs-5 fw-semibold text-dark mb-0">
+                        {{ item.employee.full_name if item.employee else '—' }}
+                    </div>
+                    {% if item.employee and item.employee.employee_number %}
+                    <div class="text-muted small mt-1">#{{ item.employee.employee_number }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-5 col-lg-4 text-md-end">
+                    <div class="payslip-net-highlight">
+                        <div class="label">Net pay</div>
+                        <div class="amount">{{ item.net_pay|fmt_money(payslip_currency) }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
+                <div class="col">
+                    {{ payslip_detail('Department', item.employee.department.name if item.employee and item.employee.department else none) }}
+                </div>
+                <div class="col">
+                    {{ payslip_detail('Job title', item.employee.job_title.name if item.employee and item.employee.job_title else none) }}
+                </div>
+                <div class="col">
+                    {{ payslip_detail('Branch', item.employee.branch.name if item.employee and item.employee.branch else none) }}
+                </div>
+                <div class="col">
+                    {{ payslip_detail('KRA PIN', item.employee.kra_pin if item.employee else none) }}
+                </div>
+                <div class="col">
+                    {{ payslip_detail('NSSF number', item.employee.nssf_number if item.employee else none) }}
+                </div>
+                <div class="col">
+                    {{ payslip_detail('SHIF/NHIF number', item.employee.nhif_number if item.employee else none) }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="card payslip-card">
+                <div class="card-header bg-white border-0 pt-3 pb-0 px-3 px-md-4">
+                    <h2 class="h6 mb-0">Pay summary</h2>
+                </div>
+                <div class="card-body pt-2 pb-3 px-3 px-md-4">
+                    <div class="table-responsive">
+                        <table class="table table-sm payslip-amount-table mb-0">
+                            <tbody>
+                                {% if earnings_lines %}
+                                <tr class="section-row"><th colspan="2">Earnings</th></tr>
+                                {% for line in earnings_lines %}
+                                <tr>
+                                    <td class="ps-2">{{ line.name }}</td>
+                                    <td class="text-end text-nowrap">{{ line.amount|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% endif %}
+                                <tr class="table-light">
+                                    <th>Gross pay</th>
+                                    <td class="text-end fw-semibold text-nowrap">{{ item.gross_pay|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                <tr class="section-row"><th colspan="2">Deductions</th></tr>
+                                <tr>
+                                    <td class="ps-2">PAYE</td>
+                                    <td class="text-end text-nowrap">{{ item.paye|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                {% if show_nssf_tiers %}
+                                <tr>
+                                    <td class="ps-2">NSSF (Tier I)</td>
+                                    <td class="text-end text-nowrap">{{ nssf_tier_1|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-2">NSSF (Tier II)</td>
+                                    <td class="text-end text-nowrap">{{ nssf_tier_2|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td class="ps-2">NSSF</td>
+                                    <td class="text-end text-nowrap">{{ item.nssf_employee|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if show_shif %}
+                                <tr>
+                                    <td class="ps-2">SHIF</td>
+                                    <td class="text-end text-nowrap">{{ item.shif|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if show_housing_levy %}
+                                <tr>
+                                    <td class="ps-2">Housing levy</td>
+                                    <td class="text-end text-nowrap">{{ item.housing_levy|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if pension_percent_amount > 0 %}
+                                <tr>
+                                    <td class="ps-2">Pension (%)</td>
+                                    <td class="text-end text-nowrap">{{ pension_percent_amount|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if pension_fixed_amount > 0 %}
+                                <tr>
+                                    <td class="ps-2">Pension (fixed)</td>
+                                    <td class="text-end text-nowrap">{{ pension_fixed_amount|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                {% endif %}
+                                {% for od in other_deduction_lines %}
+                                <tr>
+                                    <td class="ps-2">{{ od.name }}</td>
+                                    <td class="text-end text-nowrap">{{ od.amount|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="table-light">
+                                    <th>Total deductions</th>
+                                    <td class="text-end text-nowrap">{{ (item.gross_pay - item.net_pay)|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                                <tr class="table-success">
+                                    <th>Net pay</th>
+                                    <td class="text-end fw-bold text-nowrap">{{ item.net_pay|fmt_money(payslip_currency) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="card payslip-card">
+                <div class="card-header bg-white border-0 pt-3 pb-0 px-3 px-md-4">
+                    <h2 class="h6 mb-0">PAYE information</h2>
+                </div>
+                <div class="card-body pt-2 pb-3 px-3 px-md-4">
+                    <table class="table table-sm payslip-amount-table mb-0">
+                        <tbody>
+                            <tr>
+                                <th>Gross pay (total cash)</th>
+                                <td class="text-end text-nowrap">{{ item.gross_pay|fmt_money(payslip_currency) }}</td>
+                            </tr>
+                            {% if non_taxable_earnings > 0 %}
+                            <tr>
+                                <th>Non-taxable earnings</th>
+                                <td class="text-end text-nowrap">{{ non_taxable_earnings|fmt_money(payslip_currency) }}</td>
+                            </tr>
+                            <tr>
+                                <th>Taxable gross</th>
+                                <td class="text-end text-nowrap">{{ taxable_gross_for_paye|fmt_money(payslip_currency) }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <th>Allowable deductions</th>
+                                <td class="text-end text-nowrap">{{ allowable_deductions|fmt_money(payslip_currency) }}</td>
+                            </tr>
+                            <tr>
+                                <th>Taxable pay</th>
+                                <td class="text-end text-nowrap">{{ item.taxable_pay|fmt_money(payslip_currency) }}</td>
+                            </tr>
+                            {% if show_personal_relief %}
+                            <tr>
+                                <th>Personal relief</th>
+                                <td class="text-end text-nowrap">{{ personal_relief|fmt_money(payslip_currency) }}</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

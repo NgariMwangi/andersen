@@ -1,0 +1,106 @@
+{% extends "layouts/base.html" %}
+{% block title %}Statutory {{ country_code }} - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Statutory · <span class="text-primary">{{ country_code }}</span></h1>
+        <p class="text-muted small mb-0">Payroll amounts for this jurisdiction use <strong>{{ currency_code }}</strong> (branch default or override).</p>
+    </div>
+    <a href="{{ url_for('statutory.index') }}" class="btn btn-outline-secondary btn-sm">All countries</a>
+</div>
+<ul class="nav nav-tabs mb-4 flex-wrap">
+    {% for c in countries_nav %}
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if c == country_code else '' }}" href="{{ url_for('statutory.country_index', country_code=c) }}">{{ c }}</a>
+    </li>
+    {% endfor %}
+    {% if country_code not in countries_nav %}
+    <li class="nav-item"><span class="nav-link active">{{ country_code }}</span></li>
+    {% endif %}
+</ul>
+<p class="mb-3">
+    <a href="{{ url_for('statutory.rate_add', country_code=country_code) }}" class="btn btn-primary">Add rate</a>
+    <a href="{{ url_for('statutory.paye_add', country_code=country_code) }}" class="btn btn-outline-primary">Add PAYE bracket</a>
+    <a href="{{ url_for('statutory.nssf_tier_add', country_code=country_code) }}" class="btn btn-outline-primary">Add NSSF tier</a>
+</p>
+<h5 class="h6 text-secondary">Rates</h5>
+<div class="table-responsive mb-4">
+    <table class="table table-hover"><thead><tr><th>Code</th><th>Effective From</th><th>To</th><th>Value</th><th class="text-end">Actions</th></tr></thead>
+    <tbody>
+    {% for r in rates %}
+    <tr>
+        <td>{{ r.code }}</td><td>{{ r.effective_from }}</td><td>{{ r.effective_to or '-' }}</td><td>{{ r.value }}</td>
+        <td class="text-end">
+            <a href="{{ url_for('statutory.rate_edit', id=r.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+            <form method="post" action="{{ url_for('statutory.rate_delete', id=r.id) }}" class="d-inline" onsubmit="return confirm('Delete this rate?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+        </td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="text-muted">No rates for {{ country_code }}.</td></tr>{% endfor %}
+    </tbody></table>
+</div>
+<h5 class="h6 text-secondary">PAYE brackets <span class="fw-normal text-muted">({{ currency_code }})</span></h5>
+<div class="table-responsive mb-4">
+    <table class="table table-hover"><thead><tr><th>From</th><th>To</th><th>Order</th><th>Min</th><th>Max</th><th>Rate %</th><th class="text-end">Actions</th></tr></thead>
+    <tbody>
+    {% for b in brackets %}
+    <tr>
+        <td>{{ b.effective_from }}</td><td>{{ b.effective_to or '-' }}</td><td>{{ b.bracket_order }}</td><td>{{ b.min_amount }}</td><td>{{ b.max_amount or '-' }}</td><td>{{ b.rate_percent }}</td>
+        <td class="text-end">
+            <a href="{{ url_for('statutory.paye_edit', id=b.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+            <form method="post" action="{{ url_for('statutory.paye_delete', id=b.id) }}" class="d-inline" onsubmit="return confirm('Delete this PAYE bracket?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+        </td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="text-muted">No brackets for {{ country_code }}.</td></tr>{% endfor %}
+    </tbody></table>
+</div>
+<h5 class="h6 text-secondary">NSSF tiers</h5>
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>From</th>
+                <th>To</th>
+                <th>Tier</th>
+                <th>Min</th>
+                <th>Max</th>
+                <th>Emp %</th>
+                <th>Empr %</th>
+                <th>Emp max</th>
+                <th>Empr max</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in tiers %}
+            <tr>
+                <td>{{ t.effective_from }}</td>
+                <td>{{ t.effective_to or '-' }}</td>
+                <td>{{ t.tier_number }}</td>
+                <td>{{ t.pensionable_min }}</td>
+                <td>{{ t.pensionable_max }}</td>
+                <td>{{ t.employee_percent }}</td>
+                <td>{{ t.employer_percent }}</td>
+                <td>{{ t.employee_max_amount or '-' }}</td>
+                <td>{{ t.employer_max_amount or '-' }}</td>
+                <td class="text-end">
+                    <a href="{{ url_for('statutory.nssf_tier_edit', id=t.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <form method="post" action="{{ url_for('statutory.nssf_tier_delete', id=t.id) }}" class="d-inline" onsubmit="return confirm('Delete this NSSF tier?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="10" class="text-muted">No tiers for {{ country_code }}.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p class="text-muted small mt-3 mb-0">NSSF tiers support effective dates, tier bands, contribution rates, and optional contribution caps.</p>
+{% endblock %}

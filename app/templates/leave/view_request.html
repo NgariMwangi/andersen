@@ -1,0 +1,140 @@
+{% extends "layouts/base.html" %}
+{% block title %}Leave Request - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Leave request</h1>
+        {% if request.employee %}
+        <p class="text-muted small mb-0">
+            {{ request.employee.employee_number or '—' }} — {{ request.employee.full_name }}
+        </p>
+        {% endif %}
+    </div>
+    {% set st = (request.status or '')|lower %}
+    <span class="badge fs-6 bg-{% if st == 'approved' %}success{% elif st in ('pending', 'pending_hr') %}warning text-dark{% elif st == 'rejected' %}danger{% else %}secondary{% endif %}">
+        {{ leave_status_label(request.status) }}
+    </span>
+</div>
+
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3 text-muted">Leave type</dt>
+            <dd class="col-sm-9">{{ request.leave_type.name if request.leave_type else '—' }}</dd>
+
+            <dt class="col-sm-3 text-muted">Period</dt>
+            <dd class="col-sm-9">
+                {{ request.start_date.strftime('%d %b %Y') if request.start_date else '—' }}
+                –
+                {{ request.end_date.strftime('%d %b %Y') if request.end_date else '—' }}
+            </dd>
+
+            <dt class="col-sm-3 text-muted">Days requested</dt>
+            <dd class="col-sm-9">{{ request.days_requested | fmt_days }}</dd>
+
+            {% if remaining_days is not none %}
+            <dt class="col-sm-3 text-muted">Days remaining</dt>
+            <dd class="col-sm-9">{{ remaining_days | fmt_days }}</dd>
+            {% endif %}
+
+            <dt class="col-sm-3 text-muted">Handover to</dt>
+            <dd class="col-sm-9">
+                {% if request.handover_to %}
+                    {{ request.handover_to.full_name }}
+                    {% if request.handover_to.employee_number %}({{ request.handover_to.employee_number }}){% endif %}
+                {% else %}
+                    <span class="text-muted">Not recorded</span>
+                {% endif %}
+            </dd>
+
+            <dt class="col-sm-3 text-muted">Reason</dt>
+            <dd class="col-sm-9">{{ request.reason or '—' }}</dd>
+
+            <dt class="col-sm-3 text-muted">Submitted</dt>
+            <dd class="col-sm-9">
+                {{ request.created_at.strftime('%d %b %Y %H:%M') if request.created_at else '—' }}
+            </dd>
+        </dl>
+    </div>
+</div>
+
+<div class="card mb-4 border-0 bg-light">
+    <div class="card-body py-3">
+        <h2 class="h6 mb-2">Supervisor step</h2>
+        {% if supervisor_summary.state == 'not_applicable' %}
+        <p class="small mb-0 text-muted">{{ supervisor_summary.label }} — HR is the first approver for this request.</p>
+        {% elif supervisor_summary.state == 'awaiting' %}
+        <p class="small mb-1"><span class="badge bg-warning text-dark">{{ supervisor_summary.label }}</span></p>
+        <p class="small mb-0 text-muted">Assigned supervisor(s): <strong>{{ supervisor_summary.manager_name or '—' }}</strong></p>
+        {% elif supervisor_summary.state == 'completed' %}
+        <p class="small mb-1">
+            <span class="badge bg-success">Supervisor approved</span>
+            {% if supervisor_summary.reviewed_at %} {{ supervisor_summary.reviewed_at.strftime('%d %b %Y %H:%M') }}{% endif %}
+        </p>
+        <p class="small mb-0 text-muted">
+            Manager: {{ supervisor_summary.manager_name or '—' }}
+            {% if supervisor_summary.reviewer_label %} · by {{ supervisor_summary.reviewer_label }}{% endif %}
+        </p>
+        {% if supervisor_summary.notes %}<p class="small mb-0 mt-1"><strong>Supervisor notes:</strong> {{ supervisor_summary.notes }}</p>{% endif %}
+        {% elif supervisor_summary.state == 'rejected' %}
+        <p class="small mb-1"><span class="badge bg-danger">{{ supervisor_summary.label }}</span>
+            {% if supervisor_summary.reviewed_at %} {{ supervisor_summary.reviewed_at.strftime('%d %b %Y %H:%M') }}{% endif %}
+        </p>
+        {% if supervisor_summary.notes %}<p class="small mb-0"><strong>Notes:</strong> {{ supervisor_summary.notes }}</p>{% endif %}
+        {% else %}
+        <p class="small mb-0">{{ supervisor_summary.label }}</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if request.reviewed_at or request.review_notes %}
+<div class="card mb-4 border-0 bg-light">
+    <div class="card-body py-3">
+        <h2 class="h6 mb-2">HR decision</h2>
+        <p class="small mb-1">
+            {% if st == 'approved' %}
+            <span class="badge bg-success">Approved</span>
+            {% elif st == 'rejected' %}
+            <span class="badge bg-danger">Rejected</span>
+            {% else %}
+            <span class="badge bg-secondary">{{ leave_status_label(request.status) }}</span>
+            {% endif %}
+            {% if request.reviewed_at %} {{ request.reviewed_at.strftime('%d %b %Y %H:%M') }}{% endif %}
+        </p>
+        {% if request.reviewed_by and request.reviewed_by.email %}
+        <p class="small mb-1 text-muted">By {{ request.reviewed_by.email }}</p>
+        {% endif %}
+        {% if request.review_notes %}
+        <p class="small mb-0"><strong>HR notes:</strong> {{ request.review_notes }}</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if request.document_path %}
+<p class="mb-4">
+    <strong>Supporting document:</strong>
+    <a href="{{ url_for('leave.leave_request_document', id=request.id) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+        <i class="bi bi-eye me-1"></i>View
+    </a>
+    <a href="{{ url_for('leave.leave_request_document', id=request.id, download=1) }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-download me-1"></i>Download
+    </a>
+</p>
+{% else %}
+<p class="alert alert-light border py-2 small mb-4">No supporting document was attached to this request.</p>
+{% endif %}
+
+<div class="d-flex flex-wrap gap-2">
+    <a href="{{ url_for('leave.index') }}" class="btn btn-outline-secondary">Back to list</a>
+    {% if can_review %}
+    <a href="{{ url_for('leave.approve', id=request.id) }}" class="btn btn-primary">Review</a>
+    {% endif %}
+    {% if can_edit %}
+    <a href="{{ url_for('leave.edit_request', id=request.id) }}" class="btn btn-outline-secondary">Edit</a>
+    {% endif %}
+    {% if can_resubmit %}
+    <a href="{{ url_for('leave.edit_request', id=request.id) }}" class="btn btn-primary">Resubmit</a>
+    {% endif %}
+</div>
+{% endblock %}

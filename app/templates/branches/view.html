@@ -1,0 +1,38 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ branch.name }} - Branches - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-1 fw-600 text-dark">{{ branch.name }}</h1>
+        <p class="text-muted small mb-0">
+            <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ branch.country_code }}</span>
+            <span class="badge bg-light text-dark border ms-1">{{ payroll_currency }}</span>
+            {% if branch.timezone %}<span class="ms-2"><i class="bi bi-clock me-1"></i>{{ branch.timezone }}</span>{% endif %}
+        </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        {% if has_permission('manage_departments') %}
+        <a href="{{ url_for('branches.edit', id=branch.id) }}" class="btn btn-outline-primary">Edit</a>
+        {% if employee_count == 0 %}
+        <form method="post" action="{{ url_for('branches.delete', id=branch.id) }}" class="d-inline" onsubmit="return confirm('Delete this branch? This cannot be undone.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="btn btn-outline-danger">Delete</button>
+        </form>
+        {% endif %}
+        {% endif %}
+        <a href="{{ url_for('branches.index') }}" class="btn btn-outline-secondary">All branches</a>
+    </div>
+</div>
+<div class="card mb-3">
+    <div class="card-body">
+        <h2 class="h6 text-secondary">Summary</h2>
+        <dl class="row mb-0 small">
+            <dt class="col-sm-3">Employees</dt>
+            <dd class="col-sm-9">{{ employee_count }}</dd>
+        </dl>
+    </div>
+</div>
+{% if employee_count > 0 and has_permission('manage_departments') %}
+<p class="text-muted small">Delete is disabled while employees are assigned. Reassign them on each employee record first.</p>
+{% endif %}
+{% endblock %}

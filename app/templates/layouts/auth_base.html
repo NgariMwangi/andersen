@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Login - {{ app_name }}{% endblock %}</title>
+    <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='brand/andersen-logo.jpg') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --auth-accent: #ab0e1e;
+            --auth-accent-2: #8d0c18;
+            --auth-slate: #243444;
+        }
+        body.auth-body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            background: #000000;
+            background-image:
+                radial-gradient(ellipse 80% 60% at 50% 0%, rgba(171, 14, 30, 0.18), transparent 55%),
+                radial-gradient(ellipse 50% 40% at 100% 100%, rgba(36, 52, 68, 0.35), transparent);
+            -webkit-font-smoothing: antialiased;
+        }
+        .auth-shell {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 2rem 0;
+        }
+        .auth-card {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 1rem;
+            background: #ffffff;
+            box-shadow:
+                0 4px 24px rgba(0, 0, 0, 0.25),
+                0 24px 48px -24px rgba(0, 0, 0, 0.35);
+        }
+        .auth-brand-wrap {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .auth-logo {
+            display: block;
+            max-width: 200px;
+            width: 100%;
+            height: auto;
+            margin: 0 auto 0.75rem;
+        }
+        .auth-tagline {
+            margin: 0;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--auth-slate);
+        }
+        .auth-card .form-control {
+            border-radius: 0.5rem;
+            padding: 0.65rem 0.95rem;
+            border-color: #d0d3d4;
+        }
+        .auth-card .form-control:focus {
+            border-color: rgba(171, 14, 30, 0.55);
+            box-shadow: 0 0 0 3px rgba(171, 14, 30, 0.15);
+        }
+        .auth-card .btn-primary {
+            background: var(--auth-accent);
+            border: none;
+            font-weight: 600;
+            padding: 0.65rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 8px 24px rgba(171, 14, 30, 0.28);
+        }
+        .auth-card .btn-primary:hover {
+            background: var(--auth-accent-2);
+            box-shadow: 0 10px 28px rgba(171, 14, 30, 0.35);
+        }
+        .auth-card .alert {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            border-left: 4px solid;
+            padding: 0.75rem 1rem;
+        }
+        .auth-card .alert-success { border-left-color: #22c55e; background: linear-gradient(90deg, #f0fdf4, #fff); color: #166534; }
+        .auth-card .alert-danger { border-left-color: #ef4444; background: linear-gradient(90deg, #fef2f2, #fff); color: #991b1b; }
+        .auth-card .alert-warning { border-left-color: #f59e0b; background: linear-gradient(90deg, #fffbeb, #fff); color: #92400e; }
+        .auth-card .alert-info { border-left-color: var(--auth-accent); background: linear-gradient(90deg, rgba(171, 14, 30, 0.06), #fff); color: var(--auth-slate); }
+        .auth-footer-links a {
+            color: var(--auth-accent);
+            font-weight: 500;
+            text-decoration: none;
+        }
+        .auth-footer-links a:hover {
+            color: var(--auth-accent-2);
+            text-decoration: underline;
+        }
+        .password-wrap {
+            position: relative;
+        }
+        .password-wrap .form-control.has-toggle {
+            padding-right: 2.75rem;
+        }
+        .password-toggle-btn {
+            position: absolute;
+            right: 0.35rem;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: transparent;
+            color: #76848f;
+            padding: 0.4rem 0.55rem;
+            line-height: 1;
+            border-radius: 0.4rem;
+            cursor: pointer;
+        }
+        .password-toggle-btn:hover {
+            color: var(--auth-accent);
+            background: rgba(171, 14, 30, 0.08);
+        }
+        .password-toggle-btn:focus {
+            outline: 2px solid rgba(171, 14, 30, 0.35);
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body class="auth-body">
+    <div class="auth-shell">
+        <div class="container">
+            <div class="row justify-content-center align-items-center">
+                <div class="col-md-5 col-lg-4">
+                    <div class="card auth-card">
+                        <div class="card-body p-4 p-md-5">
+                            <div class="auth-brand-wrap">
+                                <img src="{{ url_for('static', filename='brand/andersen-logo.jpg') }}" alt="Andersen" class="auth-logo">
+                                <p class="auth-tagline">Human Resource Management System</p>
+                            </div>
+                            {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                            {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show mb-3 flash-alert" role="alert" data-auto-dismiss="5000">
+                                {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>{% elif category == 'danger' %}<i class="bi bi-x-circle-fill"></i>{% elif category == 'warning' %}<i class="bi bi-exclamation-triangle-fill"></i>{% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
+                                <span class="flex-grow-1">{{ message }}</span>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                            {% endwith %}
+                            {% block auth_content %}{% endblock %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.flash-alert[data-auto-dismiss]').forEach(function(alert) {
+                var delay = parseInt(alert.getAttribute('data-auto-dismiss'), 10) || 5000;
+                setTimeout(function() { var btn = alert.querySelector('.btn-close'); if (btn) btn.click(); }, delay);
+            });
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

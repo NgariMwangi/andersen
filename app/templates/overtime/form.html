@@ -1,0 +1,111 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ title }} - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">{{ title }}</h1>
+<form method="post" class="card border-0 shadow-sm" style="max-width: 32rem;">
+    <div class="card-body">
+        {{ form.hidden_tag() }}
+        {% if for_employee %}
+        <div class="mb-3">
+            {{ form.employee_id.label(class="form-label") }}
+            {{ form.employee_id(class="form-select") }}
+            {% for e in form.employee_id.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+        </div>
+        {% endif %}
+        <div class="mb-3">
+            {{ form.worked_dates.label(class="form-label") }}
+            {{ form.worked_dates(class="d-none", id="workedDatesField") }}
+            <div class="row g-2 align-items-end">
+                <div class="col-sm-8">
+                    <label for="overtimeDatePicker" class="form-label">Pick overtime date</label>
+                    <input type="date" id="overtimeDatePicker" class="form-control">
+                </div>
+                <div class="col-sm-4">
+                    <button type="button" id="addOvertimeDateBtn" class="btn btn-outline-primary w-100">Add date</button>
+                </div>
+            </div>
+            <div class="form-text">Select each overtime day from the calendar, then click Add date.</div>
+            <div id="overtimeDateList" class="d-flex flex-wrap gap-2 mt-2"></div>
+            {% for e in form.worked_dates.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                {{ form.for_pay_month.label(class="form-label") }}
+                {{ form.for_pay_month(class="form-control", min=1, max=12, readonly=true) }}
+                <div class="form-text">Auto-set from latest selected overtime date.</div>
+                {% for e in form.for_pay_month.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-6">
+                {{ form.for_pay_year.label(class="form-label") }}
+                {{ form.for_pay_year(class="form-control", readonly=true) }}
+                {% for e in form.for_pay_year.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+        </div>
+        <div class="mb-3">
+            {{ form.reason.label(class="form-label") }}
+            {{ form.reason(class="form-control", rows=3) }}
+        </div>
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('overtime.index') }}" class="btn btn-link">Back</a>
+    </div>
+</form>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var hiddenField = document.getElementById('workedDatesField');
+    var picker = document.getElementById('overtimeDatePicker');
+    var addBtn = document.getElementById('addOvertimeDateBtn');
+    var listEl = document.getElementById('overtimeDateList');
+    var monthField = document.getElementById('for_pay_month');
+    var yearField = document.getElementById('for_pay_year');
+    if (!hiddenField || !picker || !addBtn || !listEl || !monthField || !yearField) return;
+
+    var dates = new Set();
+    var existing = (hiddenField.value || '').replaceAll(',', '\n').split('\n').map(function (x) { return x.trim(); }).filter(Boolean);
+    existing.forEach(function (d) { dates.add(d); });
+
+    function syncField() {
+        var sorted = Array.from(dates).sort();
+        hiddenField.value = sorted.join('\n');
+        if (sorted.length > 0) {
+            var latest = sorted[sorted.length - 1].split('-');
+            yearField.value = latest[0];
+            monthField.value = String(parseInt(latest[1], 10));
+        } else {
+            yearField.value = '';
+            monthField.value = '';
+        }
+    }
+
+    function renderList() {
+        listEl.innerHTML = '';
+        Array.from(dates).sort().forEach(function (d) {
+            var chip = document.createElement('span');
+            chip.className = 'badge text-bg-light border text-dark';
+            chip.style.padding = '0.5rem 0.65rem';
+            chip.innerHTML = d + ' <button type="button" class="btn btn-sm p-0 ms-2 text-danger border-0 bg-transparent" data-date="' + d + '" aria-label="Remove date">&times;</button>';
+            listEl.appendChild(chip);
+        });
+    }
+
+    addBtn.addEventListener('click', function () {
+        var value = (picker.value || '').trim();
+        if (!value) return;
+        dates.add(value);
+        picker.value = '';
+        syncField();
+        renderList();
+    });
+
+    listEl.addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-date]');
+        if (!btn) return;
+        dates.delete(btn.getAttribute('data-date'));
+        syncField();
+        renderList();
+    });
+
+    syncField();
+    renderList();
+});
+</script>
+{% endblock %}

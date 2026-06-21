@@ -1,0 +1,316 @@
+{% extends "layouts/base.html" %}
+{% block title %}Dashboard - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="mb-4">
+    <h1 class="h3 mb-1">Dashboard</h1>
+    <p class="text-muted small mb-0">Overview and quick links</p>
+</div>
+{% if executive_summary %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h6 mb-0">Company operating summary</h2>
+            {% if payroll_enabled and executive_summary.payroll_period %}
+            <span class="badge text-bg-light">Latest payroll: {{ executive_summary.payroll_period }}</span>
+            {% endif %}
+        </div>
+        <div class="row g-3">
+            <div class="col-sm-6 col-lg-3">
+                <div class="border rounded p-3 h-100">
+                    <div class="small text-muted">Active employees</div>
+                    <div class="h5 mb-0">{{ executive_summary.active_employees }}</div>
+                </div>
+            </div>
+            {% if payroll_enabled %}
+            {% for branch in executive_summary.payroll_by_branch %}
+            <div class="col-sm-6 col-lg-3">
+                <div class="border rounded p-3 h-100">
+                    <div class="small text-muted">Net pay · {{ branch.country_code }} <span class="badge bg-secondary bg-opacity-75">{{ branch.status }}</span></div>
+                    <div class="h6 mb-0">{{ branch.currency }} {{ "{:,.2f}".format(branch.net|float) }}</div>
+                    <div class="small text-muted mt-1">{{ branch.staff }} staff · {{ branch.consultants }} consultant{{ 's' if branch.consultants != 1 else '' }}</div>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% if has_permission('view_leave') or has_permission('approve_leave') %}
+            <div class="col-sm-6 col-lg-3">
+                <div class="border rounded p-3 h-100">
+                    <div class="small text-muted">Pending leave approvals</div>
+                    <div class="h5 mb-0">{{ executive_summary.pending_leave }}</div>
+                </div>
+            </div>
+            {% endif %}
+            {% if overtime_enabled and has_permission('approve_overtime') %}
+            <div class="col-sm-6 col-lg-3">
+                <div class="border rounded p-3 h-100">
+                    <div class="small text-muted">Pending overtime approvals</div>
+                    <div class="h5 mb-0">{{ executive_summary.pending_overtime }}</div>
+                </div>
+            </div>
+            {% endif %}
+            <div class="col-sm-6 col-lg-3">
+                <div class="border rounded p-3 h-100">
+                    <div class="small text-muted">New hires this month</div>
+                    <div class="h5 mb-0">{{ executive_summary.new_hires_this_month }}</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="border rounded p-3 h-100">
+                    <div class="small text-muted">Exits this month</div>
+                    <div class="h5 mb-0">{{ executive_summary.exits_this_month }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% if payroll_enabled and payroll_charts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<div class="row g-3 mb-4">
+    {% for chart in payroll_charts %}
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0"><i class="bi bi-graph-up me-2"></i>{{ chart.title }}</h2>
+            </div>
+            <div class="card-body">
+                <canvas id="{{ chart.id }}" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% for chart in payroll_charts %}
+    (function() {
+        var ctx = document.getElementById('{{ chart.id }}').getContext('2d');
+        var chartData = {{ chart.data_json|safe }};
+        new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(c) {
+                                return c.dataset.label + ': ' + c.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: function(v) { return v.toLocaleString(); } }
+                    }
+                }
+            }
+        });
+    })();
+    {% endfor %}
+});
+</script>
+{% endif %}
+<div class="row g-4">
+    {% if not executive_summary %}
+    <div class="col-sm-6 col-xl-4">
+        <div class="card stat-card stat-primary h-100 border-0">
+            <div class="card-body p-4 d-flex flex-column">
+                <div class="d-flex align-items-start justify-content-between mb-3">
+                    <span class="text-uppercase fw-semibold small text-muted" style="letter-spacing:0.06em;">Active employees</span>
+                    <span class="stat-icon"><i class="bi bi-people"></i></span>
+                </div>
+                <p class="stat-value mb-0">{{ total_employees }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if overtime_enabled and pending_overtime is defined and pending_overtime > 0 %}
+    <div class="col-sm-6 col-xl-4">
+        <div class="card stat-card stat-warning h-100 border-0">
+            <div class="card-body p-4 d-flex flex-column">
+                <div class="d-flex align-items-start justify-content-between mb-3">
+                    <span class="text-uppercase fw-semibold small text-muted" style="letter-spacing:0.06em;">Pending overtime</span>
+                    <span class="stat-icon"><i class="bi bi-clock-history"></i></span>
+                </div>
+                <p class="stat-value mb-3">{{ pending_overtime }}</p>
+                <a href="{{ url_for('overtime.index') }}" class="btn btn-sm btn-outline-primary align-self-start rounded-3">Review</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if payroll_enabled and latest_payroll and has_permission('view_payroll') %}
+    <div class="col-sm-6 col-xl-4">
+        <div class="card stat-card stat-success h-100 border-0">
+            <div class="card-body p-4 d-flex flex-column">
+                <div class="d-flex align-items-start justify-content-between mb-3">
+                    <span class="text-uppercase fw-semibold small text-muted" style="letter-spacing:0.06em;">Latest payroll</span>
+                    <span class="stat-icon"><i class="bi bi-cash-stack"></i></span>
+                </div>
+                <p class="mb-2 fw-semibold text-dark">{{ latest_payroll.pay_month }}/{{ latest_payroll.pay_year }} <span class="badge bg-secondary bg-opacity-75">{{ latest_payroll.status }}</span></p>
+                <a href="{{ url_for('payroll.view_run', id=latest_payroll.id) }}" class="btn btn-sm btn-outline-primary align-self-start rounded-3">Open run</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if has_permission('view_employees') %}
+    <div class="col-12 col-xl-8">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h2 class="h6 mb-0">Upcoming birthdays (next {{ birthday_window_days }} days)</h2>
+                    <i class="bi bi-gift text-primary"></i>
+                </div>
+                {% if upcoming_birthdays %}
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Birthday</th>
+                                <th>In</th>
+                                <th>Turning</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in upcoming_birthdays %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('employees.view', id=item.employee.id) }}" class="text-decoration-none">
+                                        {{ item.employee.full_name }}
+                                    </a>
+                                </td>
+                                <td>{{ item.birthday.strftime('%d %b') }} ({{ item.weekday }})</td>
+                                <td>
+                                    {% if item.days_away == 0 %}
+                                    <span class="badge bg-success">Happy Birthday</span>
+                                    {% elif item.days_away == 1 %}
+                                    Tomorrow
+                                    {% elif item.coming_weekday_label %}
+                                    <span class="badge bg-primary-subtle text-primary-emphasis">{{ item.coming_weekday_label }}</span>
+                                    {% else %}
+                                    {{ item.days_away }} days
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.turning_age }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">No upcoming birthdays found.</p>
+                {% endif %}
+                <a href="{{ url_for('employees.birthdays') }}" class="btn btn-sm btn-outline-primary mt-3">View yearly birthdays</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if has_permission('edit_employees') %}
+    <div class="col-12 col-xl-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h2 class="h6 mb-0">Probation alerts</h2>
+                    <i class="bi bi-bell text-warning"></i>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="border rounded p-2 h-100">
+                            <div class="small text-muted">Nearing ({{ probation_alert_window_days }} days)</div>
+                            <div class="h5 mb-0">{{ probation_nearing|length }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2 h-100">
+                            <div class="small text-muted">Arrived / overdue</div>
+                            <div class="h5 mb-0">{{ probation_arrived|length }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% if probation_arrived or probation_nearing %}
+                <ul class="list-group list-group-flush small">
+                    {% for item in probation_arrived[:5] %}
+                    <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('employees.view', id=item.employee.id) }}" class="text-decoration-none">{{ item.employee.full_name }}</a>
+                        {% if item.days_to_end == 0 %}
+                        <span class="badge bg-danger">Today</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ (item.days_to_end * -1) }}d overdue</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                    {% for item in probation_nearing[:5] %}
+                    <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('employees.view', id=item.employee.id) }}" class="text-decoration-none">{{ item.employee.full_name }}</a>
+                        {% if item.days_to_end == 1 %}
+                        <span class="badge bg-warning text-dark">Tomorrow</span>
+                        {% else %}
+                        <span class="badge bg-info text-dark">{{ item.days_to_end }}d</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small mb-0">No probation alerts right now.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h2 class="h6 mb-0">Contract alerts</h2>
+                    <i class="bi bi-bell text-warning"></i>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="border rounded p-2 h-100">
+                            <div class="small text-muted">Nearing ({{ contract_alert_window_days }} days)</div>
+                            <div class="h5 mb-0">{{ contract_nearing|length }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2 h-100">
+                            <div class="small text-muted">Arrived / overdue</div>
+                            <div class="h5 mb-0">{{ contract_arrived|length }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% if contract_arrived or contract_nearing %}
+                <ul class="list-group list-group-flush small">
+                    {% for item in contract_arrived[:5] %}
+                    <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('employees.view', id=item.employee.id) }}" class="text-decoration-none">{{ item.employee.full_name }}</a>
+                        {% if item.days_to_end == 0 %}
+                        <span class="badge bg-danger">Today</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ (item.days_to_end * -1) }}d overdue</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                    {% for item in contract_nearing[:5] %}
+                    <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('employees.view', id=item.employee.id) }}" class="text-decoration-none">{{ item.employee.full_name }}</a>
+                        {% if item.days_to_end == 1 %}
+                        <span class="badge bg-warning text-dark">Tomorrow</span>
+                        {% else %}
+                        <span class="badge bg-info text-dark">{{ item.days_to_end }}d</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small mb-0">No contract alerts right now.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

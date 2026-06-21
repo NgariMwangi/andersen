@@ -1,0 +1,44 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ 'Edit' if tier else 'Add' }} NSSF tier - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">{{ 'Edit' if tier else 'Add' }} NSSF tier</h1>
+<p class="text-muted mb-4">
+    Country <strong>{{ country_code }}</strong> · Payroll currency <strong>{{ currency_code }}</strong>
+</p>
+
+{% if form.errors %}
+<div class="alert alert-danger">
+    <strong>Please correct the following:</strong>
+    <ul class="mb-0 mt-2">
+        {% for field_name, errors in form.errors.items() %}
+            {% for err in errors %}
+            <li>{{ form[field_name].label.text if field_name in form else field_name }}: {{ err }}</li>
+            {% endfor %}
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="row g-3">
+        <div class="col-md-3">{{ form.country_code.label(class='form-label') }}{{ form.country_code(class='form-control text-uppercase') }}</div>
+        <div class="col-md-3">{{ form.effective_from.label(class='form-label') }}{{ form.effective_from(class='form-control') }}</div>
+        <div class="col-md-3">{{ form.effective_to.label(class='form-label') }}{{ form.effective_to(class='form-control') }}</div>
+        <div class="col-md-3">{{ form.tier_number.label(class='form-label') }}{{ form.tier_number(class='form-control') }}</div>
+
+        <div class="col-md-3">{{ form.pensionable_min.label(class='form-label') }}{{ form.pensionable_min(class='form-control', step='0.01') }}</div>
+        <div class="col-md-3">{{ form.pensionable_max.label(class='form-label') }}{{ form.pensionable_max(class='form-control', step='0.01') }}</div>
+        <div class="col-md-3">{{ form.employee_percent.label(class='form-label') }}{{ form.employee_percent(class='form-control', step='0.01') }}</div>
+        <div class="col-md-3">{{ form.employer_percent.label(class='form-label') }}{{ form.employer_percent(class='form-control', step='0.01') }}</div>
+
+        <div class="col-md-3">{{ form.employee_max_amount.label(class='form-label') }}{{ form.employee_max_amount(class='form-control', step='0.01') }}</div>
+        <div class="col-md-3">{{ form.employer_max_amount.label(class='form-label') }}{{ form.employer_max_amount(class='form-control', step='0.01') }}</div>
+    </div>
+
+    <div class="mt-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">{{ 'Update tier' if tier else 'Save tier' }}</button>
+        <a href="{{ url_for('statutory.country_index', country_code=country_code) }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

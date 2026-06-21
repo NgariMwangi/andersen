@@ -1,0 +1,16 @@
+services:
+  web:
+    env_file:
+      - .env.production
+    restart: unless-stopped
+    build: .
+    container_name: hrms_kenya
+    environment:
+      FLASK_ENV: production
+      SECRET_KEY: jtyjxdnjncdkm
+      DATABASE_URL: postgresql://postgres:deno0707@37.60.242.201:5432/hrms_kenya1
+    ports:
+      - "5001:5001"
+    # Optional: mount app/static to provide logo.jpg without rebuilding
+    # volumes:
+    #   - ./app/static:/app/app/static:ro

@@ -1,0 +1,123 @@
+{% extends "layouts/base.html" %}
+{% block title %}Request Leave - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-2">{{ form_title or 'Request Leave' }}</h1>
+{% if edit_employee %}
+<p class="mb-2">
+    <span class="badge text-bg-light border">
+        Editing leave for: {{ edit_employee.employee_number or 'No Number' }} — {{ edit_employee.full_name }}
+    </span>
+</p>
+{% endif %}
+{% if is_resubmit %}
+<div class="alert alert-info py-2 small mb-3">
+    This request was <strong>rejected</strong>. Update the details below and resubmit — it will go back into the approval workflow.
+</div>
+{% endif %}
+<p class="text-muted small mb-3">The number of days is calculated from your dates: <strong>working days</strong> (Mon–Fri) or <strong>calendar days</strong> (including weekends), depending on the leave type — set under <em>Leave types</em>. You must nominate a colleague to <strong>hand your duties over to</strong> while you are away (when other active employees exist). After you choose a leave type, your <strong>accrued</strong> and <strong>available</strong> balance for that year appears below the form.</p>
+
+<div class="alert alert-info py-2 small mb-3" id="entitlement-helper" style="display:none;">
+    <div class="fw-semibold mb-1"><i class="bi bi-calendar-range me-1"></i> Suggested end date (full entitlement)</div>
+    <p class="mb-2 small" id="entitlement-helper-text"></p>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="btn-apply-suggested-end">Apply suggested end date</button>
+</div>
+<div class="alert alert-secondary py-2 small mb-3 d-none" id="entitlement-helper-none"></div>
+
+<form method="post" action="{{ form_action or url_for('leave.request_leave') }}" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="row g-3">
+        <div class="col-md-6">
+            {{ form.leave_type_id.label(class='form-label') }}
+            {{ form.leave_type_id(class_='form-select', id='leave_type_id') }}
+        </div>
+        <div class="col-md-3">
+            {{ form.start_date.label(class='form-label') }}
+            {{ form.start_date(class_='form-control', id='start_date') }}
+        </div>
+        <div class="col-md-3">
+            {{ form.end_date.label(class='form-label') }}
+            {{ form.end_date(class_='form-control', id='end_date') }}
+        </div>
+        <div class="col-md-8">
+            {{ form.handover_to_id.label(class='form-label') }}
+            {{ form.handover_to_id(class_='form-select', id='handover_to_id') }}
+            <span class="form-text">{% if handover_required %}Required: who will cover your role during this leave.{% else %}Optional: there is no other active employee to select — contact HR if a handover is still needed.{% endif %}</span>
+            {% for e in form.handover_to_id.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-12">{{ form.reason.label(class='form-label') }}{{ form.reason(class_='form-control') }}</div>
+        {% include 'leave/_leave_attachment.html' %}
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary">{{ form_submit_label or 'Submit Request' }}</button>
+            {% if form_action %}
+            <a href="{{ url_for('leave.index') }}" class="btn btn-outline-secondary">Cancel</a>
+            {% endif %}
+        </div>
+    </div>
+</form>
+{% include 'leave/_request_balance_preview.html' %}
+{% endblock %}
+{% block extra_js %}
+<script>
+(function() {
+    var apiUrl = {{ url_for('leave.suggest_end_date') | tojson }};
+    var box = document.getElementById('entitlement-helper');
+    var boxNone = document.getElementById('entitlement-helper-none');
+    var textEl = document.getElementById('entitlement-helper-text');
+    var btnApply = document.getElementById('btn-apply-suggested-end');
+    var sel = document.getElementById('leave_type_id');
+    var startEl = document.getElementById('start_date');
+    var endEl = document.getElementById('end_date');
+
+    var suggestedEnd = null;
+
+    function refreshHelper() {
+        suggestedEnd = null;
+        box.style.display = 'none';
+        boxNone.classList.add('d-none');
+        if (!sel || !startEl || !sel.value || !startEl.value) return;
+
+        var u = apiUrl + '?leave_type_id=' + encodeURIComponent(sel.value) + '&start_date=' + encodeURIComponent(startEl.value);
+        fetch(u, { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) return;
+                if (!data.suggest) {
+                    if (data.message) {
+                        boxNone.textContent = data.message;
+                        boxNone.classList.remove('d-none');
+                    }
+                    return;
+                }
+                suggestedEnd = data.end_date;
+                var n = data.total_days;
+                var basis = data.basis_label || '';
+                textEl.innerHTML =
+                    'For <strong>' + escapeHtml(data.leave_type_name) + '</strong>, a full period of <strong>' + n + '</strong> ' + basis +
+                    ' starting on <strong>' + escapeHtml(startEl.value) + '</strong> ends on <strong>' + escapeHtml(data.end_date_display) + '</strong>.';
+                box.style.display = 'block';
+            })
+            .catch(function() { /* ignore */ });
+    }
+
+    function escapeHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    if (sel) sel.addEventListener('change', refreshHelper);
+    if (startEl) startEl.addEventListener('change', refreshHelper);
+    if (startEl) startEl.addEventListener('blur', refreshHelper);
+
+    if (btnApply) {
+        btnApply.addEventListener('click', function() {
+            if (suggestedEnd && endEl) {
+                endEl.value = suggestedEnd;
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', refreshHelper);
+})();
+</script>
+{% endblock %}

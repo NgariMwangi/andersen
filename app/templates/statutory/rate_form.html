@@ -1,0 +1,17 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ 'Edit' if rate else 'Add' }} Rate - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-2">{{ 'Edit' if rate else 'Add' }} Statutory rate</h1>
+{% if currency_code %}<p class="text-muted small mb-4">Amount-type values use payroll currency <strong>{{ currency_code }}</strong> for this country (see Branches).</p>{% endif %}
+<form method="post" action="{{ url_for('statutory.rate_edit', id=rate.id) if rate else url_for('statutory.rate_add', country_code=country_code) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="mb-3">{{ form.country_code.label(class='form-label') }}{{ form.country_code(class='form-control text-uppercase', maxlength='2') }}</div>
+    <div class="mb-3">{{ form.code.label(class='form-label') }}{{ form.code(class='form-control') }}</div>
+    <div class="mb-3">{{ form.effective_from.label(class='form-label') }}{{ form.effective_from(class='form-control') }}</div>
+    <div class="mb-3">{{ form.effective_to.label(class='form-label') }}{{ form.effective_to(class='form-control') }}</div>
+    <div class="mb-3">{{ form.value.label(class='form-label') }}{{ form.value(class='form-control') }}</div>
+    <div class="mb-3">{{ form.description.label(class='form-label') }}{{ form.description(class='form-control') }}</div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{{ url_for('statutory.country_index', country_code=country_code) }}" class="btn btn-outline-secondary">Cancel</a>
+</form>
+{% endblock %}

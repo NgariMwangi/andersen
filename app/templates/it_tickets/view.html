@@ -1,0 +1,141 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ ticket.ticket_number }} - IT Support - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-1 fw-600 text-dark">{{ ticket.ticket_number }}</h1>
+        <p class="text-muted mb-0">{{ ticket.subject }}</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        {% if has_permission('view_tickets') %}
+        <a href="{{ url_for('it_tickets.queue') }}" class="btn btn-outline-secondary btn-sm">IT queue</a>
+        {% endif %}
+        {% if has_permission('submit_tickets') %}
+        <a href="{{ url_for('it_tickets.my_tickets') }}" class="btn btn-outline-secondary btn-sm">My tickets</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card mb-3">
+            <div class="card-header">Description</div>
+            <div class="card-body">
+                <p class="mb-0" style="white-space: pre-wrap;">{{ ticket.description }}</p>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Comments</div>
+            <div class="card-body">
+                {% for comment in ticket.comments %}
+                <div class="border-bottom pb-3 mb-3{% if loop.last %} border-0 pb-0 mb-0{% endif %}">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                        <strong class="small">
+                            {% if comment.author and comment.author.employee %}
+                            {{ comment.author.employee.full_name }}
+                            {% elif comment.author %}
+                            {{ comment.author.email }}
+                            {% else %}User{% endif %}
+                        </strong>
+                        <span class="small text-muted">{{ comment.created_at.strftime('%d %b %Y %H:%M') }}</span>
+                    </div>
+                    <p class="mb-0 small" style="white-space: pre-wrap;">{{ comment.body }}</p>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">No comments yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if ticket.status != 'closed' or can_manage %}
+        <div class="card">
+            <div class="card-header">Add comment</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('it_tickets.add_comment', id=ticket.id) }}">
+                    {{ comment_form.hidden_tag() }}
+                    {{ comment_form.body(class='form-control mb-2', rows='3', placeholder='Write a reply…') }}
+                    {{ comment_form.submit(class='btn btn-primary btn-sm') }}
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-header">Details</div>
+            <div class="card-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-sm-5">Status</dt>
+                    <dd class="col-sm-7">
+                        <span class="badge {% if ticket.status == 'open' %}bg-primary{% elif ticket.status == 'in_progress' %}bg-info text-dark{% elif ticket.status == 'waiting_on_user' %}bg-warning text-dark{% elif ticket.status == 'resolved' %}bg-success{% else %}bg-secondary{% endif %}">
+                            {{ status_labels.get(ticket.status, ticket.status) }}
+                        </span>
+                    </dd>
+                    <dt class="col-sm-5">Priority</dt>
+                    <dd class="col-sm-7">{{ priority_labels.get(ticket.priority, ticket.priority) }}</dd>
+                    <dt class="col-sm-5">Category</dt>
+                    <dd class="col-sm-7">{{ ticket.category.name if ticket.category else '—' }}</dd>
+                    <dt class="col-sm-5">Related asset</dt>
+                    <dd class="col-sm-7">
+                        {% if ticket.related_asset %}
+                        <a href="{{ url_for('company_assets.view', id=ticket.related_asset.id) }}" class="text-decoration-none">
+                            {{ ticket.related_asset.asset_tag }}{% if ticket.related_asset.name %} — {{ ticket.related_asset.name }}{% endif %}
+                        </a>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </dd>
+                    <dt class="col-sm-5">Requester</dt>
+                    <dd class="col-sm-7">
+                        {% if ticket.requester and ticket.requester.employee %}
+                        {{ ticket.requester.employee.full_name }}
+                        {% elif ticket.requester %}
+                        {{ ticket.requester.email or '—' }}
+                        {% else %}—{% endif %}
+                    </dd>
+                    <dt class="col-sm-5">Assignee</dt>
+                    <dd class="col-sm-7">
+                        {% if ticket.assigned_to and ticket.assigned_to.employee %}
+                        {{ ticket.assigned_to.employee.full_name }}
+                        {% elif ticket.assigned_to %}
+                        {{ ticket.assigned_to.email }}
+                        {% else %}
+                        <span class="text-muted">Unassigned</span>
+                        {% endif %}
+                    </dd>
+                    <dt class="col-sm-5">Created</dt>
+                    <dd class="col-sm-7">{{ ticket.created_at.strftime('%d %b %Y %H:%M') }}</dd>
+                    <dt class="col-sm-5">Updated</dt>
+                    <dd class="col-sm-7">{{ ticket.updated_at.strftime('%d %b %Y %H:%M') }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        {% if can_manage %}
+        <div class="card mb-3">
+            <div class="card-header">Assign</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('it_tickets.assign', id=ticket.id) }}">
+                    {{ assign_form.hidden_tag() }}
+                    {{ assign_form.assigned_to_user_id(class='form-select form-select-sm mb-2') }}
+                    {{ assign_form.submit(class='btn btn-sm btn-outline-primary') }}
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Update status</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('it_tickets.update_status', id=ticket.id) }}">
+                    {{ status_form.hidden_tag() }}
+                    {{ status_form.status(class='form-select form-select-sm mb-2') }}
+                    {{ status_form.submit(class='btn btn-sm btn-outline-primary') }}
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

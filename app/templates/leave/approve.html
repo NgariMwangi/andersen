@@ -1,0 +1,76 @@
+{% extends "layouts/base.html" %}
+{% block title %}Review Leave - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">{{ stage_label }} review: {{ request.employee.full_name if request.employee else '-' }}</h1>
+<p class="text-muted small mb-3">Overall status: <strong>{{ leave_status_label(request.status) }}</strong></p>
+
+<div class="card mb-4 border-0 bg-light">
+    <div class="card-body py-3">
+        <h2 class="h6 mb-2">Supervisor step</h2>
+        {% if supervisor_summary.state == 'not_applicable' %}
+        <p class="small mb-0 text-muted">{{ supervisor_summary.label }} — HR is the first approver for this request.</p>
+        {% elif supervisor_summary.state == 'awaiting' %}
+        <p class="small mb-1"><span class="badge bg-warning text-dark">{{ supervisor_summary.label }}</span></p>
+        <p class="small mb-0 text-muted">Assigned supervisor(s): <strong>{{ supervisor_summary.manager_name or '—' }}</strong></p>
+        {% if approval_stage == 'hr' and supervisor_summary.hr_can_bypass %}
+        <p class="small mb-0 mt-2">You may approve or reject now without waiting for the supervisor (e.g. if they are unavailable).</p>
+        {% endif %}
+        {% elif supervisor_summary.state == 'completed' %}
+        <p class="small mb-1"><span class="badge bg-success">Supervisor approved</span>
+            {% if supervisor_summary.reviewed_at %} {{ supervisor_summary.reviewed_at.strftime('%d %b %Y %H:%M') }}{% endif %}
+        </p>
+        <p class="small mb-0 text-muted">Manager: {{ supervisor_summary.manager_name or '—' }}{% if supervisor_summary.reviewer_label %} · by {{ supervisor_summary.reviewer_label }}{% endif %}</p>
+        {% if supervisor_summary.notes %}<p class="small mb-0 mt-1"><strong>Supervisor notes:</strong> {{ supervisor_summary.notes }}</p>{% endif %}
+        {% elif supervisor_summary.state == 'rejected' %}
+        <p class="small mb-1"><span class="badge bg-danger">{{ supervisor_summary.label }}</span></p>
+        {% if supervisor_summary.notes %}<p class="small mb-0"><strong>Notes:</strong> {{ supervisor_summary.notes }}</p>{% endif %}
+        {% else %}
+        <p class="small mb-0">{{ supervisor_summary.label }}</p>
+        {% endif %}
+    </div>
+</div>
+
+<p>{{ request.leave_type.name }} from {{ request.start_date.strftime('%d %b %Y') }} to {{ request.end_date.strftime('%d %b %Y') }} ({{ request.days_requested | fmt_days }} days).</p>
+{% if request.handover_to %}<p><strong>Handover to:</strong> {{ request.handover_to.full_name }} ({{ request.handover_to.employee_number }})</p>
+{% else %}<p class="text-muted small">No handover colleague recorded on this request.</p>{% endif %}
+{% if request.reason %}<p><strong>Reason:</strong> {{ request.reason }}</p>{% endif %}
+{% if request.document_path %}
+<p class="mb-3">
+    <strong>Supporting document:</strong>
+    <a href="{{ url_for('leave.leave_request_document', id=request.id) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+        <i class="bi bi-eye me-1"></i>View
+    </a>
+    <a href="{{ url_for('leave.leave_request_document', id=request.id, download=1) }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-download me-1"></i>Download
+    </a>
+</p>
+{% else %}
+<p class="alert alert-warning py-2 small mb-3">
+    <i class="bi bi-exclamation-triangle me-1"></i>No supporting document was attached to this leave request.
+</p>
+{% endif %}
+
+{% if approval_stage == 'supervisor' %}
+<form method="post" action="{{ url_for('leave.approve', id=request.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="mb-3">{{ form.action.label(class='form-label') }}{{ form.action(class='form-select') }}</div>
+    <div class="mb-3">{{ form.review_notes.label(class='form-label') }}{{ form.review_notes(class='form-control') }}</div>
+    <button type="submit" class="btn btn-primary">Submit</button>
+    <a href="{{ url_for('leave.index') }}" class="btn btn-outline-secondary">Cancel</a>
+</form>
+<p class="text-muted small mt-3 mb-0">Approving sends this request to HR for final approval. Leave balance is updated only after HR approves.</p>
+{% elif approval_stage == 'hr' and request.status != 'rejected' %}
+<form method="post" action="{{ url_for('leave.approve', id=request.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="mb-3">{{ form.action.label(class='form-label') }}{{ form.action(class='form-select') }}</div>
+    <div class="mb-3">{{ form.review_notes.label(class='form-label') }}{{ form.review_notes(class='form-control', placeholder='HR notes (optional)') }}</div>
+    <button type="submit" class="btn btn-primary">Submit HR decision</button>
+    <a href="{{ url_for('leave.index') }}" class="btn btn-outline-secondary">Cancel</a>
+</form>
+{% if supervisor_summary.state == 'awaiting' %}
+<p class="text-muted small mt-3 mb-0">Final approval updates leave balances even if the supervisor has not acted yet.</p>
+{% endif %}
+{% else %}
+<a href="{{ url_for('leave.index') }}" class="btn btn-outline-secondary">Back to list</a>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ 'Edit branch' if branch else 'Add branch' }} - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-4 fw-600 text-dark">{{ 'Edit branch' if branch else 'Add branch' }}</h1>
+<div class="card">
+    <div class="card-body">
+        <form method="post" action="{{ url_for('branches.edit', id=branch.id) if branch else url_for('branches.create') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="row g-3">
+                <div class="col-md-8">
+                    {{ form.name.label(class='form-label') }}
+                    {{ form.name(class='form-control') }}
+                    {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors[0] }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    {{ form.country_code.label(class='form-label') }}
+                    {{ form.country_code(class='form-control text-uppercase', maxlength='2', placeholder='KE') }}
+                    <div class="form-text">ISO-3166 alpha-2 (e.g. KE, UG).</div>
+                    {% if form.country_code.errors %}<div class="text-danger small">{{ form.country_code.errors[0] }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    {{ form.currency_code.label(class='form-label') }}
+                    {{ form.currency_code(class='form-control text-uppercase', maxlength='3', placeholder='KES') }}
+                    <div class="form-text">Optional. Leave blank to default from country (e.g. KE → KES).</div>
+                    {% if form.currency_code.errors %}<div class="text-danger small">{{ form.currency_code.errors[0] }}</div>{% endif %}
+                </div>
+                <div class="col-md-8">
+                    {{ form.timezone.label(class='form-label') }}
+                    {{ form.timezone(class='form-control', placeholder='Africa/Nairobi') }}
+                    {% if form.timezone.errors %}<div class="text-danger small">{{ form.timezone.errors[0] }}</div>{% endif %}
+                </div>
+                <div class="col-12">
+                    {{ form.submit(class='btn btn-primary') }}
+                    <a href="{{ url_for('branches.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

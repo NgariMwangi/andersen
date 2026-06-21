@@ -1,0 +1,58 @@
+{% extends "layouts/base.html" %}
+{% block title %}Employee Benefits{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-1">Employee Benefits</h1>
+        <p class="text-muted mb-0">Benefits that will post directly into selected payroll months.</p>
+    </div>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-5">
+        <input type="text" name="q" class="form-control" value="{{ request.args.get('q', '') }}" placeholder="Search employee or benefit title">
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-outline-primary w-100" type="submit">Search</button>
+    </div>
+</form>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Benefit</th>
+                    <th>Amount</th>
+                    <th>Frequency</th>
+                    <th>Payroll period</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>{{ row.employee.full_name if row.employee else '—' }}</td>
+                    <td>{{ row.title }}</td>
+                    <td>{{ "%.2f"|format(row.amount|float) }}</td>
+                    <td>{{ (row.frequency or 'one_off').replace('_', ' ') }}</td>
+                    <td>
+                        {% if row.payroll_year and row.payroll_month %}
+                        {{ row.payroll_year }}-{{ "%02d"|format(row.payroll_month) }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('employees.employee_benefits', id=row.employee_id) }}" class="btn btn-sm btn-outline-primary">Open Employee Benefits</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-muted px-3 py-2">No employee benefits found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

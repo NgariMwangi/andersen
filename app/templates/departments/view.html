@@ -1,0 +1,57 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ department.name }} - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h4 mb-0 fw-600 text-dark">{{ department.name }}</h1>
+    {% if has_permission('manage_departments') %}
+    <a href="{{ url_for('departments.edit', id=department.id) }}" class="btn btn-outline-primary"><i class="bi bi-pencil me-1"></i>Edit</a>
+    {% endif %}
+</div>
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3 text-muted">Code</dt>
+                    <dd class="col-sm-9"><span class="fw-medium">{{ department.code }}</span></dd>
+                    <dt class="col-sm-3 text-muted">Name</dt>
+                    <dd class="col-sm-9">{{ department.name }}</dd>
+                    <dt class="col-sm-3 text-muted">Parent</dt>
+                    <dd class="col-sm-9">{{ department.parent.name if department.parent else '—' }}</dd>
+                    <dt class="col-sm-3 text-muted">Description</dt>
+                    <dd class="col-sm-9">{{ department.description or '—' }}</dd>
+                </dl>
+            </div>
+        </div>
+        {% if department.children %}
+        <div class="card mt-4">
+            <div class="card-header bg-transparent border-0 py-3">
+                <h5 class="h6 mb-0 fw-600">Sub-departments</h5>
+            </div>
+            <div class="card-body pt-0">
+                <ul class="list-group list-group-flush">
+                    {% for child in department.children %}
+                    <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('departments.view', id=child.id) }}" class="text-decoration-none">{{ child.name }}</a>
+                        <span class="badge bg-light text-dark">{{ child.code }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <p class="text-muted small mb-1">Employees in this department</p>
+                <p class="display-6 fw-bold text-dark mb-0">{{ employee_count }}</p>
+                {% if has_permission('view_employees') and employee_count > 0 %}
+                <a href="{{ url_for('employees.list', department_id=department.id) }}" class="btn btn-sm btn-outline-primary mt-2">View employees</a>
+                {% endif %}
+            </div>
+        </div>
+        <a href="{{ url_for('departments.index') }}" class="btn btn-outline-secondary w-100 mt-2"><i class="bi bi-arrow-left me-1"></i>Back to departments</a>
+    </div>
+</div>
+{% endblock %}

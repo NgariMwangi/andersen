@@ -1,0 +1,274 @@
+{% extends "layouts/base.html" %}
+{% block title %}Executive Summary - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="h3 mb-1">Executive Summary</h1>
+        <p class="text-muted mb-0">Company operations snapshot for leadership reporting.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('reports.executive_summary_csv') }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV</a>
+        <a class="btn btn-primary btn-sm" href="{{ url_for('reports.executive_summary_pdf') }}"><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <div class="fw-semibold">{{ employer_name }}</div>
+                <div class="small text-muted">KRA PIN: {{ employer_pin }}</div>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <div class="small text-muted">Report generated: {{ summary.generated_at.strftime('%d %b %Y at %H:%M') }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1 text-primary">{{ summary.active_employees }}</div>
+                <div class="small text-muted">Active Employees</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1 text-info">{{ summary.active_consultants }}</div>
+                <div class="small text-muted">Active Consultants</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1 text-success">{{ summary.new_hires_this_month }}</div>
+                <div class="small text-muted">New Hires This Month</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1 text-danger">{{ summary.exits_this_month }}</div>
+                <div class="small text-muted">Exits This Month</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1 text-warning">{{ summary.pending_leave }}</div>
+                <div class="small text-muted">Pending Leave Approvals</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1 text-warning">{{ summary.pending_overtime }}</div>
+                <div class="small text-muted">Pending Overtime Approvals</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1">{{ summary.total_employees }}</div>
+                <div class="small text-muted">Total Employees (all statuses)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if payroll_charts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<div class="row g-3 mb-4">
+    {% for chart in payroll_charts %}
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0"><i class="bi bi-graph-up me-2"></i>{{ chart.title }}</h2>
+            </div>
+            <div class="card-body">
+                <canvas id="{{ chart.id }}" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% for chart in payroll_charts %}
+    (function() {
+        var ctx = document.getElementById('{{ chart.id }}').getContext('2d');
+        var chartData = {{ chart.data_json|safe }};
+        new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(c) {
+                                return c.dataset.label + ': ' + c.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: function(v) { return v.toLocaleString(); } }
+                    }
+                }
+            }
+        });
+    })();
+    {% endfor %}
+});
+</script>
+{% endif %}
+
+{% if summary.payroll_by_branch %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <h2 class="h6 mb-0"><i class="bi bi-cash-stack me-2"></i>Payroll Summary — {{ summary.payroll_period }}</h2>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Branch</th>
+                        <th>Status</th>
+                        <th class="text-end">Staff</th>
+                        <th class="text-end">Staff Gross</th>
+                        <th class="text-end">Staff Net</th>
+                        <th class="text-end">Consultants</th>
+                        <th class="text-end">Consultant Net</th>
+                        <th class="text-end fw-bold">Total Net</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in summary.payroll_by_branch %}
+                    <tr>
+                        <td class="ps-3 fw-medium">{{ b.country_code }} <span class="text-muted small">({{ b.currency }})</span></td>
+                        <td><span class="badge bg-secondary-subtle text-secondary">{{ b.status }}</span></td>
+                        <td class="text-end">{{ b.staff_count }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(b.staff_gross|float) }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(b.staff_net|float) }}</td>
+                        <td class="text-end">{{ b.consultant_count }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(b.consultant_net|float) }}</td>
+                        <td class="text-end fw-bold">{{ b.currency }} {{ "{:,.2f}".format(b.total_net|float) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0"><i class="bi bi-people me-2"></i>Headcount by Status</h2>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% for status, count in summary.status_counts %}
+                        <tr>
+                            <td class="ps-3 text-capitalize">{{ status or 'Unknown' }}</td>
+                            <td class="text-end pe-3 fw-medium">{{ count }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="2" class="text-muted text-center py-3">No data</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0"><i class="bi bi-building me-2"></i>Active Staff by Branch</h2>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% for name, cc, count in summary.branch_counts %}
+                        <tr>
+                            <td class="ps-3">{{ name }} <span class="text-muted small">({{ cc }})</span></td>
+                            <td class="text-end pe-3 fw-medium">{{ count }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="2" class="text-muted text-center py-3">No data</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0"><i class="bi bi-diagram-3 me-2"></i>Active Staff by Department</h2>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% for name, count in summary.dept_counts %}
+                        <tr>
+                            <td class="ps-3">{{ name }}</td>
+                            <td class="text-end pe-3 fw-medium">{{ count }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="2" class="text-muted text-center py-3">No data</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0"><i class="bi bi-briefcase me-2"></i>Active Staff by Employment Type</h2>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% for etype, count in summary.type_counts %}
+                        <tr>
+                            <td class="ps-3 text-capitalize">{{ etype or 'Unspecified' }}</td>
+                            <td class="text-end pe-3 fw-medium">{{ count }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="2" class="text-muted text-center py-3">No data</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

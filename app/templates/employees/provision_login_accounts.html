@@ -1,0 +1,66 @@
+{% extends "layouts/base.html" %}
+{% block title %}Provision login accounts{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h1 class="h4 mb-1">Provision employee login accounts</h1>
+        <p class="text-muted mb-0">Create accounts for active employees who do not have one yet.</p>
+    </div>
+    <a href="{{ url_for('employees.list') }}" class="btn btn-outline-secondary">Back to employees</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card card-body">
+            <div class="text-muted small">Will receive accounts</div>
+            <div class="fs-4 fw-semibold">{{ preview.eligible }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-body">
+            <div class="text-muted small">Already linked</div>
+            <div class="fs-4 fw-semibold">{{ preview.already_linked }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-body">
+            <div class="text-muted small">Without work email (generated login)</div>
+            <div class="fs-4 fw-semibold">{{ preview.missing_work_email }}</div>
+        </div>
+    </div>
+</div>
+
+{% if preview.sample_emails %}
+<p class="small text-muted">Example login emails: {{ preview.sample_emails|join(', ') }}</p>
+{% endif %}
+
+{% if preview.eligible == 0 %}
+<div class="alert alert-info">All active employees already have login accounts, or none are eligible.</div>
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <form method="post" onsubmit="return confirm('Create {{ preview.eligible }} login account(s) with the password you entered?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="mb-3">
+                <label class="form-label">Initial password (all new accounts)</label>
+                <input type="password" name="password" class="form-control" value="{{ default_password }}" required autocomplete="new-password"/>
+                <div class="form-text">Default: {{ default_password }} — at least {{ min_len }} characters. Share securely with staff.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Confirm password</label>
+                <input type="password" name="confirm_password" class="form-control" value="{{ default_password }}" required autocomplete="new-password"/>
+            </div>
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" name="must_change_password" value="1" id="must_change_password" checked/>
+                <label class="form-check-label" for="must_change_password">Require password change on first login</label>
+            </div>
+            <p class="small text-muted mb-3">
+                Each account is linked to the employee record with the <strong>Employee</strong> role.
+                Login email is the work email when set; otherwise a unique address like <code>emp123@company1.hrms.local</code>.
+            </p>
+            <button type="submit" class="btn btn-primary">Create {{ preview.eligible }} account(s)</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

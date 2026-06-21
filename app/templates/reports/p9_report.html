@@ -1,0 +1,211 @@
+{% extends "layouts/base.html" %}
+{% block title %}P9 / End of year tax returns - {{ app_name }}{% endblock %}
+{% block extra_css %}
+<style>
+    .p9-form--screen {
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .p9-form--screen .p9-title {
+        font-size: 1.1rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        text-align: center;
+        margin-bottom: 0.75rem;
+    }
+    .p9-header-wrap {
+        margin-bottom: 1.25rem;
+    }
+    .p9-header-table {
+        width: 100%;
+        font-size: 0.9rem;
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+    .p9-header-table th {
+        width: 16%;
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        padding: 0.55rem 0.75rem;
+        font-weight: 600;
+        color: #475569;
+        text-align: left;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+    .p9-header-table td {
+        width: 34%;
+        border: 1px solid #cbd5e1;
+        padding: 0.55rem 0.75rem;
+        font-weight: 500;
+        color: #0f172a;
+        vertical-align: middle;
+        word-break: break-word;
+    }
+    @media (max-width: 767.98px) {
+        .p9-header-table th { width: 38%; font-size: 0.8rem; white-space: normal; }
+        .p9-header-table td { font-size: 0.85rem; }
+    }
+    .p9-table-wrap { overflow-x: auto; margin-bottom: 1rem; }
+    .p9-table {
+        width: 100%;
+        font-size: 0.8rem;
+        border-collapse: collapse;
+        min-width: 720px;
+    }
+    .p9-table th,
+    .p9-table td {
+        border: 1px solid #94a3b8;
+        padding: 0.35rem 0.45rem;
+        vertical-align: middle;
+    }
+    .p9-table thead th {
+        background: #cfe2ff;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .p9-table td.num,
+    .p9-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .p9-table tfoot td {
+        font-weight: 700;
+        background: #e9ecef;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="h3 mb-2">{% if can_view_all_p9 %}P9 — End of year tax returns{% else %}My P9{% endif %}</h1>
+<p class="text-muted small mb-3">
+    {% if can_view_all_p9 %}
+    Preview is a summary; the PDF download is a <strong>KRA P9A</strong> tax deduction card generated from <strong>approved</strong> payroll.
+    {% else %}
+    Your P9 for the selected year (from <strong>approved</strong> payroll). Download PDF for the KRA P9A form; CSV is for iTax.
+    {% endif %}
+</p>
+
+<form method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-md-3">
+        <label class="form-label">Calendar year</label>
+        <select name="year" class="form-select" required>
+            <option value="">Select year…</option>
+            {% for y in year_list %}
+            <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% if can_view_all_p9 %}
+    <div class="col-md-5">
+        <label class="form-label">Employee</label>
+        <select name="employee_id" class="form-select" required>
+            <option value="">Select employee…</option>
+            {% for e in employees %}
+            <option value="{{ e.id }}" {% if selected_employee_id == e.id %}selected{% endif %}>
+                {{ e.full_name }}{% if e.employee_number %} ({{ e.employee_number }}){% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    {% else %}
+    {% if selected_employee_id %}
+    <input type="hidden" name="employee_id" value="{{ selected_employee_id }}"/>
+    {% endif %}
+    <div class="col-md-5 col-lg-6 d-flex align-items-end pb-1">
+        <span class="text-muted small">Showing your record{% if employees and employees[0] %}: <strong>{{ employees[0].full_name }}</strong>{% if employees[0].employee_number %} ({{ employees[0].employee_number }}){% endif %}{% endif %}</span>
+    </div>
+    {% endif %}
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">{% if can_view_all_p9 %}Preview{% else %}Show{% endif %}</button>
+    </div>
+    {% if selected_year and selected_employee_id %}
+    <div class="col-auto">
+        <a class="btn btn-outline-secondary" href="{{ url_for('reports.p9_pdf', year=selected_year, employee_id=selected_employee_id) }}">Download P9 (KRA form)</a>
+    </div>
+    {% endif %}
+</form>
+
+{% if selected_year and selected_employee_id %}
+    {% if preview %}
+    <div class="p9-form--screen">
+        <div class="p9-title">P9 — End of Year Tax Returns</div>
+        <div class="p9-header-wrap table-responsive">
+            <table class="p9-header-table">
+                <caption class="visually-hidden">Employer and tax payer identification</caption>
+                <tbody>
+                    <tr>
+                        <th scope="row">Employer</th>
+                        <td>{{ employer_display_name }}</td>
+                        <th scope="row">Tax year</th>
+                        <td>{{ selected_year }}</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Employer Tax-PIN</th>
+                        <td>{{ employer_display_pin }}</td>
+                        <th scope="row">Tax payer&apos;s name</th>
+                        <td>{{ preview.employee.full_name if preview.employee else ('Employee #' ~ preview.employee_id) }}</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Employee no.</th>
+                        <td>{{ preview.employee.employee_number if preview.employee and preview.employee.employee_number else '—' }}</td>
+                        <th scope="row">ID no.</th>
+                        <td>{{ preview.employee.national_id if preview.employee and preview.employee.national_id else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">PIN</th>
+                        <td colspan="3">{{ preview.employee.kra_pin if preview.employee and preview.employee.kra_pin else '—' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="p9-table-wrap">
+            <table class="p9-table">
+                <thead>
+                    <tr>
+                        <th>Pay date</th>
+                        <th class="num">Taxable pay (KES)</th>
+                        <th class="num">Pension (KES)</th>
+                        <th class="num">PAYE auto (KES)</th>
+                        <th class="num">Unused MPR (KES)</th>
+                        <th class="num">MPR value (KES)</th>
+                        <th class="num">Arrears (KES)</th>
+                        <th class="num">PAYE manual (KES)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in preview.monthly_rows %}
+                    <tr>
+                        <td>{{ r.pay_date }}</td>
+                        <td class="num">{{ "{:,.2f}".format(r.taxable_pay|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(r.pension|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(r.paye_auto|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(r.unused_mpr|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(r.mpr_value|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(r.arrears|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(r.paye_manual|float) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td>Totals</td>
+                        <td class="num">{{ "{:,.2f}".format(preview.monthly_totals.taxable_pay|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(preview.monthly_totals.pension|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(preview.monthly_totals.paye_auto|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(preview.monthly_totals.unused_mpr|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(preview.monthly_totals.mpr_value|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(preview.monthly_totals.arrears|float) }}</td>
+                        <td class="num">{{ "{:,.2f}".format(preview.monthly_totals.paye_manual|float) }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info mb-0">
+        No approved payroll data for this employee in {{ selected_year }}.
+    </div>
+    {% endif %}
+{% endif %}
+{% endblock %}

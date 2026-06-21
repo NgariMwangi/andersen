@@ -1,0 +1,60 @@
+{% extends "layouts/base.html" %}
+{% block title %}PAYE Report - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">PAYE Report</h1>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-4">
+        <label class="form-label">Approved Payroll Run</label>
+        <select name="run_id" class="form-select" required>
+            <option value="">Select run...</option>
+            {% for run in runs %}
+            <option value="{{ run.id }}" {% if selected_run and selected_run.id == run.id %}selected{% endif %}>
+                {{ run.pay_month }}/{{ run.pay_year }} ({{ run.status }})
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Generate</button>
+    </div>
+    {% if selected_run %}
+    <div class="col-auto">
+        <a class="btn btn-outline-secondary" href="{{ url_for('reports.paye_report_pdf', run_id=selected_run.id) }}">Export PDF</a>
+    </div>
+    {% endif %}
+</form>
+
+{% if selected_run %}
+<div class="table-responsive">
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>PIN</th>
+                <th>Employee Name</th>
+                <th class="text-end">PAYE Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <td>{{ r.pin }}</td>
+                <td>{{ r.employee_name }}</td>
+                <td class="text-end">{{ "{:,.2f}".format(r.paye_amount|float) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3" class="text-muted">No PAYE records found for this run.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="table-light fw-bold">
+                <td colspan="2">TOTAL</td>
+                <td class="text-end">{{ "{:,.2f}".format(total|float) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "layouts/base.html" %}
+{% block title %}Company assets - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-1 fw-600 text-dark">Company assets</h1>
+        {% if team_view %}
+        <p class="text-muted small mb-0">Showing assets assigned to your team.</p>
+        {% else %}
+        <p class="text-muted small mb-0">Register and track laptops, phones, and other company items.</p>
+        {% endif %}
+    </div>
+    {% if can_manage %}
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('company_assets.categories') }}" class="btn btn-outline-secondary btn-sm">Categories</a>
+        <a href="{{ url_for('company_assets.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add asset</a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Status</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">All statuses</option>
+                    {% for code, label in status_labels.items() %}
+                    <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Category</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">All categories</option>
+                    {% for cid, cname in categories %}
+                    <option value="{{ cid }}" {% if category_filter == cid %}selected{% endif %}>{{ cname }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Filter</button>
+                <a href="{{ url_for('company_assets.index') }}" class="btn btn-sm btn-link">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Tag</th>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th class="text-end">Value</th>
+                        <th>Assigned to</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for asset in assets %}
+                {% set assignee = asset.assignee %}
+                <tr>
+                    <td><a href="{{ url_for('company_assets.view', id=asset.id) }}" class="text-decoration-none fw-500">{{ asset.asset_tag }}</a></td>
+                    <td>
+                        {{ asset.name or (asset.brand ~ ' ' ~ asset.model if asset.brand or asset.model else '—') }}
+                        {% if asset.serial_number %}<div class="small text-muted">S/N {{ asset.serial_number }}</div>{% endif %}
+                    </td>
+                    <td>{{ asset.category.name if asset.category else '—' }}</td>
+                    <td class="text-end">
+                        {% if asset.purchase_value is not none %}
+                        {{ asset.purchase_value|fmt_money(tenant_nav.currency or currency) }}
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if assignee %}
+                        <a href="{{ url_for('employees.view', id=assignee.id) }}" class="text-decoration-none">{{ assignee.full_name }}</a>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge {% if asset.status == 'assigned' %}bg-primary{% elif asset.status == 'not_assigned' %}bg-secondary{% elif asset.status == 'repair' %}bg-warning text-dark{% elif asset.status == 'lost' %}bg-danger{% else %}bg-dark{% endif %}">
+                            {{ status_labels.get(asset.status, asset.status) }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('company_assets.view', id=asset.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-muted py-4 text-center">
+                        {% if team_view %}No assets assigned to your team.{% elif can_manage %}No assets yet. Add one to get started.{% else %}No assets to show.{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

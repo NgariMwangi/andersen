@@ -1,0 +1,72 @@
+{% extends "layouts/base.html" %}
+{% block title %}Casual Payments Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">Casual Payment Register</h1>
+    <a href="{{ url_for('casual_workers.index') }}" class="btn btn-outline-secondary">Back to workers</a>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-2">
+        <label class="form-label">Year</label>
+        <select name="year" class="form-select">
+            {% for y in years %}
+            <option value="{{ y }}" {{ 'selected' if y == year else '' }}>{{ y }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Month</label>
+        <select name="month" class="form-select">
+            {% for m in months %}
+            <option value="{{ m }}" {{ 'selected' if m == month else '' }}>{{ "%02d"|format(m) }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2 align-self-end">
+        <button class="btn btn-outline-primary w-100" type="submit">Load</button>
+    </div>
+</form>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="card card-body"><small class="text-muted">Total gross</small><strong>{{ "%.2f"|format(total_gross|float) }} {{ currency_code }}</strong></div></div>
+    <div class="col-md-3"><div class="card card-body"><small class="text-muted">Total net</small><strong>{{ "%.2f"|format(total_net|float) }} {{ currency_code }}</strong></div></div>
+    <div class="col-md-3"><div class="card card-body"><small class="text-muted">Pending</small><strong>{{ "%.2f"|format(total_pending|float) }} {{ currency_code }}</strong></div></div>
+    <div class="col-md-3"><div class="card card-body"><small class="text-muted">Paid</small><strong>{{ "%.2f"|format(total_paid|float) }} {{ currency_code }}</strong></div></div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Worker</th>
+                    <th>Units</th>
+                    <th>Rate / unit</th>
+                    <th>Gross</th>
+                    <th>Adjustments</th>
+                    <th>Net</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('casual_workers.view', id=row.worker_id) }}">{{ row.worker.full_name if row.worker else 'Unknown' }}</a>
+                    </td>
+                    <td>{{ row.days_worked }} {{ (row.worker.rate_unit if row.worker else 'daily') }}</td>
+                    <td>{{ "%.2f"|format(row.rate_per_day|float) }}</td>
+                    <td>{{ "%.2f"|format(row.gross_amount|float) }}</td>
+                    <td>{{ "%.2f"|format(row.adjustments|float) }}</td>
+                    <td>{{ "%.2f"|format(row.net_amount|float) }}</td>
+                    <td><span class="badge {{ 'text-bg-success' if row.status == 'paid' else 'text-bg-warning' }}">{{ row.status|title }}</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-muted px-3 py-2">No payout lines for this period.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

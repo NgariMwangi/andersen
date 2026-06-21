@@ -1,0 +1,81 @@
+{% extends "layouts/base.html" %}
+{% block title %}Probation Dates - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="h3 mb-1">Probation end dates</h1>
+        <p class="text-muted small mb-0">Probation end dates grouped by month for {{ selected_year }}</p>
+    </div>
+    <form method="get" class="d-flex align-items-center gap-2">
+        <label for="year" class="form-label mb-0">Year</label>
+        <select id="year" name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for year in year_choices %}
+            <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+{% if selected_year == current_year %}
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">This month probation end dates</p>
+                <p class="h4 mb-0">{{ this_month_probation }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">This week probation end dates</p>
+                <p class="h4 mb-0">{{ this_week_probation }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+    {% for month in range(1, 13) %}
+    {% set items = month_groups[month] %}
+    <div class="col-12 col-lg-6">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h6 mb-3">{{ month_names[month] }}</h2>
+                {% if items %}
+                <ul class="list-group list-group-flush">
+                    {% for item in items %}
+                    <li class="list-group-item px-0 d-flex align-items-center justify-content-between gap-3">
+                        <a href="{{ url_for('employees.view', id=item.employee.id) }}" class="text-decoration-none">
+                            {{ item.employee.full_name }}
+                        </a>
+                        <div class="text-end">
+                            <div class="text-muted small">
+                                {{ item.probation_end_date.strftime('%d %b') }} ({{ item.weekday }})
+                            </div>
+                            {% if selected_year == current_year %}
+                                {% if item.status == 'arrived' %}
+                                <span class="badge bg-danger">Arrived</span>
+                                {% elif item.days_until == 1 %}
+                                <span class="badge bg-warning text-dark">Tomorrow</span>
+                                {% elif item.coming_weekday_label %}
+                                <span class="badge bg-primary-subtle text-primary-emphasis">{{ item.coming_weekday_label }}</span>
+                                {% elif item.status == 'past' %}
+                                <span class="badge bg-secondary">Past</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small mb-0">No probation end dates.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

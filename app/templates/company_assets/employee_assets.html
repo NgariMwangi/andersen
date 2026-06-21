@@ -1,0 +1,52 @@
+{% extends "layouts/base.html" %}
+{% block title %}Assets — {{ employee.full_name }} - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-1 fw-600 text-dark">Assigned assets</h1>
+        <p class="text-muted mb-0"><a href="{{ url_for('employees.view', id=employee.id) }}" class="text-decoration-none">{{ employee.full_name }}</a></p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if include_history %}
+        <a href="{{ url_for('company_assets.employee_assets', employee_id=employee.id) }}" class="btn btn-outline-secondary btn-sm">Current only</a>
+        {% else %}
+        <a href="{{ url_for('company_assets.employee_assets', employee_id=employee.id, history=1) }}" class="btn btn-outline-secondary btn-sm">Show history</a>
+        {% endif %}
+        <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary btn-sm">Back to employee</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Tag</th>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th>Assigned</th>
+                        <th>Returned</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in assignments %}
+                {% set asset = row.asset %}
+                <tr>
+                    <td><a href="{{ url_for('company_assets.view', id=asset.id) }}">{{ asset.asset_tag }}</a></td>
+                    <td>{{ asset.name or (asset.brand ~ ' ' ~ asset.model if asset.brand or asset.model else '—') }}</td>
+                    <td>{{ asset.category.name if asset.category else '—' }}</td>
+                    <td>{{ row.assigned_at.strftime('%d %b %Y') }}</td>
+                    <td>{{ row.returned_at.strftime('%d %b %Y') if row.returned_at else '—' }}</td>
+                    <td>{{ status_labels.get(asset.status, asset.status) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-muted text-center py-4">No {% if include_history %}assignment{% else %}current assignment{% endif %} records.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

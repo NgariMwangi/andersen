@@ -1,0 +1,60 @@
+{% extends "layouts/base.html" %}
+{% block title %}Consultants{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-1">Consultants</h1>
+        <p class="text-muted mb-0">Monthly fee with withholding tax only; included on shared payroll runs.</p>
+    </div>
+    <a href="{{ url_for('consultants.create') }}" class="btn btn-primary">Add consultant</a>
+</div>
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input type="text" name="q" class="form-control" value="{{ request.args.get('q', '') }}" placeholder="Search name, number, email or KRA PIN">
+    </div>
+    <div class="col-md-3">
+        <select name="status" class="form-select">
+            <option value="">All statuses</option>
+            <option value="active" {{ 'selected' if request.args.get('status') == 'active' else '' }}>Active</option>
+            <option value="inactive" {{ 'selected' if request.args.get('status') == 'inactive' else '' }}>Inactive</option>
+            <option value="terminated" {{ 'selected' if request.args.get('status') == 'terminated' else '' }}>Terminated</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100">Filter</button>
+    </div>
+</form>
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Consultant</th>
+                    <th>Branch</th>
+                    <th>WHT %</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in consultants %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('consultants.view', id=c.id) }}">{{ c.full_name }}</a>
+                        <div class="small text-muted">{{ c.consultant_number or 'No number' }}</div>
+                    </td>
+                    <td>{{ c.branch.name if c.branch else '—' }}</td>
+                    <td>{{ c.withholding_rate }}%</td>
+                    <td><span class="badge text-bg-light">{{ c.status }}</span></td>
+                    <td class="text-end">
+                        <a href="{{ url_for('consultants.compensation', id=c.id) }}" class="btn btn-sm btn-outline-secondary">Compensation</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-muted">No consultants found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

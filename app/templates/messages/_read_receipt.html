@@ -1,0 +1,12 @@
+{% set receipt_status = message_read_status(msg) %}
+<span
+    class="chat-read-receipt chat-read-receipt--{{ receipt_status }}"
+    title="{% if receipt_status == 'read' %}Seen{% else %}Sent{% endif %}"
+    aria-label="{% if receipt_status == 'read' %}Seen{% else %}Sent{% endif %}"
+>
+    {% if receipt_status == 'read' %}
+    <i class="bi bi-check2-all" aria-hidden="true"></i>
+    {% else %}
+    <i class="bi bi-check2" aria-hidden="true"></i>
+    {% endif %}
+</span>

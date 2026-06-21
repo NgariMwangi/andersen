@@ -1,0 +1,74 @@
+{% extends "layouts/base.html" %}
+{% block title %}Employer Details - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h1 class="h3 mb-1">Employer Details</h1>
+        <p class="text-muted small mb-0">Company data used in statutory reports (P9, iTax exports, etc.).</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('employees.welfare_bulk') }}" class="btn btn-sm btn-outline-primary">Bulk welfare by employee</a>
+        <a href="{{ url_for('settings.index') }}" class="btn btn-sm btn-outline-secondary">Back</a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="post" action="{{ url_for('settings.employer') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.name.label }}</label>
+                    {{ form.name(class='form-control') }}
+                    {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.kra_pin.label }}</label>
+                    {{ form.kra_pin(class='form-control') }}
+                    {% for e in form.kra_pin.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.email.label }}</label>
+                    {{ form.email(class='form-control') }}
+                    {% for e in form.email.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.phone.label }}</label>
+                    {{ form.phone(class='form-control') }}
+                    {% for e in form.phone.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">{{ form.physical_address.label }}</label>
+                    {{ form.physical_address(class='form-control', rows='3') }}
+                    {% for e in form.physical_address.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="col-12">
+                    <label class="form-label">{{ form.postal_address.label }}</label>
+                    {{ form.postal_address(class='form-control') }}
+                    {% for e in form.postal_address.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.registration_number.label }}</label>
+                    {{ form.registration_number(class='form-control') }}
+                    {% for e in form.registration_number.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.welfare_kit_deduction.label }}</label>
+                    {{ form.welfare_kit_deduction(class='form-control', step='0.01', min='0') }}
+                    <div class="form-text">Amount deducted from every employee each payroll month (0 to disable).</div>
+                    {% for e in form.welfare_kit_deduction.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </div>
+
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">{{ 'Save changes' }}</button>
+                    <a href="{{ url_for('settings.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

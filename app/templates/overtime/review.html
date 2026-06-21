@@ -1,0 +1,35 @@
+{% extends "layouts/base.html" %}
+{% block title %}Review overtime - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Review overtime request</h1>
+
+<div class="card border-0 shadow-sm mb-4" style="max-width: 36rem;">
+    <div class="card-body">
+        <dl class="row mb-0 small">
+            <dt class="col-sm-4">Employee</dt>
+            <dd class="col-sm-8">{{ ot.employee.full_name if ot.employee else '—' }}</dd>
+            <dt class="col-sm-4">Payroll period</dt>
+            <dd class="col-sm-8">{{ ot.for_pay_month }}/{{ ot.for_pay_year }}</dd>
+            <dt class="col-sm-4">Days</dt>
+            <dd class="col-sm-8">{{ ot.days | fmt_days }}</dd>
+            <dt class="col-sm-4">Reason</dt>
+            <dd class="col-sm-8">{{ ot.reason or '—' }}</dd>
+        </dl>
+    </div>
+</div>
+
+<form method="post" style="max-width: 36rem;">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+        {{ form.action.label(class="form-label") }}
+        {{ form.action(class="form-select") }}
+    </div>
+    <div class="mb-3">
+        {{ form.review_notes.label(class="form-label") }}
+        {{ form.review_notes(class="form-control", rows=3) }}
+        {% for e in form.review_notes.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+    <a href="{{ url_for('overtime.index') }}" class="btn btn-link">Back</a>
+</form>
+{% endblock %}

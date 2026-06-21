@@ -1,0 +1,148 @@
+{% extends "layouts/base.html" %}
+{% block title %}Employee List Report - {{ app_name }}{% endblock %}
+{% block page_nav_section %}Reports{% endblock %}
+{% block page_nav_title %}Employee list{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Employee List</h1>
+        <p class="text-muted mb-0">Full roster with employment details and statutory identifiers.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-primary" href="{{ url_for('reports.employee_list_csv', **request.args) }}">
+            <i class="bi bi-file-earmark-excel me-1"></i> Download Current View
+        </a>
+        {% if branches_enabled %}
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-file-earmark-excel me-1"></i> Download by Branch
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="{{ url_for('reports.employee_list_csv') }}"><strong>All branches</strong></a></li>
+                <li><hr class="dropdown-divider"></li>
+                {% for b in branches %}
+                <li><a class="dropdown-item" href="{{ url_for('reports.employee_list_csv', branch_id=b.id) }}">{{ b.name }}{% if b.country_code %} ({{ b.country_code }}){% endif %}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small text-muted mb-1">Search</label>
+                <input type="search" name="q" class="form-control form-control-sm" placeholder="Name, number, email…" value="{{ request.args.get('q', '') }}">
+            </div>
+            {% if branches_enabled %}
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small text-muted mb-1">Branch</label>
+                <select name="branch_id" class="form-select form-select-sm">
+                    <option value="">All branches</option>
+                    {% for b in branches %}
+                    <option value="{{ b.id }}" {% if request.args.get('branch_id', type=int) == b.id %}selected{% endif %}>{{ b.name }}{% if b.country_code %} ({{ b.country_code }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small text-muted mb-1">Department</label>
+                <select name="department_id" class="form-select form-select-sm">
+                    <option value="">All departments</option>
+                    {% for d in departments %}
+                    <option value="{{ d.id }}" {% if request.args.get('department_id', type=int) == d.id %}selected{% endif %}>{{ d.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 col-lg-2">
+                <label class="form-label small text-muted mb-1">Status</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">All statuses</option>
+                    <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Active</option>
+                    <option value="terminated" {% if request.args.get('status') == 'terminated' %}selected{% endif %}>Terminated</option>
+                    <option value="resigned" {% if request.args.get('status') == 'resigned' %}selected{% endif %}>Resigned</option>
+                    <option value="retired" {% if request.args.get('status') == 'retired' %}selected{% endif %}>Retired</option>
+                    <option value="on_leave" {% if request.args.get('status') == 'on_leave' %}selected{% endif %}>On leave</option>
+                    <option value="suspended" {% if request.args.get('status') == 'suspended' %}selected{% endif %}>Suspended</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>Filter</button>
+            </div>
+            <div class="col-auto">
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('reports.employee_list') }}">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .sticky-col-1 { position: sticky; left: 0; z-index: 2; background: inherit; }
+    .sticky-col-2 { position: sticky; left: 70px; z-index: 2; background: inherit; }
+    thead .sticky-col-1, thead .sticky-col-2 { z-index: 3; }
+    .table-hover tbody tr:hover .sticky-col-1,
+    .table-hover tbody tr:hover .sticky-col-2 { background: #f8f9fa; }
+    .sticky-col-2 { border-right: 2px solid #dee2e6 !important; }
+</style>
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+        <span class="fw-semibold small">{{ employees|length }} employee{{ 's' if employees|length != 1 else '' }}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3 sticky-col-1" style="min-width:70px">No.</th>
+                    <th class="sticky-col-2" style="min-width:160px">Name</th>
+                    {% if branches_enabled %}<th>Branch</th>{% endif %}
+                    <th>Department</th>
+                    <th>Job Title</th>
+                    <th>Status</th>
+                    <th>Hire Date</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>KRA/TIN</th>
+                    <th>NSSF</th>
+                    <th>SHIF/NHIF</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in employees %}
+                <tr>
+                    <td class="ps-3 text-nowrap fw-medium sticky-col-1 bg-white">{{ e.employee_number or '—' }}</td>
+                    <td class="text-nowrap sticky-col-2 bg-white">
+                        <a href="{{ url_for('employees.view', id=e.id) }}" class="text-decoration-none">{{ e.full_name }}</a>
+                    </td>
+                    {% if branches_enabled %}<td class="text-nowrap small">{{ e.branch.name if e.branch else '—' }}</td>{% endif %}
+                    <td class="small">{{ e.department.name if e.department else '—' }}</td>
+                    <td class="small">{{ e.job_title.name if e.job_title else '—' }}</td>
+                    <td>
+                        {% if e.status == 'active' %}
+                        <span class="badge bg-success-subtle text-success">Active</span>
+                        {% elif e.status == 'terminated' %}
+                        <span class="badge bg-danger-subtle text-danger">Terminated</span>
+                        {% elif e.status == 'resigned' %}
+                        <span class="badge bg-warning-subtle text-warning">Resigned</span>
+                        {% else %}
+                        <span class="badge bg-secondary-subtle text-secondary text-capitalize">{{ e.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-nowrap small">{{ e.hire_date.strftime('%d %b %Y') if e.hire_date else '—' }}</td>
+                    <td class="small">{{ e.email or '—' }}</td>
+                    <td class="small text-nowrap">{{ e.phone or '—' }}</td>
+                    <td class="small">{{ e.kra_pin or '—' }}</td>
+                    <td class="small">{{ e.nssf_number or '—' }}</td>
+                    <td class="small">{{ e.nhif_number or '—' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="12" class="text-muted py-4 text-center">No employees match the filters.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

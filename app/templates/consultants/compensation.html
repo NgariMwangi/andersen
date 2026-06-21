@@ -1,0 +1,69 @@
+{% extends "layouts/base.html" %}
+{% block title %}Compensation - {{ consultant.full_name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-1">Compensation</h1>
+        <p class="text-muted mb-0">{{ consultant.full_name }} · amounts in {{ currency_code }}</p>
+    </div>
+    <a href="{{ url_for('consultants.view', id=consultant.id) }}" class="btn btn-outline-secondary">Back to profile</a>
+</div>
+<div class="row g-3">
+    <div class="col-lg-5">
+        <form method="post" class="card card-body">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">
+                <label class="form-label">Effective from</label>
+                {{ form.effective_from(class='form-control', type='date') }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Effective to</label>
+                {{ form.effective_to(class='form-control', type='date') }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Monthly fee</label>
+                {{ form.monthly_fee(class='form-control', step='0.01') }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Other allowances</label>
+                {{ form.other_allowances(class='form-control', step='0.01') }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Notes</label>
+                {{ form.notes(class='form-control', rows=2) }}
+            </div>
+            <button type="submit" class="btn btn-primary">Add record</button>
+        </form>
+    </div>
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr><th>From</th><th>To</th><th class="text-end">Fee</th><th class="text-end">Other</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        {% for r in records %}
+                        <tr>
+                            <td>{{ r.effective_from }}</td>
+                            <td>{{ r.effective_to or '—' }}</td>
+                            <td class="text-end">{{ r.monthly_fee|fmt_money(currency_code) }}</td>
+                            <td class="text-end">{{ r.other_allowances|fmt_money(currency_code) }}</td>
+                            <td class="text-end text-nowrap">
+                                <a href="{{ url_for('consultants.compensation_edit', id=consultant.id, comp_id=r.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                <form method="post" action="{{ url_for('consultants.compensation_delete', id=consultant.id, comp_id=r.id) }}" class="d-inline" onsubmit="return confirm('Delete this compensation record?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-muted">No records yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ consultant.full_name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h1 class="h4 mb-1">{{ consultant.full_name }}</h1>
+        <p class="text-muted mb-0">{{ consultant.consultant_number or 'No number' }} · {{ consultant.status }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('consultants.compensation', id=consultant.id) }}" class="btn btn-outline-primary">Compensation</a>
+        <a href="{{ url_for('consultants.edit', id=consultant.id) }}" class="btn btn-outline-secondary">Edit</a>
+        <a href="{{ url_for('consultants.index') }}" class="btn btn-link">Back</a>
+    </div>
+</div>
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card card-body h-100">
+            <h2 class="h6">Profile</h2>
+            <dl class="row mb-0 small">
+                <dt class="col-5">Branch</dt><dd class="col-7">{{ consultant.branch.name if consultant.branch else '—' }}</dd>
+                <dt class="col-5">Email</dt><dd class="col-7">{{ consultant.email or '—' }}</dd>
+                <dt class="col-5">Phone</dt><dd class="col-7">{{ consultant.phone or '—' }}</dd>
+                <dt class="col-5">KRA PIN</dt><dd class="col-7">{{ consultant.kra_pin or '—' }}</dd>
+                <dt class="col-5">National ID</dt><dd class="col-7">{{ consultant.national_id or '—' }}</dd>
+                <dt class="col-5">Withholding</dt><dd class="col-7">{{ consultant.withholding_rate }}%</dd>
+                <dt class="col-5">Start</dt><dd class="col-7">{{ consultant.start_date }}</dd>
+                <dt class="col-5">End</dt><dd class="col-7">{{ consultant.end_date or '—' }}</dd>
+            </dl>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card card-body h-100">
+            <h2 class="h6">Bank</h2>
+            <dl class="row mb-0 small">
+                <dt class="col-5">Bank</dt><dd class="col-7">{{ consultant.bank_name or '—' }}</dd>
+                <dt class="col-5">Branch</dt><dd class="col-7">{{ consultant.bank_branch or '—' }}</dd>
+                <dt class="col-5">Account</dt><dd class="col-7">{{ consultant.bank_account_number|mask_bank_account if consultant.bank_account_number else '—' }}</dd>
+            </dl>
+        </div>
+    </div>
+</div>
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Compensation history</span>
+        <span class="small text-muted">{{ currency_code }}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr><th>From</th><th>To</th><th class="text-end">Monthly fee</th><th class="text-end">Other</th></tr>
+            </thead>
+            <tbody>
+                {% for r in compensation_records %}
+                <tr>
+                    <td>{{ r.effective_from }}</td>
+                    <td>{{ r.effective_to or '—' }}</td>
+                    <td class="text-end">{{ r.monthly_fee|fmt_money(currency_code) }}</td>
+                    <td class="text-end">{{ r.other_allowances|fmt_money(currency_code) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-muted">No compensation records. <a href="{{ url_for('consultants.compensation', id=consultant.id) }}">Add one</a>.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% if consultant.notes %}
+<p class="text-muted small mt-3">{{ consultant.notes }}</p>
+{% endif %}
+{% endblock %}

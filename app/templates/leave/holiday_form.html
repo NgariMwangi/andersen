@@ -1,0 +1,71 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ 'Edit' if holiday else 'Add' }} public holiday - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">{{ 'Edit public holiday' if holiday else 'Add public holiday' }}</h1>
+<p class="text-muted small mb-4">Working-day leave does not count these days (weekends are already excluded).</p>
+<form method="post">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+        <label class="form-label d-block">{{ form.kind.label }}</label>
+        {% for subfield in form.kind %}
+        <div class="form-check mb-1">
+            {{ subfield(class_='form-check-input kind-radio') }}
+            {{ subfield.label(class_='form-check-label') }}
+        </div>
+        {% endfor %}
+        {% for e in form.kind.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+    <div class="mb-3">
+        <label class="form-label">{{ form.name.label }}</label>
+        {{ form.name(class_='form-control') }}
+        {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+    <div id="panel-recurring" class="border rounded p-3 mb-3 bg-light">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">{{ form.recurring_month.label }}</label>
+                {{ form.recurring_month(class_='form-select') }}
+                {% for e in form.recurring_month.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">{{ form.recurring_day.label }}</label>
+                {{ form.recurring_day(class_='form-control', placeholder='1–31') }}
+                {% for e in form.recurring_day.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+        </div>
+        <p class="text-muted small mb-0 mt-2">Example: 1 May for Labour Day — it will apply in every future year automatically.</p>
+    </div>
+    <div id="panel-oneoff" class="border rounded p-3 mb-3 bg-light" style="display:none;">
+        <div class="col-md-4 px-0">
+            <label class="form-label">{{ form.holiday_date.label }}</label>
+            {{ form.holiday_date(class_='form-control') }}
+            {% for e in form.holiday_date.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <p class="text-muted small mb-0 mt-2">Use for holidays that only exist in a single calendar year.</p>
+    </div>
+    <div class="mt-4">
+        {{ form.submit(class_='btn btn-primary') }}
+        <a href="{{ url_for('leave.holidays_index') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function() {
+    function syncPanels() {
+        var rec = document.querySelector('.kind-radio[value="recurring"]');
+        var one = document.querySelector('.kind-radio[value="one_off"]');
+        var pr = document.getElementById('panel-recurring');
+        var po = document.getElementById('panel-oneoff');
+        if (!pr || !po) return;
+        var isRec = rec && rec.checked;
+        pr.style.display = isRec ? 'block' : 'none';
+        po.style.display = isRec ? 'none' : 'block';
+    }
+    document.querySelectorAll('.kind-radio').forEach(function(el) {
+        el.addEventListener('change', syncPanels);
+    });
+    document.addEventListener('DOMContentLoaded', syncPanels);
+})();
+</script>
+{% endblock %}

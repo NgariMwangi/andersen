@@ -1,0 +1,61 @@
+{% extends "layouts/base.html" %}
+{% block title %}Employee Deductions{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-1">Employee Deductions</h1>
+        <p class="text-muted mb-0">Recurring deductions applied on payroll while each assignment is active.</p>
+    </div>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-5">
+        <input type="text" name="q" class="form-control" value="{{ request.args.get('q', '') }}" placeholder="Search employee or deduction title">
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-outline-primary w-100" type="submit">Search</button>
+    </div>
+</form>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Deduction</th>
+                    <th>Mode</th>
+                    <th>Amount / Rate</th>
+                    <th>Effective</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>{{ row.employee.full_name if row.employee else '—' }}</td>
+                    <td>{{ row.title or (row.deduction.name if row.deduction else '—') }}</td>
+                    <td>{{ row.calculation_mode.replace('_', ' ') }}</td>
+                    <td>
+                        {% if row.calculation_mode == 'fixed' %}
+                        {{ "%.2f"|format(row.amount|float) }}
+                        {% else %}
+                        {{ row.rate_percent or '—' }}%
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ row.effective_from }}
+                        {% if row.effective_to %}→ {{ row.effective_to }}{% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('employees.employee_deductions', id=row.employee_id) }}" class="btn btn-sm btn-outline-primary">Open Employee Deductions</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-muted px-3 py-2">No employee deductions found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

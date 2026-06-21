@@ -1,0 +1,182 @@
+{% extends "layouts/base.html" %}
+{% block title %}Benefits — {{ employee.full_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-2">Employee Benefits</h1>
+<p class="text-muted mb-4">
+    <strong>{{ employee.employee_number or 'No Number' }}</strong> — {{ employee.full_name }}.
+    Record each benefit once and pick the payroll month it should appear in.
+    Use a negative amount for payroll deductions or adjustments.
+    <strong>Non-taxable</strong> benefits are paid in net only (no PAYE/NSSF/levies on that amount).
+    Existing benefits remain taxable and pensionable unless you edit them.
+</p>
+<div class="d-flex flex-wrap gap-2 mb-4">
+    <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary">Back to employee</a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Add benefit</div>
+    <div class="card-body">
+        <form method="post" class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="action" value="add"/>
+            <div class="col-md-5">
+                <label class="form-label">Title / description</label>
+                <input type="text" name="title" class="form-control" required maxlength="200" placeholder="e.g. Airtime reimbursement"/>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Amount ({{ currency_code }})</label>
+                <input type="number" name="amount" class="form-control" step="0.01" required value="0"/>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Frequency</label>
+                <select name="frequency" class="form-select">
+                    <option value="one_off">One-off</option>
+                    <option value="monthly">Recurring monthly</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Payroll year</label>
+                <input type="number" name="payroll_year" class="form-control" min="2000" max="2100" required value="{{ today.year }}">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label">Payroll month</label>
+                <select name="payroll_month" class="form-select" required>
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}" {% if m == today.month %}selected{% endif %}>{{ "%02d"|format(m) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label">Notes (optional)</label>
+                <input type="text" name="notes" class="form-control" maxlength="500" placeholder="Internal note"/>
+            </div>
+            <div class="col-md-3">
+                <div class="form-check mt-2">
+                    <input type="hidden" name="is_taxable" value="0"/>
+                    <input type="checkbox" name="is_taxable" value="1" class="form-check-input" id="benefit_is_taxable" checked/>
+                    <label class="form-check-label" for="benefit_is_taxable">Taxable (included in PAYE base)</label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-check mt-2">
+                    <input type="hidden" name="is_pensionable" value="0"/>
+                    <input type="checkbox" name="is_pensionable" value="1" class="form-check-input" id="benefit_is_pensionable" checked/>
+                    <label class="form-check-label" for="benefit_is_pensionable">Pensionable (included in NSSF base)</label>
+                </div>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Recorded benefits</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Amount ({{ currency_code }})</th>
+                        <th>Frequency</th>
+                        <th>Payroll period</th>
+                        <th>Taxable</th>
+                        <th>Pensionable</th>
+                        <th>Notes</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in assignments %}
+                    <tr>
+                        <td>{{ a.title }}</td>
+                        <td>{{ "%.2f"|format(a.amount|float) }}</td>
+                        <td>{{ (a.frequency or 'one_off').replace('_', ' ') }}</td>
+                        <td>
+                            {% if a.payroll_year and a.payroll_month %}
+                            {{ a.payroll_year }}-{{ "%02d"|format(a.payroll_month) }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>{{ 'Yes' if a.is_taxable else 'No' }}</td>
+                        <td>{{ 'Yes' if a.is_pensionable else 'No' }}</td>
+                        <td>{{ a.notes or '—' }}</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#benefitEdit{{ a.id }}" aria-expanded="false" aria-controls="benefitEdit{{ a.id }}">Edit</button>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Remove this benefit?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="action" value="delete"/>
+                                <input type="hidden" name="assignment_id" value="{{ a.id }}"/>
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <tr class="collapse" id="benefitEdit{{ a.id }}">
+                        <td colspan="8" class="bg-light">
+                            <form method="post" class="row g-2 p-2">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="action" value="edit"/>
+                                <input type="hidden" name="assignment_id" value="{{ a.id }}"/>
+                                <div class="col-md-4">
+                                    <label class="form-label mb-1">Title / description</label>
+                                    <input type="text" name="title" class="form-control form-control-sm" required maxlength="200" value="{{ a.title }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label mb-1">Amount</label>
+                                    <input type="number" name="amount" class="form-control form-control-sm" step="0.01" required value="{{ a.amount|float }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label mb-1">Frequency</label>
+                                    <select name="frequency" class="form-select form-select-sm">
+                                        <option value="one_off" {% if (a.frequency or 'one_off') == 'one_off' %}selected{% endif %}>One-off</option>
+                                        <option value="monthly" {% if a.frequency == 'monthly' %}selected{% endif %}>Recurring monthly</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label mb-1">Payroll year</label>
+                                    <input type="number" name="payroll_year" class="form-control form-control-sm" min="2000" max="2100" required value="{{ a.payroll_year or today.year }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label mb-1">Payroll month</label>
+                                    <select name="payroll_month" class="form-select form-select-sm" required>
+                                        {% for m in range(1, 13) %}
+                                        <option value="{{ m }}" {% if m == (a.payroll_month or today.month) %}selected{% endif %}>{{ "%02d"|format(m) }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label mb-1">Notes</label>
+                                    <input type="text" name="notes" class="form-control form-control-sm" maxlength="500" value="{{ a.notes or '' }}">
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input type="hidden" name="is_taxable" value="0"/>
+                                        <input type="checkbox" name="is_taxable" value="1" class="form-check-input" id="benefit_taxable_{{ a.id }}" {% if a.is_taxable %}checked{% endif %}/>
+                                        <label class="form-check-label" for="benefit_taxable_{{ a.id }}">Taxable</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input type="hidden" name="is_pensionable" value="0"/>
+                                        <input type="checkbox" name="is_pensionable" value="1" class="form-check-input" id="benefit_pensionable_{{ a.id }}" {% if a.is_pensionable %}checked{% endif %}/>
+                                        <label class="form-check-label" for="benefit_pensionable_{{ a.id }}">Pensionable</label>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-sm btn-primary">Save changes</button>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="text-muted px-3 py-2">No benefits recorded yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

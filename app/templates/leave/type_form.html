@@ -1,0 +1,83 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ 'Edit' if leave_type else 'Add' }} leave type - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">{{ 'Edit leave type' if leave_type else 'Add leave type' }}</h1>
+<form method="post">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">{{ form.code.label }}</label>
+            {{ form.code(class_='form-control') }}
+            {% for e in form.code.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-8">
+            <label class="form-label">{{ form.name.label }}</label>
+            {{ form.name(class_='form-control') }}
+        </div>
+        <div class="col-12">
+            <label class="form-label">{{ form.days_count_basis.label }}</label>
+            {{ form.days_count_basis(class_='form-select') }}
+            <span class="form-text">Annual leave uses <strong>working days</strong> (Mon–Fri, excluding <a href="{{ url_for('leave.holidays_index') }}">public holidays</a>); maternity / paternity often use <strong>calendar days</strong> (every day counts).</span>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">{{ form.days_per_year.label }}</label>
+            {{ form.days_per_year(class_='form-control') }}
+            <span class="form-text">Leave blank for unlimited or manual tracking.</span>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check mt-4">
+                {{ form.accrues_monthly(class_='form-check-input') }}
+                <label class="form-check-label">{{ form.accrues_monthly.label }}</label>
+            </div>
+            <span class="form-text d-block">When enabled, employees <strong>earn</strong> leave each month (e.g. 2 days/month). Total is capped by <em>Days per year</em> if set.</span>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">{{ form.days_per_month.label }}</label>
+            {{ form.days_per_month(class_='form-control') }}
+            <span class="form-text">Example: <code>2</code> for two earned days every month.</span>
+        </div>
+        <div class="col-12"><hr class="my-1"></div>
+        <div class="col-md-4">
+            <div class="form-check">
+                {{ form.requires_approval(class_='form-check-input') }}
+                <label class="form-check-label">{{ form.requires_approval.label }}</label>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check">
+                {{ form.requires_document(class_='form-check-input') }}
+                <label class="form-check-label">{{ form.requires_document.label }}</label>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check">
+                {{ form.is_paid(class_='form-check-input') }}
+                <label class="form-check-label">{{ form.is_paid.label }}</label>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">{{ form.min_days_request.label }}</label>
+            {{ form.min_days_request(class_='form-control') }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">{{ form.max_consecutive_days.label }}</label>
+            {{ form.max_consecutive_days(class_='form-control') }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">{{ form.carry_forward_max.label }}</label>
+            {{ form.carry_forward_max(class_='form-control') }}
+            <span class="form-text">Maximum days that can roll from one year’s closing balance into the next (use <em>Leave balances → Year rollover</em>). Use <code>0</code> for no carry.</span>
+        </div>
+        <div class="col-12">
+            <div class="form-check">
+                {{ form.is_active(class_='form-check-input') }}
+                <label class="form-check-label">{{ form.is_active.label }}</label>
+            </div>
+        </div>
+    </div>
+    <div class="mt-4">
+        {{ form.submit(class_='btn btn-primary') }}
+        <a href="{{ url_for('leave.types_index') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

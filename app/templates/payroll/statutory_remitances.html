@@ -1,0 +1,70 @@
+{% extends "layouts/base.html" %}
+{% block title %}Statutory remittances {{ run.pay_month }}/{{ run.pay_year }} - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-2">Statutory remittances</h1>
+<p class="text-muted mb-4">
+    Payroll <strong>{{ run.pay_month }}/{{ run.pay_year }}</strong> (approved).
+    Amounts below were recorded when this payroll was approved — use for filing/payment to each institution.
+</p>
+<div class="d-flex flex-wrap gap-2 mb-4">
+    <a href="{{ url_for('payroll.view_run', id=run.id) }}" class="btn btn-outline-secondary">Back to payroll</a>
+</div>
+
+<h2 class="h5">Totals by institution</h2>
+<div class="table-responsive mb-4">
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Institution</th>
+                <th class="text-end">Amount (KES)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in totals %}
+            <tr>
+                <td><code>{{ t.code }}</code></td>
+                <td>{{ t.institution_name }}</td>
+                <td class="text-end">{{ "{:,.2f}".format(t.total|float) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-muted">No remittance lines recorded.</td></tr>
+            {% endfor %}
+        </tbody>
+        {% if totals %}
+        <tfoot>
+            <tr class="table-light fw-bold">
+                <td colspan="2">Grand total (all statutories)</td>
+                <td class="text-end">{{ "{:,.2f}".format(grand_total|float) }}</td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</div>
+
+<h2 class="h5">By employee</h2>
+<div class="table-responsive">
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>Employee</th>
+                <th>Code</th>
+                <th>Institution</th>
+                <th class="text-end">Amount (KES)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in remittances %}
+            <tr>
+                <td>{{ r.employee.full_name if r.employee else ('#' ~ r.employee_id) }}</td>
+                <td><code>{{ r.statutory_code }}</code></td>
+                <td>{{ r.institution_name }}</td>
+                <td class="text-end">{{ "{:,.2f}".format(r.amount|float) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-muted">No rows.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

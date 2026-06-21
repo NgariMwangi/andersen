@@ -1,0 +1,117 @@
+{% extends "layouts/base.html" %}
+{% block title %}IT queue - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-1 fw-600 text-dark">IT queue</h1>
+        <p class="text-muted small mb-0">All support tickets for your organization.</p>
+    </div>
+    {% if can_manage %}
+    <a href="{{ url_for('it_tickets.categories') }}" class="btn btn-outline-secondary btn-sm">Categories</a>
+    {% endif %}
+</div>
+
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Status</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for code, label in status_labels.items() %}
+                    <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Category</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for cid, cname in categories %}
+                    <option value="{{ cid }}" {% if category_filter == cid %}selected{% endif %}>{{ cname }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Priority</label>
+                <select name="priority" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for code, label in priority_labels.items() %}
+                    <option value="{{ code }}" {% if priority_filter == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Assignee</label>
+                <select name="assignee" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for uid, uname in assignees %}
+                    <option value="{{ uid }}" {% if assignee_filter == uid %}selected{% endif %}>{{ uname }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Filter</button>
+                <a href="{{ url_for('it_tickets.queue') }}" class="btn btn-sm btn-link">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Ticket</th>
+                        <th>Subject</th>
+                        <th>Requester</th>
+                        <th>Category</th>
+                        <th>Priority</th>
+                        <th>Assignee</th>
+                        <th>Status</th>
+                        <th>Updated</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for ticket in tickets %}
+                <tr>
+                    <td class="fw-500">{{ ticket.ticket_number }}</td>
+                    <td>{{ ticket.subject }}</td>
+                    <td>
+                        {% if ticket.requester and ticket.requester.employee %}
+                        {{ ticket.requester.employee.full_name }}
+                        {% elif ticket.requester %}
+                        {{ ticket.requester.email or '—' }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>{{ ticket.category.name if ticket.category else '—' }}</td>
+                    <td>
+                        <span class="badge {% if ticket.priority == 'urgent' %}bg-danger{% elif ticket.priority == 'high' %}bg-warning text-dark{% elif ticket.priority == 'low' %}bg-light text-dark border{% else %}bg-secondary{% endif %}">
+                            {{ priority_labels.get(ticket.priority, ticket.priority) }}
+                        </span>
+                    </td>
+                    <td>{{ ticket.assigned_to.employee.full_name if ticket.assigned_to and ticket.assigned_to.employee else (ticket.assigned_to.email if ticket.assigned_to else '—') }}</td>
+                    <td>
+                        <span class="badge {% if ticket.status == 'open' %}bg-primary{% elif ticket.status == 'in_progress' %}bg-info text-dark{% elif ticket.status == 'waiting_on_user' %}bg-warning text-dark{% elif ticket.status == 'resolved' %}bg-success{% else %}bg-secondary{% endif %}">
+                            {{ status_labels.get(ticket.status, ticket.status) }}
+                        </span>
+                    </td>
+                    <td class="small text-muted">{{ ticket.updated_at.strftime('%d %b %Y %H:%M') }}</td>
+                    <td class="text-end">
+                        <a href="{{ url_for('it_tickets.view', id=ticket.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-muted py-4 text-center">No tickets match your filters.</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "layouts/base.html" %}
+{% block title %}Statutory by country - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-2">Statutory configuration</h1>
+<p class="text-muted mb-4">Choose a <strong>country</strong> to manage PAYE brackets, NSSF tiers, and statutory rates for that jurisdiction. Amounts use the <strong>payroll currency</strong> shown (set per branch under Organization → Branches).</p>
+<div class="row g-3">
+    {% for row in rows %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="badge bg-primary fs-6">{{ row.code }}</span>
+                    <span class="text-muted small">{{ row.currency }}</span>
+                </div>
+                <p class="small text-muted mb-3">
+                    {{ row.rates }} rate(s), {{ row.brackets }} PAYE bracket row(s), {{ row.tiers }} NSSF tier row(s)
+                </p>
+                <div class="mt-auto">
+                    <a href="{{ url_for('statutory.country_index', country_code=row.code) }}" class="btn btn-primary btn-sm">Open statutory</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+<p class="text-muted small mt-4 mb-0">Missing a country? Add a <a href="{{ url_for('branches.index') }}">branch</a> with that country code, then add statutory rows for that ISO code — it will appear here automatically.</p>
+{% endblock %}

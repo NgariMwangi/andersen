@@ -1,0 +1,25 @@
+{# Optional supporting document for any leave type. #}
+<div class="col-12">
+    <div class="alert alert-warning py-2 small mb-2">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        Attaching a supporting document or image (e.g. medical certificate, travel booking, approval letter) is
+        <strong>not required</strong>, but it is <strong>strongly recommended</strong> to support your request
+        and speed up approval.
+    </div>
+    <label class="form-label" for="supporting_document">Supporting document or image <span class="text-muted">(optional)</span></label>
+    <input
+        type="file"
+        name="supporting_document"
+        id="supporting_document"
+        class="form-control"
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.heic,image/*,application/pdf"
+    />
+    <div class="form-text">PDF, Word, or image (JPG, PNG, etc.). Max size: {{ leave_max_attachment_mb }} MB.</div>
+    {% if existing_document %}
+    <p class="small text-muted mt-2 mb-0">
+        <i class="bi bi-paperclip me-1"></i>Current file on record.
+        <a href="{{ url_for('leave.leave_request_document', id=existing_document_request_id, download=1) }}">Download</a>
+        — upload a new file to replace it when saving.
+    </p>
+    {% endif %}
+</div>

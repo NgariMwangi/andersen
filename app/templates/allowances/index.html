@@ -1,0 +1,43 @@
+{% extends "layouts/base.html" %}
+{% block title %}Allowances - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h4 mb-0 fw-600 text-dark">Allowances</h1>
+    <p class="text-muted small mb-0">Define company allowance types. Assign amounts per employee on their Salary page.</p>
+    {% if has_permission('manage_departments') %}
+    <a href="{{ url_for('allowances.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add Allowance</a>
+    {% endif %}
+</div>
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr><th>Name</th><th>Taxable</th><th>Pensionable</th><th class="text-end">Actions</th></tr>
+                </thead>
+                <tbody>
+                {% for a in allowances %}
+                <tr>
+                    <td><a href="{{ url_for('allowances.view', id=a.id) }}" class="text-decoration-none">{{ a.name }}</a></td>
+                    <td>{{ 'Yes' if a.is_taxable else 'No' }}</td>
+                    <td>{{ 'Yes' if a.is_pensionable else 'No' }}</td>
+                    <td class="text-end">
+                        <a href="{{ url_for('allowances.view', id=a.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                        {% if has_permission('manage_departments') %}
+                        <a href="{{ url_for('allowances.edit', id=a.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <form method="post" action="{{ url_for('allowances.delete', id=a.id) }}" class="d-inline" onsubmit="return confirm('Delete this allowance?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-muted py-4 text-center">No allowances. Add one (e.g. House, Transport, Meal).</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

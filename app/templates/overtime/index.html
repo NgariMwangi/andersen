@@ -1,0 +1,69 @@
+{% extends "layouts/base.html" %}
+{% block title %}Overtime - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Overtime compensation</h1>
+    <div class="d-flex flex-wrap gap-2">
+        {% if has_permission('request_overtime') and current_user.employee_id %}
+        <a href="{{ url_for('overtime.new_request') }}" class="btn btn-primary btn-sm">Request overtime</a>
+        {% endif %}
+        {% if has_permission('submit_overtime_same_dept') %}
+        <a href="{{ url_for('overtime.new_for_employee') }}" class="btn btn-outline-primary btn-sm">Request for employee</a>
+        {% endif %}
+    </div>
+</div>
+
+<p class="text-muted small mb-4">
+    Overtime is recorded in <strong>days</strong>. Pay is calculated at payroll as
+    <strong>(monthly gross × 12 ÷ 365) × days</strong> for the selected payroll month.
+    Your line manager (or HR) must approve before it appears on a payroll run.
+</p>
+
+<div class="table-responsive">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th>Employee</th>
+                <th>Period</th>
+                <th class="text-end">Days</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in requests %}
+        <tr>
+            <td>{{ r.employee.full_name if r.employee else '—' }}</td>
+            <td>{{ r.for_pay_month }}/{{ r.for_pay_year }}</td>
+            <td class="text-end">{{ r.days | fmt_days }}</td>
+            <td>
+                <span class="badge rounded-pill {% if r.status == 'approved' %}text-bg-success{% elif r.status == 'pending' %}text-bg-warning text-dark{% elif r.status == 'rejected' %}text-bg-secondary{% else %}text-bg-light text-dark{% endif %}">
+                    {{ r.status }}
+                </span>
+            </td>
+            <td class="small text-muted">{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '—' }}</td>
+            <td class="text-end text-nowrap">
+                {% if r.status == 'pending' %}
+                    {% set subject = r.employee %}
+                    {% if has_permission('approve_overtime') or (subject and current_user.employee_id and subject.is_supervised_by(current_user.employee_id)) %}
+                    <a href="{{ url_for('overtime.review', id=r.id) }}" class="btn btn-sm btn-outline-primary">Review</a>
+                    {% endif %}
+                    {% if r.employee_id == current_user.employee_id or has_permission('approve_overtime') %}
+                    <form method="post" action="{{ url_for('overtime.cancel', id=r.id) }}" class="d-inline" onsubmit="return confirm('Cancel this request?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">Cancel</button>
+                    </form>
+                    {% endif %}
+                {% elif r.applied_to_payroll_run_id %}
+                <span class="small text-muted">Payroll #{{ r.applied_to_payroll_run_id }}</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-muted">No overtime requests yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

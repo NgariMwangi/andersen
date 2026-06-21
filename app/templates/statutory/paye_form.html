@@ -1,0 +1,30 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ 'Edit' if bracket else 'Add' }} PAYE Bracket - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-2">{{ 'Edit' if bracket else 'Add' }} PAYE bracket</h1>
+{% if currency_code %}<p class="text-muted small mb-3">Min/max taxable bands are in <strong>{{ currency_code }}</strong> for this country.</p>{% endif %}
+{% if form.errors %}
+<div class="alert alert-danger">
+    <strong>Please fix these errors:</strong>
+    <ul class="mb-0 mt-2">
+    {% for field_name, errors in form.errors.items() %}
+        {% for err in errors %}
+        <li>{{ form[field_name].label.text if field_name in form else field_name }}: {{ err }}</li>
+        {% endfor %}
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+<form method="post" action="{{ url_for('statutory.paye_edit', id=bracket.id) if bracket else url_for('statutory.paye_add', country_code=country_code) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="mb-3">{{ form.country_code.label(class='form-label') }}{{ form.country_code(class='form-control text-uppercase', maxlength='2') }}</div>
+    <div class="mb-3">{{ form.effective_from.label(class='form-label') }}{{ form.effective_from(class='form-control') }}</div>
+    <div class="mb-3">{{ form.effective_to.label(class='form-label') }}{{ form.effective_to(class='form-control') }}</div>
+    <div class="mb-3">{{ form.bracket_order.label(class='form-label') }}{{ form.bracket_order(class='form-control', min='1', max='50') }}</div>
+    <div class="mb-3">{{ form.min_amount.label(class='form-label') }}{{ form.min_amount(class='form-control') }}</div>
+    <div class="mb-3">{{ form.max_amount.label(class='form-label') }}{{ form.max_amount(class='form-control') }}</div>
+    <div class="mb-3">{{ form.rate_percent.label(class='form-label') }}{{ form.rate_percent(class='form-control') }}</div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{{ url_for('statutory.country_index', country_code=country_code) }}" class="btn btn-outline-secondary">Cancel</a>
+</form>
+{% endblock %}

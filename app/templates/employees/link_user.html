@@ -1,0 +1,42 @@
+{% extends "layouts/base.html" %}
+{% block title %}Link login account - {{ employee.full_name }} - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-4">Link login account – {{ employee.employee_number }} {{ employee.full_name }}</h1>
+<div class="card">
+    <div class="card-body">
+        <p class="text-muted">Create a user account so this employee can log in. Use their work email.</p>
+        <form method="post" action="{{ url_for('employees.link_user', id=employee.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Email *</label>
+                    <input type="email" name="email" class="form-control" required value="{{ employee.email or '' }}" placeholder="employee@company.com">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Password *</label>
+                    <input type="password" name="password" class="form-control" required minlength="8" value="nexgen2026" placeholder="Min 8 characters">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Role</label>
+                    <select name="role_id" class="form-select">
+                        <option value="">-- Select role --</option>
+                        {% for r in roles %}
+                        <option value="{{ r.id }}" {% if default_role_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="must_change_password" value="1" id="must_change_password" checked/>
+                        <label class="form-check-label" for="must_change_password">Require password change on first login</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Create and link account</button>
+                    <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

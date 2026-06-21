@@ -1,0 +1,222 @@
+{% extends "layouts/base.html" %}
+{% block title %}Leave - {{ app_name }}{% endblock %}
+
+{% macro leave_status_badge(r) %}
+{% set st = (r.status or '')|lower %}
+<span class="badge bg-{% if st == 'approved' %}success{% elif st in ('pending', 'pending_hr') %}warning text-dark{% elif st == 'rejected' %}danger{% else %}secondary{% endif %}">{{ leave_status_label(r.status) }}</span>
+{% endmacro %}
+
+{% macro supervisor_status_badge(r) %}
+{% set sup = supervisor_step_summary(r) %}
+{% if sup.state == 'not_applicable' %}
+<span class="text-muted small">—</span>
+{% elif sup.state == 'awaiting' %}
+<span class="badge bg-secondary" title="Manager: {{ sup.manager_name or '—' }}">Awaiting</span>
+{% elif sup.state == 'completed' %}
+<span class="badge bg-success" title="{{ sup.notes or '' }}">Done</span>
+{% elif sup.state == 'rejected' %}
+<span class="badge bg-danger">Rejected</span>
+{% else %}
+<span class="text-muted small">{{ sup.label }}</span>
+{% endif %}
+{% endmacro %}
+
+{% macro leave_remaining_cell(r) %}
+{% if r.status == 'approved' and remaining_days.get(r.id) is not none %}
+    {% set rem = remaining_days[r.id] %}
+    {% if rem == 0 %}
+        <span class="text-muted">0</span>
+    {% else %}
+        <span class="fw-semibold">{{ rem | fmt_days }}</span>
+    {% endif %}
+{% else %}
+    <span class="text-muted">—</span>
+{% endif %}
+{% endmacro %}
+
+{% macro leave_request_actions(r) %}
+{% set st = (r.status or '')|lower %}
+{% set can_act = has_permission('approve_leave') or (current_user.employee_id and current_user.employee_id == r.employee_id) %}
+{% set can_edit = st == 'pending' and can_act %}
+{% set can_resubmit = st == 'rejected' and can_act %}
+<a href="{{ url_for('leave.view_request', id=r.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+{% if can_edit %}
+<a href="{{ url_for('leave.edit_request', id=r.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+<form method="post" action="{{ url_for('leave.delete_request', id=r.id) }}" class="d-inline" onsubmit="return confirm('Delete this leave request?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+</form>
+{% elif can_resubmit %}
+<a href="{{ url_for('leave.edit_request', id=r.id) }}" class="btn btn-sm btn-outline-primary">Resubmit</a>
+<form method="post" action="{{ url_for('leave.delete_request', id=r.id) }}" class="d-inline" onsubmit="return confirm('Delete this leave request?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+</form>
+{% endif %}
+{% if leave_approval_stage(r) %}
+<a href="{{ url_for('leave.approve', id=r.id) }}" class="btn btn-sm btn-outline-primary">Review</a>
+{% endif %}
+{% endmacro %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Leave Requests</h1>
+    {% if has_permission('manage_leave_types') %}
+    <a href="{{ url_for('leave.types_index') }}" class="btn btn-outline-secondary btn-sm">Configure leave types</a>
+    <a href="{{ url_for('leave.balances') }}" class="btn btn-outline-secondary btn-sm">Leave balances</a>
+    <a href="{{ url_for('leave.tracker') }}" class="btn btn-outline-secondary btn-sm">Leave tracker</a>
+    <a href="{{ url_for('leave.admin_request_leave') }}" class="btn btn-outline-secondary btn-sm">Apply leave for employee</a>
+    <a href="{{ url_for('leave.holidays_index') }}" class="btn btn-outline-secondary btn-sm">Public holidays</a>
+    {% endif %}
+</div>
+
+{% if leave_statistics %}
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted mb-3">Your leave summary ({{ stats_year }})</h2>
+        <p class="text-muted small mb-3 mb-md-2">
+            Leave types are filtered by the gender on your employee profile (e.g. maternity hidden for male, paternity hidden for female).
+            For types with <strong>monthly accrual</strong>, <strong>Book total</strong> is opening/carry-in plus earned days plus adjustments; <strong>Remaining</strong> is that minus approved use.
+            Other types use yearly entitlement minus <strong>Used</strong> (approved days overlapping {{ stats_year }}).
+        </p>
+        <div class="row g-3">
+            {% for row in leave_statistics %}
+            <div class="col-sm-6 col-lg-4 col-xl-3">
+                <div class="border rounded p-3 h-100 bg-light bg-opacity-50">
+                    <div class="fw-semibold mb-2">{{ row.name }}</div>
+                    <dl class="row small mb-0">
+                        {% if row.mode == 'ledger' %}
+                        <dt class="col-6 text-muted">Opening / carry</dt>
+                        <dd class="col-6 text-end mb-1">{{ row.opening_balance | fmt_days }} <span class="text-muted">days</span></dd>
+                        <dt class="col-6 text-muted">Earned YTD</dt>
+                        <dd class="col-6 text-end mb-1">{{ row.accrued | fmt_days }} <span class="text-muted">days</span></dd>
+                        {% if row.adjusted %}
+                        <dt class="col-6 text-muted">Adjustment</dt>
+                        <dd class="col-6 text-end mb-1">{{ row.adjusted | fmt_days }} <span class="text-muted">days</span></dd>
+                        {% endif %}
+                        <dt class="col-6 text-muted">Book total</dt>
+                        <dd class="col-6 text-end mb-1">{{ row.entitlement | fmt_days }} <span class="text-muted">days</span></dd>
+                        {% if row.carry_forward_max is defined and row.carry_forward_max > 0 %}
+                        <dt class="col-6 text-muted">Max carry next yr</dt>
+                        <dd class="col-6 text-end mb-1 text-muted">{{ row.carry_forward_max }} days</dd>
+                        {% endif %}
+                        {% elif row.mode == 'annual_grant' %}
+                        <dt class="col-6 text-muted">Earned YTD</dt>
+                        <dd class="col-6 text-end mb-1">{{ row.accrued | fmt_days }} <span class="text-muted">days</span></dd>
+                        {% elif row.entitlement is not none %}
+                        <dt class="col-6 text-muted">Entitlement</dt>
+                        <dd class="col-6 text-end mb-1">{{ row.entitlement | fmt_days }} <span class="text-muted">days</span></dd>
+                        {% endif %}
+                        <dt class="col-6 text-muted">Used</dt>
+                        <dd class="col-6 text-end mb-1">{{ row.used | fmt_days }} <span class="text-muted">days</span></dd>
+                        <dt class="col-6 text-muted">Remaining</dt>
+                        <dd class="col-6 text-end mb-0 fw-semibold text-primary">
+                            {% if row.remaining is not none %}
+                                {{ row.remaining | fmt_days }} <span class="text-muted fw-normal">days</span>
+                            {% else %}
+                                <span class="text-muted fw-normal">—</span>
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% elif not current_user.employee_id %}
+<div class="alert alert-light border mb-4 small">
+    Link your login to an <strong>employee</strong> record to see personal leave statistics here.
+</div>
+{% endif %}
+
+{% set show_employee_column = has_permission('approve_leave') or is_line_manager() %}
+{% set show_supervisor_column = has_permission('approve_leave') %}
+{% set leave_table_cols = 8 + (1 if show_employee_column else 0) + (1 if show_supervisor_column else 0) %}
+<a href="{{ url_for('leave.request_leave') }}" class="btn btn-primary mb-3">New Request</a>
+<div class="d-none d-md-block table-responsive leave-requests-table-wrap">
+    <table class="table leave-requests-table mb-0">
+        <thead>
+            <tr>
+                {% if show_employee_column %}<th>Employee</th>{% endif %}
+                <th>Type</th>
+                <th>Handover to</th>
+                <th>Start</th>
+                <th>End</th>
+                <th class="text-center">Days</th>
+                <th class="text-center">Remaining</th>
+                <th>Status</th>
+                {% if show_supervisor_column %}<th>Supervisor</th>{% endif %}
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in requests %}
+        <tr>
+            {% if show_employee_column %}
+            <td>{{ r.employee.full_name if r.employee else '-' }}</td>
+            {% endif %}
+            <td>{{ r.leave_type.name if r.leave_type else '-' }}</td>
+            <td>{{ r.handover_to.full_name if r.handover_to else '-' }}</td>
+            <td>{{ r.start_date.strftime('%d %b %Y') if r.start_date else '-' }}</td>
+            <td>{{ r.end_date.strftime('%d %b %Y') if r.end_date else '-' }}</td>
+            <td class="text-center">{{ r.days_requested | fmt_days }}</td>
+            <td class="text-center align-middle">{{ leave_remaining_cell(r) }}</td>
+            <td>{{ leave_status_badge(r) }}</td>
+            {% if show_supervisor_column %}<td>{{ supervisor_status_badge(r) }}</td>{% endif %}
+            <td class="text-nowrap">{{ leave_request_actions(r) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ leave_table_cols }}" class="text-muted">No leave requests.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="d-md-none leave-request-cards">
+    {% for r in requests %}
+    <div class="card border-0 shadow-sm mb-3 leave-request-card">
+        <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <div class="min-w-0">
+                    <div class="fw-semibold">{{ r.leave_type.name if r.leave_type else 'Leave' }}</div>
+                    {% if show_employee_column %}
+                    <div class="small text-muted text-truncate">{{ r.employee.full_name if r.employee else '—' }}</div>
+                    {% endif %}
+                </div>
+                {{ leave_status_badge(r) }}
+            </div>
+            <dl class="leave-request-card-details mb-3">
+                <dt>Period</dt>
+                <dd>
+                    {{ r.start_date.strftime('%d %b %Y') if r.start_date else '—' }}
+                    –
+                    {{ r.end_date.strftime('%d %b %Y') if r.end_date else '—' }}
+                </dd>
+                <dt>Days</dt>
+                <dd>{{ r.days_requested | fmt_days }}</dd>
+                <dt>Remaining</dt>
+                <dd>{{ leave_remaining_cell(r) }}</dd>
+                {% if show_supervisor_column %}
+                <dt>Supervisor</dt>
+                <dd>{{ supervisor_status_badge(r) }}</dd>
+                {% endif %}
+                {% if r.handover_to %}
+                <dt>Handover</dt>
+                <dd>{{ r.handover_to.full_name }}</dd>
+                {% endif %}
+            </dl>
+            <div class="leave-request-card-actions d-flex flex-wrap gap-2">
+                {{ leave_request_actions(r) }}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">No leave requests.</p>
+    {% endfor %}
+</div>
+<p class="text-muted small mb-0">
+    When a <strong>manager</strong> is set on the employee, they normally approve first; HR can still approve or reject anytime and will see supervisor status (Awaiting / Done).
+    <strong>Remaining</strong> is for <strong>approved</strong> leave only: days still to run in the period (from today through the end date), using the same rule as the leave type — <em>working days</em> (Mon–Fri) or <em>calendar days</em>.
+</p>
+{% endblock %}

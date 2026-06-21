@@ -1,0 +1,23 @@
+{% extends "layouts/base.html" %}
+{% block title %}Add Allowance - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-4">Add Allowance</h1>
+<div class="card">
+    <div class="card-body">
+        <form method="post" action="{{ url_for('allowances.create') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="row g-3">
+                <div class="col-md-4">{{ form.code.label(class='form-label') }}{{ form.code(class='form-control') }}</div>
+                <div class="col-md-4">{{ form.name.label(class='form-label') }}{{ form.name(class='form-control') }}</div>
+                <div class="col-12">{{ form.description.label(class='form-label') }}{{ form.description(class='form-control', rows=2) }}</div>
+                <div class="col-md-6"><div class="form-check">{{ form.is_taxable(class='form-check-input') }}{{ form.is_taxable.label(class='form-check-label') }}</div></div>
+                <div class="col-md-6"><div class="form-check">{{ form.is_pensionable(class='form-check-input') }}{{ form.is_pensionable.label(class='form-check-label') }}</div></div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <a href="{{ url_for('allowances.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

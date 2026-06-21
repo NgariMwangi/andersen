@@ -1,0 +1,23 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ allowance.name }} - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-4">{{ allowance.code }} - {{ allowance.name }}</h1>
+<div class="card mb-3">
+    <div class="card-body">
+        <p class="mb-1"><strong>Code:</strong> {{ allowance.code }}</p>
+        <p class="mb-1"><strong>Taxable:</strong> {{ 'Yes' if allowance.is_taxable else 'No' }}</p>
+        <p class="mb-1"><strong>Pensionable (NSSF base):</strong> {{ 'Yes' if allowance.is_pensionable else 'No' }}</p>
+        {% if allowance.description %}<p class="mb-0"><strong>Description:</strong> {{ allowance.description }}</p>{% endif %}
+    </div>
+</div>
+<div class="d-flex gap-2">
+    {% if has_permission('manage_departments') %}
+    <a href="{{ url_for('allowances.edit', id=allowance.id) }}" class="btn btn-primary">Edit</a>
+    <form method="post" action="{{ url_for('allowances.delete', id=allowance.id) }}" class="d-inline" onsubmit="return confirm('Delete this allowance?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn btn-outline-danger">Delete</button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('allowances.index') }}" class="btn btn-outline-secondary">Back to list</a>
+</div>
+{% endblock %}

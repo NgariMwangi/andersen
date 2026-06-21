@@ -1,0 +1,147 @@
+{% extends "layouts/base.html" %}
+{% block title %}Deductions — {{ employee.full_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-2">Deductions</h1>
+<p class="text-muted mb-4">
+    <strong>{{ employee.employee_number }}</strong> — {{ employee.full_name }}.
+    Recurring deductions apply on each payroll while the assignment is active. One-off amounts for a single month are set under
+    <strong>Payroll → Manual deductions</strong> on a draft run.
+</p>
+<div class="d-flex flex-wrap gap-2 mb-4">
+    <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary">Back to employee</a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Add deduction</div>
+    <div class="card-body">
+        <form method="post" class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="action" value="add"/>
+            <div class="col-md-6">
+                <label class="form-label">Title / description</label>
+                <input type="text" name="title" class="form-control" required maxlength="200" placeholder="e.g. Bank loan repayment — Co-op Bank"/>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Calculation</label>
+                <select name="calculation_mode" class="form-select" id="calcMode">
+                    <option value="fixed">Fixed amount ({{ currency_code }} / month)</option>
+                    <option value="percent_basic">% of basic salary</option>
+                    <option value="percent_gross">% of gross pay</option>
+                </select>
+            </div>
+            <div class="col-md-2" id="grpAmount">
+                <label class="form-label">Amount ({{ currency_code }})</label>
+                <input type="number" name="amount" class="form-control" step="0.01" min="0" value="0"/>
+            </div>
+            <div class="col-md-2" id="grpRate" style="display:none;">
+                <label class="form-label">Rate (%)</label>
+                <input type="number" name="rate_percent" class="form-control" step="0.01" min="0" placeholder="e.g. 5"/>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Effective from</label>
+                <input type="date" name="effective_from" class="form-control" required/>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Effective to (optional)</label>
+                <input type="date" name="effective_to" class="form-control"/>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Loan balance cap (optional)</label>
+                <input type="number" name="remaining_balance" class="form-control" step="0.01" min="0" placeholder="Stops when cleared"/>
+            </div>
+            <div class="col-12">
+                <label class="form-label">Extra notes (optional)</label>
+                <input type="text" name="notes" class="form-control" maxlength="500" placeholder="Shown in brackets on payslip after the title"/>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Active &amp; past assignments</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Title / description</th>
+                        <th>Mode</th>
+                        <th>Amount / Rate</th>
+                        <th>Effective</th>
+                        <th>Balance cap</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in assignments %}
+                    <tr>
+                        <td>
+                            {{ a.title or (a.deduction.name if a.deduction else '—') }}
+                            {% if a.notes %}<span class="text-muted small d-block">{{ a.notes }}</span>{% endif %}
+                        </td>
+                        <td>{{ a.calculation_mode }}</td>
+                        <td>
+                            {% if a.calculation_mode == 'fixed' %}
+                            {{ "%.2f"|format(a.amount|float) }}
+                            {% else %}
+                            {{ a.rate_percent or '—' }}%
+                            {% endif %}
+                        </td>
+                        <td>{{ a.effective_from }} {% if a.effective_to %}→ {{ a.effective_to }}{% endif %}</td>
+                        <td>{{ a.remaining_balance if a.remaining_balance is not none else '—' }}</td>
+                        <td>
+                            {% if a.effective_to is none and a.is_active %}
+                            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="collapse" data-bs-target="#stopDed{{ a.id }}" aria-expanded="false" aria-controls="stopDed{{ a.id }}">Stop</button>
+                            {% endif %}
+                            <form method="post" class="d-inline" onsubmit="return confirm('Remove this deduction?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="action" value="delete"/>
+                                <input type="hidden" name="assignment_id" value="{{ a.id }}"/>
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% if a.effective_to is none and a.is_active %}
+                    <tr class="collapse" id="stopDed{{ a.id }}">
+                        <td colspan="6" class="bg-light">
+                            <form method="post" class="row g-2 p-2 align-items-end">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="action" value="stop"/>
+                                <input type="hidden" name="assignment_id" value="{{ a.id }}"/>
+                                <div class="col-md-5">
+                                    <label class="form-label mb-1">Last payroll month this deduction should apply</label>
+                                    <div class="d-flex gap-2">
+                                        <input type="number" name="last_payroll_year" class="form-control form-control-sm" min="2000" max="2100" required placeholder="Year">
+                                        <select name="last_payroll_month" class="form-select form-select-sm" required>
+                                            {% for m in range(1, 13) %}
+                                            <option value="{{ m }}">{{ "%02d"|format(m) }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-7">
+                                    <button type="submit" class="btn btn-sm btn-warning">Confirm stop</button>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% else %}
+                    <tr><td colspan="6" class="text-muted px-3 py-2">No deductions yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('calcMode').addEventListener('change', function() {
+    var fixed = this.value === 'fixed';
+    document.getElementById('grpAmount').style.display = fixed ? '' : 'none';
+    document.getElementById('grpRate').style.display = fixed ? 'none' : '';
+});
+</script>
+{% endblock %}

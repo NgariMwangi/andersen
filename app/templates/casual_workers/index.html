@@ -1,0 +1,69 @@
+{% extends "layouts/base.html" %}
+{% block title %}Casual Workers{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-1">Casual Workers</h1>
+        <p class="text-muted mb-0">Separate from payroll employees and monthly payroll runs.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('casual_workers.report') }}" class="btn btn-outline-secondary">Payment report</a>
+        <a href="{{ url_for('casual_workers.create') }}" class="btn btn-primary">Add casual worker</a>
+    </div>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input type="text" name="q" class="form-control" value="{{ request.args.get('q', '') }}" placeholder="Search by name, phone, ID or number">
+    </div>
+    <div class="col-md-3">
+        <select name="status" class="form-select">
+            <option value="">All statuses</option>
+            <option value="active" {{ 'selected' if request.args.get('status') == 'active' else '' }}>Active</option>
+            <option value="inactive" {{ 'selected' if request.args.get('status') == 'inactive' else '' }}>Inactive</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100">Filter</button>
+    </div>
+</form>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Worker</th>
+                    <th>Phone</th>
+                    <th>Branch</th>
+                    <th>Rate</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for w in workers %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('casual_workers.view', id=w.id) }}">{{ w.full_name }}</a>
+                        <div class="small text-muted">{{ w.worker_number or 'No number' }}</div>
+                    </td>
+                    <td>{{ w.phone or '—' }}</td>
+                    <td>{{ w.branch.name if w.branch else '—' }}</td>
+                    <td>{{ "%.2f"|format(w.daily_rate|float) }} / {{ w.rate_unit or 'daily' }}</td>
+                    <td>
+                        <span class="badge {{ 'text-bg-success' if w.status == 'active' else 'text-bg-secondary' }}">{{ w.status|title }}</span>
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('casual_workers.view', id=w.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                        <a href="{{ url_for('casual_workers.edit', id=w.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-muted px-3 py-2">No casual workers found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

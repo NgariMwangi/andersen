@@ -1,0 +1,125 @@
+{% extends "layouts/base.html" %}
+{% block title %}Settings - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h1 class="h3 mb-1">Settings</h1>
+        <p class="text-muted small mb-0">Manage users, security and system activity for {{ app_name }}.</p>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center me-2" style="width:40px;height:40px;">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                    <div>
+                        <h2 class="h6 mb-0">Users &amp; Roles</h2>
+                        <small class="text-muted">Login access, roles, employee links</small>
+                    </div>
+                </div>
+                <p class="text-muted small mb-3 mt-2">Create and manage user accounts, assign roles (ADMIN, HR, Manager, Employee) and link logins to employees.</p>
+                <div class="mt-auto">
+                    <a href="{{ url_for('settings.users') }}" class="btn btn-sm btn-outline-primary">
+                        Manage users
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if payroll_enabled %}
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center me-2" style="width:40px;height:40px;">
+                        <i class="bi bi-percent"></i>
+                    </div>
+                    <div>
+                        <h2 class="h6 mb-0">Statutory Rates</h2>
+                        <small class="text-muted">PAYE, NSSF, SHIF, housing levy</small>
+                    </div>
+                </div>
+                <p class="text-muted small mb-3 mt-2">Update statutory rates and PAYE brackets when legislation changes, without touching code.</p>
+                <div class="mt-auto">
+                    <a href="{{ url_for('statutory.index') }}" class="btn btn-sm btn-outline-warning">
+                        Configure rates
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="rounded-circle bg-info-subtle text-info d-flex align-items-center justify-content-center me-2" style="width:40px;height:40px;">
+                        <i class="bi bi-clipboard-data"></i>
+                    </div>
+                    <div>
+                        <h2 class="h6 mb-0">Audit Log</h2>
+                        <small class="text-muted">Who changed what, and when</small>
+                    </div>
+                </div>
+                <p class="text-muted small mb-3 mt-2">Review high‑level system activity for compliance and troubleshooting.</p>
+                <div class="mt-auto">
+                    <a href="{{ url_for('settings.audit_log') }}" class="btn btn-sm btn-outline-info">
+                        View audit log
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center me-2" style="width:40px;height:40px;">
+                        <i class="bi bi-building"></i>
+                    </div>
+                    <div>
+                        <h2 class="h6 mb-0">Employer Details</h2>
+                        <small class="text-muted">Used in reports and documents</small>
+                    </div>
+                </div>
+                <p class="text-muted small mb-3 mt-2">Update employer name and identifiers (KRA PIN, address) without changing code.</p>
+                <div class="mt-auto">
+                    <a href="{{ url_for('settings.employer') }}" class="btn btn-sm btn-outline-primary">
+                        Manage employer
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if current_user.is_superuser %}
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0 border-primary">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" style="width:40px;height:40px;">
+                        <i class="bi bi-diagram-3"></i>
+                    </div>
+                    <div>
+                        <h2 class="h6 mb-0">Companies</h2>
+                        <small class="text-muted">Platform superuser</small>
+                    </div>
+                </div>
+                <p class="text-muted small mb-3 mt-2">After the first registration, new tenants are added here. Each company gets its own data, branches, and first administrator account.</p>
+                <div class="mt-auto d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('settings.companies_list') }}" class="btn btn-sm btn-primary">View companies</a>
+                    <a href="{{ url_for('settings.companies_new') }}" class="btn btn-sm btn-outline-primary">New company</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

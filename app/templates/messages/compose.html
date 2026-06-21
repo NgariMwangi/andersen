@@ -1,0 +1,75 @@
+{% extends "layouts/base.html" %}
+{% block title %}New message - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-4 fw-600 text-dark">New message</h1>
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post" action="{{ url_for('messages.compose') }}" id="composeMessageForm">
+            {{ form.hidden_tag() }}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="recipient_type">{{ form.recipient_type.label.text }}</label>
+                    {{ form.recipient_type(class='form-select', id='recipient_type') }}
+                </div>
+                <div class="col-12" id="recipientPicker">
+                    <label class="form-label" for="recipient_ids">{{ form.recipient_ids.label.text }}</label>
+                    {{ form.recipient_ids(class='form-select', id='recipient_ids', size='8', multiple=True) }}
+                    <div class="form-text" id="recipientHelp">Hold Ctrl (Windows) or Cmd (Mac) to select multiple people.</div>
+                    {% if form.recipient_ids.errors %}
+                    <div class="text-danger small">{{ form.recipient_ids.errors[0] }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="subject">{{ form.subject.label.text }}</label>
+                    {{ form.subject(class='form-control', id='subject', placeholder='Subject') }}
+                    {% if form.subject.errors %}<div class="text-danger small">{{ form.subject.errors[0] }}</div>{% endif %}
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="body">{{ form.body.label.text }}</label>
+                    {{ form.body(class='form-control', id='body', rows='8', placeholder='Write your message…') }}
+                    {% if form.body.errors %}<div class="text-danger small">{{ form.body.errors[0] }}</div>{% endif %}
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        {{ form.send_email(class='form-check-input', id='send_email') }}
+                        <label class="form-check-label" for="send_email">{{ form.send_email.label.text }}</label>
+                    </div>
+                    <div class="form-text">Recipients receive an email with a link to this conversation. You receive a confirmation email when enabled.</div>
+                </div>
+                <div class="col-12">
+                    {{ form.submit(class='btn btn-primary') }}
+                    <a href="{{ url_for('messages.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var typeSelect = document.getElementById('recipient_type');
+    var picker = document.getElementById('recipientPicker');
+    var recipientSelect = document.getElementById('recipient_ids');
+    var help = document.getElementById('recipientHelp');
+    if (!typeSelect || !picker) return;
+
+    function syncRecipientUi() {
+        var mode = typeSelect.value;
+        if (mode === 'organization') {
+            picker.classList.add('d-none');
+            if (recipientSelect) {
+                Array.from(recipientSelect.options).forEach(function(o) { o.selected = false; });
+            }
+        } else {
+            picker.classList.remove('d-none');
+            if (help) {
+                help.textContent = mode === 'individual'
+                    ? 'Select one person.'
+                    : 'Hold Ctrl (Windows) or Cmd (Mac) to select multiple people.';
+            }
+        }
+    }
+    typeSelect.addEventListener('change', syncRecipientUi);
+    syncRecipientUi();
+});
+</script>
+{% endblock %}

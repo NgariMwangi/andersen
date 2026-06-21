@@ -1,0 +1,48 @@
+{% extends "layouts/auth_base.html" %}
+{% block auth_content %}
+<form method="post" action="{{ url_for('auth.login') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-control" required autofocus value="{{ form.email.data or '' }}">
+        {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors[0] }}</div>{% endif %}
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="login-password">Password</label>
+        <div class="password-wrap">
+            <input type="password" name="password" id="login-password" class="form-control has-toggle" required autocomplete="current-password">
+            <button type="button" class="password-toggle-btn" id="login-password-toggle" aria-label="Show password" title="Show password">
+                <i class="bi bi-eye" id="login-password-icon" aria-hidden="true"></i>
+            </button>
+        </div>
+        {% if form.password.errors %}<div class="text-danger small">{{ form.password.errors[0] }}</div>{% endif %}
+    </div>
+    <div class="mb-3 form-check">
+        <input type="checkbox" name="remember_me" class="form-check-input" {% if form.remember_me.data %}checked{% endif %}>
+        <label class="form-check-label">Remember me</label>
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Sign In</button>
+</form>
+<p class="text-center mt-4 mb-0 auth-footer-links small">
+    {% if allow_register %}<a href="{{ url_for('auth.register') }}">Create first account</a><br>{% endif %}
+    <a href="{{ url_for('auth.forgot_password') }}">Forgot password?</a>
+</p>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+    var btn = document.getElementById('login-password-toggle');
+    var input = document.getElementById('login-password');
+    var icon = document.getElementById('login-password-icon');
+    if (!btn || !input || !icon) return;
+    btn.addEventListener('click', function () {
+        var show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        icon.classList.toggle('bi-eye', !show);
+        icon.classList.toggle('bi-eye-slash', show);
+        btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        btn.setAttribute('title', show ? 'Hide password' : 'Show password');
+    });
+})();
+</script>
+{% endblock %}

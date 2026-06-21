@@ -1,0 +1,71 @@
+<div class="chat-thread-page" id="chatThreadPage" data-message-thread-id="{{ thread.id }}">
+    <header class="chat-header">
+        <button type="button" class="chat-header-back d-lg-none" id="chatMobileBack" aria-label="Back to chats">
+            <i class="bi bi-arrow-left"></i>
+        </button>
+        <div class="chat-header-avatar" aria-hidden="true">
+            {% if thread.thread_type == 'broadcast' %}
+            <i class="bi bi-megaphone"></i>
+            {% else %}
+            <i class="bi bi-people-fill"></i>
+            {% endif %}
+        </div>
+        <div class="chat-header-info min-w-0">
+            <h1 class="chat-header-title">{{ thread.subject }}</h1>
+            <p class="chat-header-subtitle mb-0">
+                {% if thread.thread_type == 'broadcast' %}
+                Whole organization
+                {% else %}
+                {% for u in participants %}
+                {{ chat_sender_name(u.id) }}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+                {% endif %}
+            </p>
+        </div>
+    </header>
+
+    <div class="chat-messages" id="chatMessages" role="log" aria-live="polite">
+        {% include 'messages/_message_rows.html' %}
+    </div>
+
+    <footer class="chat-compose">
+        <div class="chat-reply-preview d-none" id="chatReplyPreview" aria-live="polite">
+            <div class="chat-reply-preview-bar"></div>
+            <div class="chat-reply-preview-body min-w-0">
+                <div class="chat-reply-preview-label">Replying to <span id="chatReplyPreviewName"></span></div>
+                <div class="chat-reply-preview-text text-truncate" id="chatReplyPreviewText"></div>
+            </div>
+            <button type="button" class="chat-reply-preview-close" id="chatReplyPreviewClose" aria-label="Cancel reply">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <form method="post" action="{{ url_for('messages.thread', thread_id=thread.id) }}" class="chat-compose-form" id="chatComposeForm">
+            {{ reply_form.hidden_tag('csrf_token') }}
+            <input
+                type="hidden"
+                name="reply_to_message_id"
+                id="replyToMessageId"
+                value="{{ reply_form.reply_to_message_id.data or '' }}"
+                tabindex="-1"
+                aria-hidden="true"
+            >
+
+            <div class="chat-compose-input-wrap">
+                {{ reply_form.body(class='chat-compose-input', id='chatComposeInput', rows='1', placeholder='Type a message…', autocomplete='off') }}
+            </div>
+
+            <div class="chat-compose-actions">
+                <label class="chat-email-toggle" title="Also send email notification">
+                    {{ reply_form.send_email(id='reply_send_email') }}
+                    <i class="bi bi-envelope"></i>
+                </label>
+                <button type="submit" class="chat-send-btn" id="chatSendBtn" aria-label="Send message">
+                    <i class="bi bi-send-fill chat-send-btn-icon" aria-hidden="true"></i>
+                    <span class="chat-send-btn-spinner spinner-border spinner-border-sm" role="status" aria-hidden="true" hidden></span>
+                </button>
+            </div>
+        </form>
+        <div class="chat-compose-error d-none" id="chatComposeError"></div>
+    </footer>
+</div>

@@ -1,0 +1,48 @@
+<div class="row g-3">
+    <div class="col-md-4">
+        <label class="form-label" for="category_id">Category *</label>
+        {{ form.category_id(class='form-select') }}
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="asset_tag">Asset tag *</label>
+        {{ form.asset_tag(class='form-control', placeholder='e.g. AND-LAP-001') }}
+        {% if form.asset_tag.errors %}<div class="text-danger small">{{ form.asset_tag.errors[0] }}</div>{% endif %}
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="status">Status *</label>
+        {{ form.status(class='form-select') }}
+    </div>
+    <div class="col-md-6">
+        <label class="form-label" for="name">Name / label</label>
+        {{ form.name(class='form-control', placeholder='e.g. Finance laptop') }}
+    </div>
+    <div class="col-md-3">
+        <label class="form-label" for="brand">Brand</label>
+        {{ form.brand(class='form-control') }}
+    </div>
+    <div class="col-md-3">
+        <label class="form-label" for="model">Model</label>
+        {{ form.model(class='form-control') }}
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="serial_number">Serial number</label>
+        {{ form.serial_number(class='form-control') }}
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="purchase_date">Purchase date</label>
+        {{ form.purchase_date(class='form-control') }}
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="purchase_value">Purchase value ({{ tenant_nav.currency or currency }})</label>
+        {{ form.purchase_value(class='form-control', placeholder='e.g. 85000') }}
+        {% if form.purchase_value.errors %}<div class="text-danger small">{{ form.purchase_value.errors[0] }}</div>{% endif %}
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="description">Description</label>
+        {{ form.description(class='form-control', rows='2') }}
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="notes">Notes</label>
+        {{ form.notes(class='form-control', rows='2') }}
+    </div>
+</div>

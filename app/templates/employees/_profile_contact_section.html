@@ -1,0 +1,104 @@
+{% macro profile_field_readonly(label, value) %}
+<div class="profile-field">
+    <div class="profile-field-label">{{ label }}</div>
+    <div class="profile-field-value">{{ value if value is not none and value != '' else '—' }}</div>
+</div>
+{% endmacro %}
+
+<div id="contact" class="card profile-section-card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-telephone text-primary"></i>
+            <div>
+                <div class="fw-semibold mb-0">Contact</div>
+                <small class="text-muted fw-normal">How we reach you</small>
+            </div>
+        </div>
+        <button
+            type="button"
+            class="btn btn-sm btn-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#contactEditModal"
+        >
+            <i class="bi bi-pencil-square me-1"></i>Update info
+        </button>
+    </div>
+    <div class="card-body pt-2 pb-3 px-3 px-md-4">
+        {{ profile_field_readonly('Sign-in email', contact_form.login_email.data) }}
+        {{ profile_field_readonly('Work email', employee.email) }}
+        {{ profile_field_readonly('Secondary email', employee.secondary_email) }}
+        {{ profile_field_readonly('Phone', employee.phone) }}
+        {{ profile_field_readonly('Secondary phone', employee.secondary_phone or employee.phone_alt) }}
+        {{ profile_field_readonly('Physical address', employee.address) }}
+        {% if employee.postal_address %}
+        {{ profile_field_readonly('Postal address', employee.postal_address) }}
+        {% endif %}
+        <hr class="my-2 opacity-25">
+        <p class="small text-muted fw-semibold mb-2">Emergency contact</p>
+        {{ profile_field_readonly('Name', employee.emergency_contact_name) }}
+        {{ profile_field_readonly('Phone', employee.emergency_contact_phone) }}
+    </div>
+</div>
+
+<div class="modal fade" id="contactEditModal" tabindex="-1" aria-labelledby="contactEditModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down contact-edit-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="contactEditModalLabel">Update contact info</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{{ url_for('employees.profile') }}#contact" class="contact-edit-modal-form" novalidate>
+                {{ contact_form.hidden_tag() }}
+                <input type="hidden" name="form_name" value="contact">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="contact_login_email">{{ contact_form.login_email.label.text }}</label>
+                            {{ contact_form.login_email(class='form-control', id='contact_login_email', placeholder='you@company.com', autocomplete='email') }}
+                            <div class="form-text">Used to log in. You will use the new address on your next sign-in.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="contact_email">{{ contact_form.email.label.text }}</label>
+                            {{ contact_form.email(class='form-control', id='contact_email', placeholder='you@company.com') }}
+                            <div class="form-text">HR and payroll contact address on your employee record.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="contact_secondary_email">{{ contact_form.secondary_email.label.text }}</label>
+                            {{ contact_form.secondary_email(class='form-control', id='contact_secondary_email') }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="contact_phone">{{ contact_form.phone.label.text }}</label>
+                            {{ contact_form.phone(class='form-control', id='contact_phone', placeholder='07XX XXX XXX') }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="contact_secondary_phone">{{ contact_form.secondary_phone.label.text }}</label>
+                            {{ contact_form.secondary_phone(class='form-control', id='contact_secondary_phone', placeholder='07XX XXX XXX') }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="contact_address">{{ contact_form.address.label.text }}</label>
+                            {{ contact_form.address(class='form-control', id='contact_address', rows=2) }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="contact_postal">{{ contact_form.postal_address.label.text }}</label>
+                            {{ contact_form.postal_address(class='form-control', id='contact_postal') }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="contact_emergency_name">{{ contact_form.emergency_contact_name.label.text }}</label>
+                            {{ contact_form.emergency_contact_name(class='form-control', id='contact_emergency_name') }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="contact_emergency_phone">{{ contact_form.emergency_contact_phone.label.text }}</label>
+                            {{ contact_form.emergency_contact_phone(class='form-control', id='contact_emergency_phone', placeholder='07XX XXX XXX') }}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer contact-edit-modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Save changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

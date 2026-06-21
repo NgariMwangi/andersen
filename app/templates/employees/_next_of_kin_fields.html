@@ -1,0 +1,84 @@
+<div class="col-12">
+    <hr class="my-1">
+    <h5 class="h6 mb-1">Next of kin</h5>
+    <p class="small text-muted mb-3">Add one or more contacts. Leave a row blank to skip it.</p>
+</div>
+<div class="col-12">
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-2" id="nokTable">
+            <thead class="table-light">
+                <tr>
+                    <th style="min-width:10rem">Full name</th>
+                    <th style="min-width:8rem">Relationship</th>
+                    <th style="min-width:9rem">Phone</th>
+                    <th style="min-width:10rem">Email</th>
+                    <th style="min-width:12rem">Address</th>
+                    <th style="width:2.5rem"></th>
+                </tr>
+            </thead>
+            <tbody id="nokRows">
+                {% for nok in next_of_kin|default([]) %}
+                <tr class="nok-row">
+                    <td><input type="hidden" name="nok_id" value="{{ nok.id }}"><input type="text" name="nok_name" class="form-control form-control-sm" value="{{ nok.full_name }}"></td>
+                    <td><input type="text" name="nok_relationship" class="form-control form-control-sm" value="{{ nok.relationship or '' }}" placeholder="e.g. Spouse"></td>
+                    <td><input type="text" name="nok_phone" class="form-control form-control-sm" value="{{ nok.phone or '' }}" placeholder="07XX XXX XXX"></td>
+                    <td><input type="email" name="nok_email" class="form-control form-control-sm" value="{{ nok.email or '' }}"></td>
+                    <td><input type="text" name="nok_address" class="form-control form-control-sm" value="{{ nok.address or '' }}"></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger nok-remove" title="Remove row" aria-label="Remove row"><i class="bi bi-x-lg"></i></button></td>
+                </tr>
+                {% else %}
+                <tr class="nok-row">
+                    <td><input type="hidden" name="nok_id" value=""><input type="text" name="nok_name" class="form-control form-control-sm"></td>
+                    <td><input type="text" name="nok_relationship" class="form-control form-control-sm" placeholder="e.g. Spouse"></td>
+                    <td><input type="text" name="nok_phone" class="form-control form-control-sm" placeholder="07XX XXX XXX"></td>
+                    <td><input type="email" name="nok_email" class="form-control form-control-sm"></td>
+                    <td><input type="text" name="nok_address" class="form-control form-control-sm"></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger nok-remove" title="Remove row" aria-label="Remove row"><i class="bi bi-x-lg"></i></button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-secondary mb-2" id="addNokRow">
+        <i class="bi bi-plus-lg me-1"></i>Add next of kin
+    </button>
+</div>
+<template id="nokRowTemplate">
+    <tr class="nok-row">
+        <td><input type="hidden" name="nok_id" value=""><input type="text" name="nok_name" class="form-control form-control-sm"></td>
+        <td><input type="text" name="nok_relationship" class="form-control form-control-sm" placeholder="e.g. Spouse"></td>
+        <td><input type="text" name="nok_phone" class="form-control form-control-sm" placeholder="07XX XXX XXX"></td>
+        <td><input type="email" name="nok_email" class="form-control form-control-sm"></td>
+        <td><input type="text" name="nok_address" class="form-control form-control-sm"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger nok-remove" title="Remove row" aria-label="Remove row"><i class="bi bi-x-lg"></i></button></td>
+    </tr>
+</template>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var tbody = document.getElementById('nokRows');
+    var template = document.getElementById('nokRowTemplate');
+    var addBtn = document.getElementById('addNokRow');
+    if (!tbody || !template || !addBtn) return;
+
+    function bindRemove(row) {
+        var btn = row.querySelector('.nok-remove');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            var rows = tbody.querySelectorAll('.nok-row');
+            if (rows.length <= 1) {
+                row.querySelectorAll('input').forEach(function(input) { input.value = ''; });
+                return;
+            }
+            row.remove();
+        });
+    }
+
+    tbody.querySelectorAll('.nok-row').forEach(bindRemove);
+    addBtn.addEventListener('click', function() {
+        var clone = template.content.cloneNode(true);
+        var row = clone.querySelector('.nok-row');
+        tbody.appendChild(clone);
+        bindRemove(row);
+    });
+});
+</script>

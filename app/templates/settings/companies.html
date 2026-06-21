@@ -1,0 +1,38 @@
+{% extends "layouts/base.html" %}
+{% block title %}Companies - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h1 class="h3 mb-1">Companies</h1>
+        <p class="text-muted small mb-0">All organizations in this installation. Adding a company here does not switch your own session to that tenant.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('settings.companies_new') }}" class="btn btn-primary">New company</a>
+        <a href="{{ url_for('settings.index') }}" class="btn btn-outline-secondary">Back to settings</a>
+    </div>
+</div>
+<div class="table-responsive card shadow-sm border-0">
+    <table class="table table-hover mb-0">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Active</th>
+                <th>Branches</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in companies %}
+            <tr>
+                <td>{{ c.id }}</td>
+                <td>{{ c.name }}</td>
+                <td>{{ 'Yes' if c.is_active else 'No' }}</td>
+                <td>{{ c.branches.count() }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-muted">No companies.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "layouts/base.html" %}
+{% block title %}Run Payroll - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Create Payroll Run</h1>
+<form method="post" action="{{ url_for('payroll.run') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">{{ form.country_code.label.text }}</label>
+            <select name="country_code" class="form-select" required>
+                {% for code, label in countries %}
+                <option value="{{ code }}" {% if (form.country_code.data or 'KE') == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">{{ form.pay_month.label(class='form-label') }}{{ form.pay_month(class='form-select') }}</div>
+        <div class="col-md-4">{{ form.pay_year.label(class='form-label') }}{{ form.pay_year(class='form-select') }}</div>
+        <div class="col-12">{{ form.notes.label(class='form-label') }}{{ form.notes(class='form-control') }}</div>
+        <div class="col-12"><button type="submit" class="btn btn-primary">Create</button></div>
+    </div>
+</form>
+{% endblock %}

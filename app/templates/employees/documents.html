@@ -1,0 +1,78 @@
+{% extends "layouts/base.html" %}
+{% block title %}Documents - {{ employee.full_name }} - {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-4">Documents – {{ employee.employee_number }} {{ employee.full_name }}</h1>
+
+{% if has_permission('edit_employees') %}
+<div class="card mb-4">
+    <div class="card-header">Upload document</div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('employees.documents', id=employee.id) }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Name *</label>
+                    <input type="text" name="name" class="form-control" required placeholder="e.g. Contract, ID, KRA PIN">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Category</label>
+                    <select name="category_id" class="form-select">
+                        <option value="">-- None --</option>
+                        {% for c in categories %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">File * (PDF, DOC, DOCX, JPG, PNG, max 5MB)</label>
+                    <input type="file" name="file" class="form-control" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Notes</label>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Optional"></textarea>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-upload me-1"></i>Upload</button>
+                    <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary">Back to employee</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">Documents</div>
+    <div class="card-body">
+        {% if documents %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>Name</th><th>Category</th><th>Size</th><th>Uploaded</th><th>Actions</th></tr></thead>
+                <tbody>
+                {% for d in documents %}
+                <tr>
+                    <td>{{ d.name }}</td>
+                    <td>{{ d.category.name if d.category else '-' }}</td>
+                    <td>{% if d.file_size %}{{ (d.file_size / 1024)|round(1) }} KB{% else %}-{% endif %}</td>
+                    <td>{{ d.created_at.strftime('%d %b %Y') if d.created_at else '-' }}</td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener"
+                           href="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id) }}">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Open
+                        </a>
+                        <a class="btn btn-sm btn-outline-secondary"
+                           href="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id, download=1) }}">
+                            <i class="bi bi-download me-1"></i>Download
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No documents yet. Upload one above.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

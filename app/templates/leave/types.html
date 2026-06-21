@@ -1,0 +1,51 @@
+{% extends "layouts/base.html" %}
+{% block title %}Leave types - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Leave types</h1>
+        <p class="text-muted small mb-0">Define categories employees can request (annual, sick, unpaid, etc.). These appear in the “New request” form.</p>
+    </div>
+    <a href="{{ url_for('leave.type_create') }}" class="btn btn-primary">Add leave type</a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Day count</th>
+                <th class="text-end">Days / year</th>
+                <th>Accrues monthly</th>
+                <th>Paid</th>
+                <th>Active</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in types_list %}
+            <tr>
+                <td><code>{{ t.code }}</code></td>
+                <td>{{ t.name }}</td>
+                <td><span class="badge bg-light text-dark border">{{ 'Calendar' if (t.days_count_basis or 'working') == 'calendar' else 'Working' }}</span></td>
+                <td class="text-end">{% if t.days_per_year is not none %}{{ t.days_per_year }}{% else %}—{% endif %}</td>
+                <td>{% if t.accrues_monthly %}Yes{% if t.days_per_month %} ({{ t.days_per_month }}/mo){% endif %}{% else %}No{% endif %}</td>
+                <td>{% if t.is_paid %}Yes{% else %}No{% endif %}</td>
+                <td>{% if t.is_active %}<span class="badge bg-success">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
+                <td class="text-end text-nowrap">
+                    <a href="{{ url_for('leave.type_edit', id=t.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <form method="post" action="{{ url_for('leave.type_delete', id=t.id) }}" class="d-inline" onsubmit="return confirm('Delete this leave type? This cannot be undone.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-muted">No leave types. Run database seed or add one above.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p class="text-muted small mb-0"><a href="{{ url_for('leave.index') }}">← Back to leave requests</a></p>
+{% endblock %}

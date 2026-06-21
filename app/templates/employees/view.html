@@ -1,0 +1,307 @@
+{% extends "layouts/base.html" %}
+{% block title %}{{ employee.full_name }} - {{ app_name }}{% endblock %}
+{% block page_nav_section %}Employees{% endblock %}
+{% block page_nav_title %}{{ employee.full_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <h1 class="h3 mb-0">{{ employee.employee_number or 'No Number' }} - {{ employee.full_name }}</h1>
+    <a href="{{ url_for('employees.list') }}" class="btn btn-outline-secondary shrink-0">
+        <i class="bi bi-arrow-left me-1"></i>Back to employee list
+    </a>
+</div>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header">Personal</div>
+            <div class="card-body">
+                {% if employee.photo_url %}
+                <div class="mb-3">
+                    <img
+                        src="{{ url_for('employees.photo', id=employee.id) }}"
+                        alt="{{ employee.full_name }} photo"
+                        class="img-thumbnail"
+                        style="max-width: 180px; max-height: 180px; object-fit: cover;"
+                    >
+                </div>
+                {% endif %}
+                <p class="mb-1"><strong>DOB:</strong> {{ employee.date_of_birth.strftime('%d %b %Y') if employee.date_of_birth else '-' }}</p>
+                <p class="mb-1"><strong>Gender:</strong> {{ employee.gender or '-' }}</p>
+                <p class="mb-1"><strong>National ID:</strong> {{ employee.national_id or '-' }}</p>
+                <p class="mb-1"><strong>Passport No:</strong> {{ employee.passport_number or '-' }}</p>
+                {% if payroll_enabled %}
+                <p class="mb-1"><strong>KRA PIN:</strong> {{ employee.kra_pin or '-' }}</p>
+                <p class="mb-1"><strong>NSSF No:</strong> {{ employee.nssf_number or '-' }}</p>
+                <p class="mb-1"><strong>NHIF/SHIF:</strong> {{ employee.nhif_number or '-' }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header">Employment</div>
+            <div class="card-body">
+                {% if branches_enabled %}
+                <p class="mb-1"><strong>Work site (branch):</strong> {% if employee.branch %}{{ employee.branch.name }} · {{ employee.branch.country_code }}{% if employee.branch.currency_code %} · {{ employee.branch.currency_code }}{% endif %}{% else %}—{% endif %}</p>
+                {% endif %}
+                <p class="mb-1"><strong>Department:</strong> {{ employee.department.name if employee.department else '-' }}</p>
+                <p class="mb-1"><strong>Job Title:</strong> {{ employee.job_title.name if employee.job_title else '-' }}</p>
+                <p class="mb-1"><strong>Supervisors:</strong>
+                    {% if employee.assigned_supervisors %}
+                    {{ employee.assigned_supervisor_names }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </p>
+                <p class="mb-1"><strong>Status:</strong>
+                    {% if employee.status == 'active' %}
+                    <span class="badge bg-success">Active</span>
+                    {% elif employee.status == 'suspended' %}
+                    <span class="badge bg-warning text-dark">Suspended</span>
+                    {% elif employee.status == 'terminated' %}
+                    <span class="badge bg-danger">Terminated</span>
+                    {% else %}
+                    <span class="badge bg-secondary text-capitalize">{{ employee.status.replace('_', ' ') }}</span>
+                    {% endif %}
+                </p>
+                {% if employee.status == 'suspended' and (employee.suspension_from_date or employee.suspension_to_date) %}
+                <p class="mb-1"><strong>Suspension:</strong>
+                    {{ employee.suspension_from_date.strftime('%d %b %Y') if employee.suspension_from_date else '—' }}
+                    → {{ employee.suspension_to_date.strftime('%d %b %Y') if employee.suspension_to_date else 'Open-ended' }}
+                </p>
+                {% endif %}
+                {% if employee.termination_date %}
+                <p class="mb-1"><strong>Termination date:</strong> {{ employee.termination_date.strftime('%d %b %Y') }}</p>
+                {% endif %}
+                {% if employee.termination_reason %}
+                <p class="mb-1"><strong>Termination reason:</strong> {{ employee.termination_reason }}</p>
+                {% endif %}
+                <p class="mb-1"><strong>Employment type:</strong> {{ employee.employment_type.replace('_', ' ').title() if employee.employment_type else '-' }}</p>
+                <p class="mb-1"><strong>Hire Date:</strong> {{ employee.hire_date.strftime('%d %b %Y') if employee.hire_date else '-' }}</p>
+                {% if employee.employment_type == 'probation' and (employee.probation_start_date or employee.probation_end_date) %}
+                <p class="mb-1"><strong>Probation:</strong>
+                    {{ employee.probation_start_date.strftime('%d %b %Y') if employee.probation_start_date else '—' }}
+                    → {{ employee.probation_end_date.strftime('%d %b %Y') if employee.probation_end_date else '—' }}
+                </p>
+                {% endif %}
+                {% if employee.employment_type == 'contract' and (employee.contract_start_date or employee.contract_end_date) %}
+                <p class="mb-1"><strong>Contract period:</strong>
+                    {{ employee.contract_start_date.strftime('%d %b %Y') if employee.contract_start_date else '—' }}
+                    → {{ employee.contract_end_date.strftime('%d %b %Y') if employee.contract_end_date else '—' }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% if payroll_enabled %}
+<div class="card mb-3">
+    <div class="card-header">Bank (payroll)</div>
+    <div class="card-body">
+        {% if employee.bank_name or employee.bank_account_number %}
+        <p class="mb-1"><strong>Bank:</strong> {{ employee.bank_name or '—' }}{% if employee.bank_branch %} — {{ employee.bank_branch }}{% endif %}</p>
+        <p class="mb-1"><strong>Account:</strong> {{ (employee.bank_account_number or '')|mask_bank_account }}</p>
+        <p class="mb-1 text-muted small mb-0">{% if has_permission('edit_employees') %}Open <strong>Edit details</strong> to view or change the full account number.{% else %}Ask HR to update bank details if needed.{% endif %} Store a cancelled cheque or bank letter under <a href="{{ url_for('employees.documents', id=employee.id) }}">Documents</a> if your policy requires proof.</p>
+        {% else %}
+        <p class="text-muted mb-2">No bank details on file.</p>
+        {% if has_permission('edit_employees') %}
+        <p class="mb-0"><a href="{{ url_for('employees.edit', id=employee.id) }}" class="btn btn-sm btn-outline-primary">Add bank details</a></p>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+<div class="card mb-3">
+    <div class="card-header">Contact</div>
+    <div class="card-body">
+        <p class="mb-1"><strong>Email:</strong> {{ employee.email or '-' }}</p>
+        <p class="mb-1"><strong>Secondary Email:</strong> {{ employee.secondary_email or '-' }}</p>
+        <p class="mb-1"><strong>Phone:</strong> {{ employee.phone or '-' }}</p>
+        <p class="mb-1"><strong>Secondary Phone:</strong> {{ employee.secondary_phone or employee.phone_alt or '-' }}</p>
+        <p class="mb-1"><strong>Address:</strong> {{ employee.address or '-' }}</p>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">Next of kin</div>
+    <div class="card-body">
+        {% if employee.next_of_kin %}
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Relationship</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for nok in employee.next_of_kin %}
+                    <tr>
+                        <td>{{ nok.full_name }}</td>
+                        <td>{{ nok.relationship or '—' }}</td>
+                        <td>{{ nok.phone or '—' }}</td>
+                        <td>{{ nok.email or '—' }}</td>
+                        <td>{{ nok.address or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No next of kin on file.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if has_permission('edit_employees') %}
+<div class="card mb-3 border-warning">
+    <div class="card-header">Employment status actions</div>
+    <div class="card-body">
+        <p class="text-muted small mb-3">Suspend or terminate without opening the full edit form. Reactivate when the employee returns.</p>
+        <div class="d-flex flex-wrap gap-2">
+            {% if employee.status != 'terminated' %}
+            <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#suspendEmployeeModal">
+                <i class="bi bi-pause-circle me-1"></i>{% if employee.status == 'suspended' %}Update suspension{% else %}Suspend{% endif %}
+            </button>
+            {% endif %}
+            {% if employee.status != 'terminated' %}
+            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#terminateEmployeeModal">
+                <i class="bi bi-x-circle me-1"></i>Terminate
+            </button>
+            {% endif %}
+            {% if employee.status in ('suspended', 'terminated') %}
+            <form method="post" action="{{ url_for('employees.reactivate_employee', id=employee.id) }}" class="d-inline" onsubmit="return confirm('Set this employee back to active?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn btn-success"><i class="bi bi-person-check me-1"></i>Reactivate</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if show_employee_assets %}
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Assigned company assets</span>
+        <a href="{{ url_for('company_assets.employee_assets', employee_id=employee.id) }}" class="btn btn-sm btn-outline-primary">View all</a>
+    </div>
+    <div class="card-body p-0">
+        {% if employee_assets %}
+        <ul class="list-group list-group-flush">
+            {% for row in employee_assets %}
+            {% set asset = row.asset %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <a href="{{ url_for('company_assets.view', id=asset.id) }}" class="fw-500 text-decoration-none">{{ asset.asset_tag }}</a>
+                    <span class="text-muted"> — {{ asset.name or (asset.category.name if asset.category else 'Asset') }}</span>
+                </div>
+                <span class="small text-muted">Since {{ row.assigned_at.strftime('%d %b %Y') }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted mb-0 p-3">No company assets currently assigned.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<div class="card mb-3">
+    <div class="card-header">Next steps</div>
+    <div class="card-body">
+        <p class="text-muted small mb-3">After creating an employee you can: fix details{% if payroll_enabled %}, set salary{% endif %}, link a login account, and upload documents.</p>
+        <div class="d-flex flex-wrap gap-2">
+            {% if has_permission('edit_employees') %}
+            <a href="{{ url_for('employees.edit', id=employee.id) }}" class="btn btn-primary"><i class="bi bi-pencil me-1"></i>Edit details</a>
+            {% endif %}
+            <a href="{{ url_for('employees.history', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-clock-history me-1"></i>Career history</a>
+            {% if payroll_enabled %}
+            <a href="{{ url_for('employees.salary', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-cash-stack me-1"></i>Salary</a>
+            <a href="{{ url_for('employees.employee_deductions', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-dash-circle me-1"></i>Deductions</a>
+            <a href="{{ url_for('employees.employee_benefits', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-wallet2 me-1"></i>Benefits</a>
+            {% endif %}
+            {% if not employee.user %}
+            <a href="{{ url_for('employees.link_user', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-person-badge me-1"></i>Link login account</a>
+            {% else %}
+            <span class="btn btn-outline-secondary disabled"><i class="bi bi-person-check me-1"></i>Account linked</span>
+            {% endif %}
+            {% if has_permission('view_assets') and show_employee_assets %}
+            <a href="{{ url_for('company_assets.employee_assets', employee_id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-laptop me-1"></i>Assigned assets</a>
+            {% endif %}
+            <a href="{{ url_for('employees.documents', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-file-earmark me-1"></i>Documents</a>
+            {% if has_permission('manage_leave_types') %}
+            <a href="{{ url_for('leave.balances', employee_id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-sliders me-1"></i>Leave balances</a>
+            <a href="{{ url_for('leave.admin_request_leave', employee_id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-person-plus me-1"></i>Apply leave</a>
+            {% endif %}
+            <a href="{{ url_for('employees.list') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to employee list</a>
+        </div>
+    </div>
+</div>
+
+{% if has_permission('edit_employees') %}
+<div class="modal fade" id="suspendEmployeeModal" tabindex="-1" aria-labelledby="suspendEmployeeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('employees.suspend_employee', id=employee.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="suspendEmployeeModalLabel">Suspend employee</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Suspension from <span class="text-danger">*</span></label>
+                        <input type="date" name="suspension_from" class="form-control" required
+                               value="{{ employee.suspension_from_date.isoformat() if employee.suspension_from_date else today.isoformat() }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Suspension to <span class="text-muted">(optional)</span></label>
+                        <input type="date" name="suspension_to" class="form-control"
+                               value="{{ employee.suspension_to_date.isoformat() if employee.suspension_to_date else '' }}">
+                        <div class="form-text">Leave blank for an open-ended suspension.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Save suspension</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="terminateEmployeeModal" tabindex="-1" aria-labelledby="terminateEmployeeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('employees.terminate_employee', id=employee.id) }}"
+                  onsubmit="return confirm('Terminate this employee?{% if payroll_enabled %} They will be excluded from new payroll runs.{% endif %}');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="terminateEmployeeModalLabel">Terminate employee</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Termination date <span class="text-danger">*</span></label>
+                        <input type="date" name="termination_date" class="form-control" required
+                               value="{{ employee.termination_date.isoformat() if employee.termination_date else today.isoformat() }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason <span class="text-muted">(optional)</span></label>
+                        <input type="text" name="termination_reason" class="form-control" maxlength="500"
+                               value="{{ employee.termination_reason or '' }}" placeholder="e.g. End of contract">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Terminate</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

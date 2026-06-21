@@ -1,0 +1,39 @@
+{% extends "layouts/base.html" %}
+{% block title %}Edit Compensation - {{ consultant.full_name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-4">Edit compensation — {{ consultant.full_name }}</h1>
+<p class="text-muted small mb-3">Amounts in {{ currency_code }}</p>
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="post" action="{{ url_for('consultants.compensation_edit', id=consultant.id, comp_id=compensation_record.id) }}">
+            {{ form.hidden_tag() }}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.effective_from.label.text }}</label>
+                    {{ form.effective_from(class='form-control', type='date') }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.effective_to.label.text }}</label>
+                    {{ form.effective_to(class='form-control', type='date') }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.monthly_fee.label.text }}</label>
+                    {{ form.monthly_fee(class='form-control', step='0.01') }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.other_allowances.label.text }}</label>
+                    {{ form.other_allowances(class='form-control', step='0.01') }}
+                </div>
+                <div class="col-12">
+                    <label class="form-label">{{ form.notes.label.text }}</label>
+                    {{ form.notes(class='form-control', rows=2) }}
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Save changes</button>
+                    <a href="{{ url_for('consultants.compensation', id=consultant.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
