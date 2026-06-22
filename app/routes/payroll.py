@@ -1410,7 +1410,6 @@ def _fetch_consultant_payslip_item(run_id: int, consultant_id: int) -> Consultan
 
 def _build_consultant_payslip_context(item: ConsultantPayrollItem) -> dict:
     from app.utils.currency import currency_for_branch
-from app.utils.salary_basis import monthly_basic_for_payroll
 
     run = item.payroll_run
     period_date = date(run.pay_year, run.pay_month, 1)
