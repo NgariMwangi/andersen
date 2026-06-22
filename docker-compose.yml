@@ -4,13 +4,13 @@ services:
       - .env.production
     restart: unless-stopped
     build: .
-    container_name: hrms_kenya
+    container_name: andersen
     environment:
       FLASK_ENV: production
       SECRET_KEY: jtyjxdnjncdkm
       DATABASE_URL: postgresql://postgres:deno0707@37.60.242.201:5432/andersen
     ports:
-      - "5001:5001"
+      - "5002:5002"
     # Optional: mount app/static to provide logo.jpg without rebuilding
     # volumes:
     #   - ./app/static:/app/app/static:ro

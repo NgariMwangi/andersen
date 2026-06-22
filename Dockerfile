@@ -22,7 +22,7 @@ USER appuser
 
 ENV FLASK_APP=run.py
 ENV PYTHONUNBUFFERED=1
-EXPOSE 5001
+EXPOSE 5002
 
 # Run with Flask built-in server (simple, single process; no gunicorn)
 CMD ["python", "run.py"]
