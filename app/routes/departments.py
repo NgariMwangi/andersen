@@ -32,19 +32,34 @@ def index():
     return render_template('departments/index.html', departments=departments)
 
 
+def _populate_department_form(form: DepartmentForm, *, exclude_id: int | None = None) -> None:
+    form.parent_id.choices = _department_choices(exclude_id=exclude_id)
+
+
 @departments_bp.route('/create', methods=['GET', 'POST'])
 @login_required
 @permission_required('manage_departments')
 def create():
     form = DepartmentForm()
+    _populate_department_form(form)
     if form.validate_on_submit():
         cid = require_company_id()
+        code_raw = (form.code.data or '').strip()
+        code = code_raw.upper() if code_raw else None
+        if code:
+            existing = db.session.query(Department).filter(
+                Department.company_id == cid,
+                Department.code == code,
+            ).first()
+            if existing:
+                flash('A department with this code already exists.', 'danger')
+                return render_template('departments/create.html', form=form)
         dept = Department(
             company_id=cid,
-            code=None,
+            code=code,
             name=form.name.data.strip(),
             description=form.description.data.strip() or None,
-            parent_id=None,
+            parent_id=form.parent_id.data,
         )
         db.session.add(dept)
         db.session.commit()
@@ -74,7 +89,7 @@ def edit(id):
         flash('Department not found.', 'danger')
         return redirect(url_for('departments.index'))
     form = DepartmentForm()
-    form.parent_id.choices = _department_choices(exclude_id=id)
+    _populate_department_form(form, exclude_id=id)
     if form.validate_on_submit():
         code_raw = (form.code.data or '').strip()
         code = code_raw.upper() if code_raw else None
