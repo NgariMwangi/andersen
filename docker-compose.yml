@@ -13,6 +13,7 @@ services:
       # Set to true only behind HTTPS (see APP_BASE_URL=https://...).
       SESSION_COOKIE_SECURE: "false"
       APP_BASE_URL: http://197.232.12.38:5002
+      SALARY_BASIS: annual
     ports:
       - "5002:5002"
     # Optional: mount app/static to provide logo.jpg without rebuilding

@@ -65,6 +65,17 @@ def inject_config():
         'attendance_enabled': bool(current_app.config.get('ENABLE_ATTENDANCE', False)),
         'overtime_enabled': bool(current_app.config.get('ENABLE_OVERTIME', False)),
         'branches_enabled': bool(current_app.config.get('ENABLE_BRANCHES', False)),
+        'salary_is_annual': (current_app.config.get('SALARY_BASIS') or 'annual').strip().lower() != 'monthly',
+        'salary_basic_label': (
+            'Annual basic salary'
+            if (current_app.config.get('SALARY_BASIS') or 'annual').strip().lower() != 'monthly'
+            else 'Monthly basic salary'
+        ),
+        'salary_basic_column_label': (
+            'Basic (per annum)'
+            if (current_app.config.get('SALARY_BASIS') or 'annual').strip().lower() != 'monthly'
+            else 'Basic (per month)'
+        ),
     }
 
 

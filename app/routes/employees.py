@@ -774,12 +774,26 @@ def view(id):
         if user_can_view_employee_assets(current_user, emp, cid):
             show_employee_assets = True
             employee_assets = employee_asset_rows(emp.id, include_history=False)
+    current_salary = None
+    if current_user.has_permission('edit_employees') or current_user.has_permission('view_employees'):
+        current_salary = (
+            db.session.query(EmployeeSalary)
+            .filter(EmployeeSalary.employee_id == emp.id)
+            .order_by(EmployeeSalary.effective_from.desc(), EmployeeSalary.id.desc())
+            .first()
+        )
+    currency_code = currency_for_branch(
+        emp.branch,
+        app_default=current_app.config.get('DEFAULT_CURRENCY', 'KES'),
+    ) if emp.branch else current_app.config.get('DEFAULT_CURRENCY', 'KES')
     return render_template(
         'employees/view.html',
         employee=emp,
         today=date.today(),
         show_employee_assets=show_employee_assets,
         employee_assets=employee_assets,
+        current_salary=current_salary,
+        currency_code=currency_code,
     )
 
 
@@ -1026,7 +1040,6 @@ def edit(id):
 @employees_bp.route('/<int:id>/salary', methods=['GET', 'POST'])
 @login_required
 @permission_required('edit_employees')
-@require_payroll
 def salary(id):
     from datetime import date
     emp = db.session.get(Employee, id)
@@ -1049,6 +1062,7 @@ def salary(id):
 
     if request.method == 'POST':
         action = request.form.get('action', 'add_salary')
+        payroll_on = bool(current_app.config.get('ENABLE_PAYROLL', False))
         if action == 'add_salary' and form.validate_on_submit():
             rec = EmployeeSalary(
                 employee_id=id,
@@ -1058,14 +1072,17 @@ def salary(id):
                 transport_allowance=0,
                 meal_allowance=0,
                 other_allowances=0,
-                pension_employee_percent=form.pension_employee_percent.data or None,
-                pension_employee_fixed_amount=form.pension_employee_fixed_amount.data or None,
-                pension_employer_percent=form.pension_employer_percent.data or None,
+                pension_employee_percent=(form.pension_employee_percent.data or None) if payroll_on else None,
+                pension_employee_fixed_amount=(form.pension_employee_fixed_amount.data or None) if payroll_on else None,
+                pension_employer_percent=(form.pension_employer_percent.data or None) if payroll_on else None,
                 notes=form.notes.data or None,
             )
             db.session.add(rec)
             db.session.commit()
             flash('Salary record added.', 'success')
+            return redirect(url_for('employees.salary', id=id))
+        if not payroll_on and action != 'add_salary':
+            flash('Allowances and pension are available when payroll is enabled.', 'info')
             return redirect(url_for('employees.salary', id=id))
         if action == 'add_allowance':
             allowance_id = request.form.get('allowance_id', type=int)
@@ -1134,7 +1151,6 @@ def salary(id):
 @employees_bp.route('/<int:id>/salary/<int:salary_id>/edit', methods=['GET', 'POST'])
 @login_required
 @permission_required('edit_employees')
-@require_payroll
 def salary_edit(id, salary_id):
     """Edit one salary history row for an employee."""
     emp = db.session.get(Employee, id)
@@ -1150,9 +1166,10 @@ def salary_edit(id, salary_id):
     if form.validate_on_submit():
         rec.basic_salary = form.basic_salary.data
         rec.effective_from = form.effective_from.data
-        rec.pension_employee_percent = form.pension_employee_percent.data or None
-        rec.pension_employee_fixed_amount = form.pension_employee_fixed_amount.data or None
-        rec.pension_employer_percent = form.pension_employer_percent.data or None
+        if current_app.config.get('ENABLE_PAYROLL', False):
+            rec.pension_employee_percent = form.pension_employee_percent.data or None
+            rec.pension_employee_fixed_amount = form.pension_employee_fixed_amount.data or None
+            rec.pension_employer_percent = form.pension_employer_percent.data or None
         rec.notes = form.notes.data or None
         db.session.commit()
         flash('Salary record updated.', 'success')
@@ -1163,7 +1180,6 @@ def salary_edit(id, salary_id):
 @employees_bp.route('/<int:id>/salary/<int:salary_id>/delete', methods=['POST'])
 @login_required
 @permission_required('edit_employees')
-@require_payroll
 def salary_delete(id, salary_id):
     """Delete one salary history row for an employee."""
     emp = db.session.get(Employee, id)

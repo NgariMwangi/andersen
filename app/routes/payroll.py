@@ -43,6 +43,7 @@ from app.services.audit_service import log_update, log_create, model_to_audit_di
 from app.decorators.permissions import permission_required
 from app.utils.tenant import require_company_id
 from app.utils.currency import currency_for_country
+from app.utils.salary_basis import monthly_basic_for_payroll
 from datetime import date
 from sqlalchemy import update
 from sqlalchemy import extract
@@ -379,7 +380,7 @@ def run_calculate(id):
         manual_lines = get_manual_deduction_line_items_for_run(run_obj.id, emp.id)
         overtime_days = sum((Decimal(str(r.days)) for r in ot_rows), start=Decimal('0'))
 
-        basic = salary.basic_salary if salary else 0
+        basic = monthly_basic_for_payroll(salary.basic_salary) if salary else Decimal('0')
         pension_pct = salary.pension_employee_percent if salary else 0
         pension_fixed = salary.pension_employee_fixed_amount if salary else 0
 
@@ -605,7 +606,7 @@ def run_calculate(id):
                 run_obj.id,
             )
             overtime_days = sum((Decimal(str(r.days)) for r in ot_rows), start=Decimal('0'))
-            basic = salary.basic_salary if salary else 0
+            basic = monthly_basic_for_payroll(salary.basic_salary) if salary else Decimal('0')
             pension_pct = salary.pension_employee_percent if salary else 0
             pension_fixed = salary.pension_employee_fixed_amount if salary else 0
 
@@ -1409,6 +1410,7 @@ def _fetch_consultant_payslip_item(run_id: int, consultant_id: int) -> Consultan
 
 def _build_consultant_payslip_context(item: ConsultantPayrollItem) -> dict:
     from app.utils.currency import currency_for_branch
+from app.utils.salary_basis import monthly_basic_for_payroll
 
     run = item.payroll_run
     period_date = date(run.pay_year, run.pay_month, 1)

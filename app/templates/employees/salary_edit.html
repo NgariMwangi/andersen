@@ -7,11 +7,16 @@
         <form method="post" action="{{ url_for('employees.salary_edit', id=employee.id, salary_id=salary_record.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="row g-3">
-                <div class="col-md-4">{{ form.basic_salary.label(class='form-label') }}{{ form.basic_salary(class='form-control') }}</div>
+                <div class="col-md-4">
+                    <label class="form-label" for="basic_salary">{{ salary_basic_label }}</label>
+                    {{ form.basic_salary(class='form-control') }}
+                </div>
                 <div class="col-md-4">{{ form.effective_from.label(class='form-label') }}{{ form.effective_from(class='form-control') }}</div>
+                {% if payroll_enabled %}
                 <div class="col-md-4">{{ form.pension_employee_percent.label(class='form-label') }}{{ form.pension_employee_percent(class='form-control') }}</div>
                 <div class="col-md-4">{{ form.pension_employee_fixed_amount.label(class='form-label') }}{{ form.pension_employee_fixed_amount(class='form-control') }}</div>
                 <div class="col-md-4">{{ form.pension_employer_percent.label(class='form-label') }}{{ form.pension_employer_percent(class='form-control') }}</div>
+                {% endif %}
                 <div class="col-12">{{ form.notes.label(class='form-label') }}{{ form.notes(class='form-control', rows=2) }}</div>
                 <div class="col-12">
                     <button type="submit" class="btn btn-primary">Save changes</button>

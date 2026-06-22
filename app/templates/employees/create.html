@@ -58,7 +58,7 @@
         <div class="col-md-4 contract-fields d-none"><label class="form-label">Contract End Date</label><input type="date" name="contract_end_date" class="form-control" value="{{ form.contract_end_date.data or '' }}" placeholder="Optional — open-ended contracts"></div>
         <div class="col-md-4">{{ form.status.label(class='form-label') }}{{ form.status(class='form-select') }}</div>
         {% include 'employees/_next_of_kin_fields.html' %}
-        <div class="col-12"><hr><h5>Bank Details</h5></div>
+        <div class="col-12"><hr><h5 class="h6 text-muted mb-1">Bank details</h5></div>
         <div class="col-md-4"><label class="form-label">Bank Name</label><input type="text" name="bank_name" class="form-control" value="{{ form.bank_name.data or '' }}"></div>
         <div class="col-md-4"><label class="form-label">Bank branch</label><input type="text" name="bank_branch" class="form-control" value="{{ form.bank_branch.data or '' }}" placeholder="e.g. Westlands"></div>
         <div class="col-md-4"><label class="form-label">Account Number</label><input type="text" name="bank_account_number" class="form-control" value="{{ form.bank_account_number.data or '' }}"></div>

@@ -6,20 +6,29 @@
     Branch context: <strong>{{ employee.branch.name if employee.branch else 'Unassigned branch' }}</strong>
     · Country <strong>{{ branch_country_code }}</strong>
     · Currency <strong>{{ currency_code }}</strong>
+    {% if salary_is_annual %}
+    · Amounts are recorded <strong>per annum</strong> (annual gross basic).
+    {% endif %}
 </p>
 
 <div class="card mb-4">
-    <div class="card-header">Basic salary</div>
+    <div class="card-header">{% if salary_is_annual %}Annual basic salary{% else %}Basic salary{% endif %}</div>
     <div class="card-body">
         <form method="post" action="{{ url_for('employees.salary', id=employee.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="action" value="add_salary"/>
             <div class="row g-3">
-                <div class="col-md-4">{{ form.basic_salary.label(class='form-label') }}{{ form.basic_salary(class='form-control') }}</div>
+                <div class="col-md-4">
+                    <label class="form-label" for="basic_salary">{{ salary_basic_label }} ({{ currency_code }})</label>
+                    <input type="number" name="basic_salary" id="basic_salary" class="form-control" step="0.01" min="0" required value="{{ form.basic_salary.data or '' }}">
+                    {% if form.basic_salary.errors %}<div class="text-danger small">{{ form.basic_salary.errors[0] }}</div>{% endif %}
+                </div>
                 <div class="col-md-4">{{ form.effective_from.label(class='form-label') }}{{ form.effective_from(class='form-control') }}</div>
+                {% if payroll_enabled %}
                 <div class="col-md-4">{{ form.pension_employee_percent.label(class='form-label') }}{{ form.pension_employee_percent(class='form-control') }}</div>
                 <div class="col-md-4">{{ form.pension_employee_fixed_amount.label(class='form-label') }}{{ form.pension_employee_fixed_amount(class='form-control') }}</div>
                 <div class="col-md-4">{{ form.pension_employer_percent.label(class='form-label') }}{{ form.pension_employer_percent(class='form-control') }}</div>
+                {% endif %}
                 <div class="col-12">{{ form.notes.label(class='form-label') }}{{ form.notes(class='form-control', rows=2) }}</div>
                 <div class="col-12">
                     <button type="submit" class="btn btn-primary">Add salary record</button>
@@ -29,6 +38,7 @@
     </div>
 </div>
 
+{% if payroll_enabled %}
 <div class="card mb-4">
     <div class="card-header">Add allowance</div>
     <div class="card-body">
@@ -105,21 +115,24 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
 
 <div class="card mb-4">
-    <div class="card-header">Salary history (basic)</div>
+    <div class="card-header">Salary history</div>
     <div class="card-body">
         {% if salary_records %}
         <div class="table-responsive">
             <table class="table table-sm">
-                <thead><tr><th>Effective from</th><th>Basic ({{ currency_code }})</th><th>Pension %</th><th>Pension Fixed ({{ currency_code }})</th><th>Notes</th><th class="text-end">Actions</th></tr></thead>
+                <thead><tr><th>Effective from</th><th>{{ salary_basic_column_label }} ({{ currency_code }})</th>{% if payroll_enabled %}<th>Pension %</th><th>Pension Fixed ({{ currency_code }})</th>{% endif %}<th>Notes</th><th class="text-end">Actions</th></tr></thead>
                 <tbody>
                 {% for s in salary_records %}
                 <tr>
                     <td>{{ s.effective_from.strftime('%d %b %Y') if s.effective_from else '-' }}</td>
                     <td>{{ s.basic_salary|fmt_money(currency_code) }}</td>
+                    {% if payroll_enabled %}
                     <td>{{ s.pension_employee_percent or 0 }} / {{ s.pension_employer_percent or 0 }}</td>
                     <td>{{ (s.pension_employee_fixed_amount or 0)|fmt_money(currency_code) }}</td>
+                    {% endif %}
                     <td>{{ s.notes or '-' }}</td>
                     <td class="text-end">
                         <a href="{{ url_for('employees.salary_edit', id=employee.id, salary_id=s.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>

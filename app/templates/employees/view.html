@@ -93,9 +93,22 @@
         </div>
     </div>
 </div>
-{% if payroll_enabled %}
 <div class="card mb-3">
-    <div class="card-header">Bank (payroll)</div>
+    <div class="card-header">Compensation</div>
+    <div class="card-body">
+        {% if current_salary %}
+        <p class="mb-1"><strong>{{ salary_basic_column_label }}:</strong> {{ current_salary.basic_salary|fmt_money(currency_code) }}</p>
+        <p class="mb-1 text-muted small">Effective from {{ current_salary.effective_from.strftime('%d %b %Y') if current_salary.effective_from else '—' }}</p>
+        {% else %}
+        <p class="text-muted mb-2">No salary recorded yet.</p>
+        {% endif %}
+        {% if has_permission('edit_employees') %}
+        <a href="{{ url_for('employees.salary', id=employee.id) }}" class="btn btn-sm btn-outline-primary">{% if current_salary %}Update salary{% else %}Record salary{% endif %}</a>
+        {% endif %}
+    </div>
+</div>
+<div class="card mb-3">
+    <div class="card-header">Bank details</div>
     <div class="card-body">
         {% if employee.bank_name or employee.bank_account_number %}
         <p class="mb-1"><strong>Bank:</strong> {{ employee.bank_name or '—' }}{% if employee.bank_branch %} — {{ employee.bank_branch }}{% endif %}</p>
@@ -109,7 +122,6 @@
         {% endif %}
     </div>
 </div>
-{% endif %}
 <div class="card mb-3">
     <div class="card-header">Contact</div>
     <div class="card-body">
@@ -212,14 +224,14 @@
 <div class="card mb-3">
     <div class="card-header">Next steps</div>
     <div class="card-body">
-        <p class="text-muted small mb-3">After creating an employee you can: fix details{% if payroll_enabled %}, set salary{% endif %}, link a login account, and upload documents.</p>
+        <p class="text-muted small mb-3">After creating an employee you can: fix details, record salary, link a login account, and upload documents.</p>
         <div class="d-flex flex-wrap gap-2">
             {% if has_permission('edit_employees') %}
             <a href="{{ url_for('employees.edit', id=employee.id) }}" class="btn btn-primary"><i class="bi bi-pencil me-1"></i>Edit details</a>
+            <a href="{{ url_for('employees.salary', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-cash-stack me-1"></i>Salary</a>
             {% endif %}
             <a href="{{ url_for('employees.history', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-clock-history me-1"></i>Career history</a>
             {% if payroll_enabled %}
-            <a href="{{ url_for('employees.salary', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-cash-stack me-1"></i>Salary</a>
             <a href="{{ url_for('employees.employee_deductions', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-dash-circle me-1"></i>Deductions</a>
             <a href="{{ url_for('employees.employee_benefits', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-wallet2 me-1"></i>Benefits</a>
             {% endif %}

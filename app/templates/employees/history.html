@@ -20,8 +20,8 @@
     <div class="card-body py-2 px-3">
         <span class="text-muted small me-2">Jump to:</span>
         <a href="#section-assignments" class="btn btn-sm btn-outline-primary me-1 mb-1">Role &amp; organization</a>
-        {% if payroll_enabled %}
         <a href="#section-salary" class="btn btn-sm btn-outline-success me-1 mb-1">Salary</a>
+        {% if payroll_enabled %}
         <a href="#section-benefits" class="btn btn-sm btn-outline-secondary mb-1">Benefits</a>
         {% endif %}
     </div>
@@ -85,14 +85,13 @@
 </section>
 
 {# --- 2. Salary history --- #}
-{% if payroll_enabled %}
 <section id="section-salary" class="mb-4">
     <div class="card border-success border-opacity-25 shadow-sm">
         <div class="card-header bg-success bg-opacity-10 d-flex align-items-center gap-2 py-3">
             <i class="bi bi-cash-stack fs-5 text-success"></i>
             <div>
                 <h2 class="h6 mb-0">Salary history</h2>
-                <small class="text-muted">Basic pay and pension settings — from the Salary page</small>
+                <small class="text-muted">{% if salary_is_annual %}Annual basic pay{% else %}Basic pay{% endif %} — from the Salary page</small>
             </div>
         </div>
         <div class="card-body p-0">
@@ -102,9 +101,11 @@
                     <thead class="table-light">
                         <tr>
                             <th class="text-nowrap">Effective from</th>
-                            <th class="text-end">Basic salary</th>
+                            <th class="text-end">{{ salary_basic_column_label }}</th>
+                            {% if payroll_enabled %}
                             <th class="text-end text-nowrap">Pension emp %</th>
                             <th class="text-end text-nowrap">Pension fixed</th>
+                            {% endif %}
                             <th>Notes</th>
                         </tr>
                     </thead>
@@ -113,6 +114,7 @@
                         <tr>
                             <td class="text-nowrap">{{ r.effective_from.strftime('%d %b %Y') if r.effective_from else '—' }}</td>
                             <td class="text-end fw-medium">{{ r.basic_salary|fmt_money(currency_code) }}</td>
+                            {% if payroll_enabled %}
                             <td class="text-end text-muted">{{ r.pension_employee_percent if r.pension_employee_percent is not none else '—' }}</td>
                             <td class="text-end text-muted">
                                 {% if r.pension_employee_fixed_amount is not none and r.pension_employee_fixed_amount != 0 %}
@@ -121,6 +123,7 @@
                                 —
                                 {% endif %}
                             </td>
+                            {% endif %}
                             <td class="small text-muted">{{ r.notes or '—' }}</td>
                         </tr>
                         {% endfor %}
@@ -128,12 +131,11 @@
                 </table>
             </div>
             {% else %}
-            <p class="text-muted mb-0 px-3 py-4">No salary records yet. Add them under <a href="{{ url_for('employees.salary', id=employee.id) }}">Salary</a>.</p>
+            <p class="text-muted mb-0 px-3 py-4">No salary records yet.{% if has_permission('edit_employees') %} Add them under <a href="{{ url_for('employees.salary', id=employee.id) }}">Salary</a>.{% endif %}</p>
             {% endif %}
         </div>
     </div>
 </section>
-{% endif %}
 
 {# --- 3. Benefits --- #}
 {% if payroll_enabled %}
