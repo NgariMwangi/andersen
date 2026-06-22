@@ -12,34 +12,13 @@
         <div class="card">
             <div class="card-body">
                 <dl class="row mb-0">
-                    <dt class="col-sm-3 text-muted">Code</dt>
-                    <dd class="col-sm-9"><span class="fw-medium">{{ department.code }}</span></dd>
                     <dt class="col-sm-3 text-muted">Name</dt>
                     <dd class="col-sm-9">{{ department.name }}</dd>
-                    <dt class="col-sm-3 text-muted">Parent</dt>
-                    <dd class="col-sm-9">{{ department.parent.name if department.parent else '—' }}</dd>
                     <dt class="col-sm-3 text-muted">Description</dt>
                     <dd class="col-sm-9">{{ department.description or '—' }}</dd>
                 </dl>
             </div>
         </div>
-        {% if department.children %}
-        <div class="card mt-4">
-            <div class="card-header bg-transparent border-0 py-3">
-                <h5 class="h6 mb-0 fw-600">Sub-departments</h5>
-            </div>
-            <div class="card-body pt-0">
-                <ul class="list-group list-group-flush">
-                    {% for child in department.children %}
-                    <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
-                        <a href="{{ url_for('departments.view', id=child.id) }}" class="text-decoration-none">{{ child.name }}</a>
-                        <span class="badge bg-light text-dark">{{ child.code }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
-        {% endif %}
     </div>
     <div class="col-lg-4">
         <div class="card">

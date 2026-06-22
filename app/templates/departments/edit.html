@@ -7,19 +7,10 @@
         <form method="post" action="{{ url_for('departments.edit', id=department.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">Code</label>
-                    <input type="text" name="code" class="form-control" maxlength="50" value="{{ form.code.data or '' }}" placeholder="Optional">
-                    {% if form.code.errors %}<div class="text-danger small">{{ form.code.errors[0] }}</div>{% endif %}
-                </div>
-                <div class="col-md-8">
+                <div class="col-12">
                     <label class="form-label">Name *</label>
                     <input type="text" name="name" class="form-control" required maxlength="200" value="{{ form.name.data or '' }}" placeholder="e.g. Information Technology">
                     {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors[0] }}</div>{% endif %}
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Parent Department</label>
-                    {{ form.parent_id(class='form-select') }}
                 </div>
                 <div class="col-12">
                     <label class="form-label">Description</label>

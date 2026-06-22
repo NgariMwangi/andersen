@@ -77,16 +77,12 @@
             <label class="form-label">Note for assignment history <span class="text-muted fw-normal">(optional)</span></label>
             <textarea name="assignment_change_reason" class="form-control" rows="2" maxlength="500" placeholder="If you change branch, department, job title, supervisors, status or employment type, add a short reason (e.g. promotion, transfer). Shown on Career history."></textarea>
         </div>
-        {% if payroll_enabled %}
-        <div class="col-12"><hr><h5 class="h6 text-muted mb-2">Bank details (payroll)</h5>
-            <p class="small text-muted mb-3">Change these when the employee switches bank or account. Updates apply to payroll that uses this record (typically from the next pay run after you save).</p>
-        </div>
+        <div class="col-12"><hr><h5 class="h6 text-muted mb-2">Bank details</h5></div>
         <div class="col-md-4"><label class="form-label">Bank name</label><input type="text" name="bank_name" class="form-control" value="{{ form.bank_name.data or employee.bank_name or '' }}"></div>
         <div class="col-md-4"><label class="form-label">Bank branch</label><input type="text" name="bank_branch" class="form-control" value="{{ form.bank_branch.data or employee.bank_branch or '' }}" placeholder="e.g. Westlands"></div>
         <div class="col-md-4"><label class="form-label">Account number</label><input type="text" name="bank_account_number" class="form-control" value="{{ form.bank_account_number.data or employee.bank_account_number or '' }}" autocomplete="off"></div>
         <div class="col-md-4"><label class="form-label">Bank code</label><input type="text" name="bank_code" class="form-control" value="{{ form.bank_code.data or employee.bank_code or '' }}"></div>
         <div class="col-md-4"><label class="form-label">SWIFT code</label><input type="text" name="swift_code" class="form-control" value="{{ form.swift_code.data or employee.swift_code or '' }}"></div>
-        {% endif %}
         <div class="col-12">
             <button type="submit" class="btn btn-primary" {% if not form.branch_id.choices %}disabled{% endif %}>Save</button>
             <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary">Cancel</a>
