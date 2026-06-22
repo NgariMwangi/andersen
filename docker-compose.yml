@@ -9,6 +9,10 @@ services:
       FLASK_ENV: production
       SECRET_KEY: jtyjxdnjncdkm
       DATABASE_URL: postgresql://postgres:deno0707@37.60.242.201:5432/andersen
+      # Required when users access the app over plain HTTP (e.g. http://IP:5002).
+      # Set to true only behind HTTPS (see APP_BASE_URL=https://...).
+      SESSION_COOKIE_SECURE: "false"
+      APP_BASE_URL: http://197.232.12.38:5002
     ports:
       - "5002:5002"
     # Optional: mount app/static to provide logo.jpg without rebuilding

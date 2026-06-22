@@ -11,6 +11,29 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent / '.env')
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    return str(raw).strip().lower() in ('1', 'true', 'yes')
+
+
+def _session_cookie_secure_default() -> bool:
+    """
+    Secure cookies require HTTPS. When APP_BASE_URL is http:// (or unset),
+  browsers ignore the session cookie and login appears to do nothing.
+    """
+    explicit = os.environ.get('SESSION_COOKIE_SECURE')
+    if explicit is not None and str(explicit).strip():
+        return _env_bool('SESSION_COOKIE_SECURE')
+    base = (os.environ.get('APP_BASE_URL') or '').strip().lower()
+    if base.startswith('https://'):
+        return True
+    if base.startswith('http://'):
+        return False
+    return False
+
+
 class Config:
     """Base configuration."""
     # Flask
@@ -31,7 +54,7 @@ class Config:
     SESSION_TYPE = 'redis' if os.environ.get('REDIS_URL') else 'filesystem'
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SECURE = True  # Set False in dev if not using HTTPS
+    SESSION_COOKIE_SECURE = _session_cookie_secure_default()
     SESSION_COOKIE_SAMESITE = 'Lax'
     SESSION_COOKIE_NAME = 'hrms_session'
 
@@ -125,7 +148,7 @@ class TestingConfig(Config):
 class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
-    SESSION_COOKIE_SECURE = True
+    # Inherits SESSION_COOKIE_SECURE from env / APP_BASE_URL (see helper above).
 
 
 config_by_name = {

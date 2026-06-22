@@ -25,6 +25,31 @@ from app.utils.navigation import redirect_to_user_home, user_home_endpoint
 auth_bp = Blueprint('auth', __name__)
 
 
+def _safe_next_url(next_url: str | None) -> str | None:
+    """Avoid redirect loops to login/register and off-site URLs."""
+    if not next_url:
+        return None
+    path = next_url.split('?', 1)[0]
+    if not path.startswith('/') or path.startswith('//'):
+        return None
+    if path.startswith('/auth/'):
+        return None
+    return next_url
+
+
+def _flash_form_errors(form, *, prefix: str = 'Please fix the errors below.') -> None:
+    if not form.errors:
+        return
+    parts = [prefix]
+    for field, errors in form.errors.items():
+        label = getattr(form, field, None)
+        name = getattr(label, 'label', None)
+        field_name = name.text if name else field.replace('_', ' ').title()
+        for err in errors:
+            parts.append(f'{field_name}: {err}')
+    flash(' '.join(parts), 'danger')
+
+
 def _auth_rate_limit():
     from flask import current_app
     return current_app.config.get('RATE_LIMIT_AUTH', '50 per minute')
@@ -72,8 +97,10 @@ def login():
             flash('Please set a new password before continuing.', 'warning')
             return redirect(url_for('auth.change_password'))
         flash('Welcome back.', 'success')
-        next_url = request.args.get('next') or url_for(user_home_endpoint())
+        next_url = _safe_next_url(request.args.get('next')) or url_for(user_home_endpoint())
         return redirect(next_url)
+    if request.method == 'POST':
+        _flash_form_errors(form, prefix='Could not sign in.')
     return render_template('auth/login.html', form=form, allow_register=_allow_registration())
 
 
@@ -92,33 +119,40 @@ def register():
         if db.session.query(User).filter_by(email=email).first():
             flash('An account with that email already exists.', 'danger')
             return render_template('auth/register.html', form=form)
-        org_name = (form.organization_name.data or '').strip()
-        cc_raw = (form.country_code.data or 'KE').strip().upper()
-        cc = cc_raw[:2] if len(cc_raw) >= 2 else 'KE'
-        company = Company(name=org_name or 'Organization', is_active=True)
-        db.session.add(company)
-        db.session.flush()
-        db.session.add(
-            Branch(company_id=company.id, name='Head Office', country_code=cc),
-        )
-        db.session.add(Employer(company_id=company.id, name=org_name or 'Organization'))
-        user = User(
-            email=email,
-            company_id=company.id,
-            is_superuser=True,
-            is_active=True,
-        )
-        user.set_password(form.password.data)
-        db.session.add(user)
-        db.session.flush()
-        # Assign ADMIN role if it exists (e.g. after seed_data); else superuser is enough
-        admin_role = db.session.query(Role).filter_by(code='ADMIN').first()
-        if admin_role:
-            db.session.add(UserRole(user_id=user.id, role_id=admin_role.id))
-        db.session.commit()
-        bootstrap_company_defaults(company.id, cc)
-        flash('Account created. You can now sign in.', 'success')
-        return redirect(url_for('auth.login'))
+        try:
+            org_name = (form.organization_name.data or '').strip()
+            cc_raw = (form.country_code.data or 'KE').strip().upper()
+            cc = cc_raw[:2] if len(cc_raw) >= 2 else 'KE'
+            company = Company(name=org_name or 'Organization', is_active=True)
+            db.session.add(company)
+            db.session.flush()
+            db.session.add(
+                Branch(company_id=company.id, name='Head Office', country_code=cc),
+            )
+            db.session.add(Employer(company_id=company.id, name=org_name or 'Organization'))
+            user = User(
+                email=email,
+                company_id=company.id,
+                is_superuser=True,
+                is_active=True,
+            )
+            user.set_password(form.password.data)
+            db.session.add(user)
+            db.session.flush()
+            admin_role = db.session.query(Role).filter_by(code='ADMIN').first()
+            if admin_role:
+                db.session.add(UserRole(user_id=user.id, role_id=admin_role.id))
+            db.session.commit()
+            bootstrap_company_defaults(company.id, cc)
+            flash('Account created. You can now sign in.', 'success')
+            return redirect(url_for('auth.login'))
+        except Exception as exc:
+            db.session.rollback()
+            current_app.logger.exception('Registration failed')
+            flash(f'Could not create account: {exc}', 'danger')
+            return render_template('auth/register.html', form=form)
+    if request.method == 'POST':
+        _flash_form_errors(form, prefix='Could not create account.')
     return render_template('auth/register.html', form=form)
 
 
