@@ -8,7 +8,7 @@ services:
     environment:
       FLASK_ENV: production
       SECRET_KEY: jtyjxdnjncdkm
-      DATABASE_URL: postgresql://postgres:deno0707@37.60.242.201:5432/hrms_kenya1
+      DATABASE_URL: postgresql://postgres:deno0707@37.60.242.201:5432/andersen
     ports:
       - "5001:5001"
     # Optional: mount app/static to provide logo.jpg without rebuilding
