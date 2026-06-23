@@ -941,7 +941,7 @@ def edit(id):
             branch = db.session.get(Branch, form.branch_id.data)
             if not branch or branch.company_id != cid:
                 flash('Select a valid branch for this company.', 'danger')
-                return render_template('employees/edit.html', form=form, employee=emp)
+                return render_template('employees/edit.html', form=form, employee=emp, next_of_kin=emp.next_of_kin)
             before_assign = assignment_snapshot(emp)
             backfill_assignment_history_if_missing(emp)
             old = model_to_audit_dict(emp)
@@ -959,7 +959,7 @@ def edit(id):
                 )
                 if existing_emp:
                     flash('Employee number already exists in this branch. Use a different number.', 'danger')
-                    return render_template('employees/edit.html', form=form, employee=emp)
+                    return render_template('employees/edit.html', form=form, employee=emp, next_of_kin=emp.next_of_kin)
             emp.employee_number = employee_number
             emp.branch_id = branch.id
             emp.first_name = form.first_name.data

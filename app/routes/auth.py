@@ -1,6 +1,6 @@
 """Authentication: login, logout, password reset."""
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, current_app, session
 from flask_login import login_user, logout_user, current_user, login_required
 from app.extensions import db, limiter
 from app.models.user import User, Role, UserRole
@@ -91,6 +91,7 @@ def login():
         user.locked_until = None
         user.last_login_at = datetime.utcnow()
         db.session.commit()
+        session.permanent = True
         login_user(user, remember=form.remember_me.data)
         log_login(user.id, success=True)
         if user.must_change_password:

@@ -50,9 +50,11 @@ class Config:
         'pool_recycle': 300,
     }
 
-    # Session
+    # Session (default 2 hours; override with SESSION_LIFETIME_HOURS)
+    SESSION_LIFETIME_HOURS = float(os.environ.get('SESSION_LIFETIME_HOURS', '2'))
     SESSION_TYPE = 'redis' if os.environ.get('REDIS_URL') else 'filesystem'
-    PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=SESSION_LIFETIME_HOURS)
+    REMEMBER_COOKIE_DURATION = timedelta(hours=SESSION_LIFETIME_HOURS)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SECURE = _session_cookie_secure_default()
     SESSION_COOKIE_SAMESITE = 'Lax'
@@ -65,7 +67,7 @@ class Config:
 
     # Security
     WTF_CSRF_ENABLED = True
-    WTF_CSRF_TIME_LIMIT = 3600
+    WTF_CSRF_TIME_LIMIT = int(float(os.environ.get('SESSION_LIFETIME_HOURS', '2')) * 3600)
     PASSWORD_MIN_LENGTH = 8
     PASSWORD_HISTORY_COUNT = 3
     PASSWORD_EXPIRY_DAYS = 90

@@ -1,15 +1,22 @@
 {% extends "layouts/base.html" %}
 {% block title %}Salary - {{ employee.full_name }} - {{ app_name }}{% endblock %}
 {% block content %}
-<h1 class="h4 mb-4">Salary – {{ employee.employee_number }} {{ employee.full_name }}</h1>
-<p class="text-muted small mb-4">
-    Branch context: <strong>{{ employee.branch.name if employee.branch else 'Unassigned branch' }}</strong>
-    · Country <strong>{{ branch_country_code }}</strong>
-    · Currency <strong>{{ currency_code }}</strong>
-    {% if salary_is_annual %}
-    · Amounts are recorded <strong>per annum</strong> (annual gross basic).
-    {% endif %}
-</p>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-2">Salary – {{ employee.employee_number }} {{ employee.full_name }}</h1>
+        <p class="text-muted small mb-0">
+            Branch context: <strong>{{ employee.branch.name if employee.branch else 'Unassigned branch' }}</strong>
+            · Country <strong>{{ branch_country_code }}</strong>
+            · Currency <strong>{{ currency_code }}</strong>
+            {% if salary_is_annual %}
+            · Amounts are recorded <strong>per annum</strong> (annual gross basic).
+            {% endif %}
+        </p>
+    </div>
+    <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary shrink-0">
+        <i class="bi bi-arrow-left me-1"></i>Back to employee
+    </a>
+</div>
 
 <div class="card mb-4">
     <div class="card-header">{% if salary_is_annual %}Annual basic salary{% else %}Basic salary{% endif %}</div>
@@ -151,8 +158,4 @@
         {% endif %}
     </div>
 </div>
-
-<p>
-    <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary">Back to employee</a>
-</p>
 {% endblock %}

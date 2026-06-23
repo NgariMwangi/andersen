@@ -350,8 +350,13 @@ def _register_error_handlers(app):
 
 def _register_request_hooks(app):
     """Global request hooks (e.g. forced password change after bulk provisioning)."""
-    from flask import redirect, request, url_for
+    from flask import redirect, request, session, url_for
     from flask_login import current_user
+
+    @app.before_request
+    def refresh_session_lifetime():
+        """Keep signed-in users active for PERMANENT_SESSION_LIFETIME (default 2h)."""
+        session.permanent = True
 
     @app.before_request
     def enforce_password_change():

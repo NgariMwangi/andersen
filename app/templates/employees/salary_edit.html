@@ -1,7 +1,15 @@
 {% extends "layouts/base.html" %}
 {% block title %}Edit Salary - {{ employee.full_name }} - {{ app_name }}{% endblock %}
 {% block content %}
-<h1 class="h4 mb-4">Edit salary record - {{ employee.full_name }}</h1>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-0">Edit salary record</h1>
+        <p class="text-muted small mb-0 mt-2">{{ employee.employee_number }} — {{ employee.full_name }}</p>
+    </div>
+    <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary shrink-0">
+        <i class="bi bi-arrow-left me-1"></i>Back to employee
+    </a>
+</div>
 <div class="card mb-4">
     <div class="card-body">
         <form method="post" action="{{ url_for('employees.salary_edit', id=employee.id, salary_id=salary_record.id) }}">
