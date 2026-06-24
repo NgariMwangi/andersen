@@ -27,10 +27,8 @@ STANDARD_CATEGORY_CODES = {code for code, _name, _track in STANDARD_DOCUMENT_CAT
 
 
 def allowed_document_filename(filename: str) -> bool:
-    if not filename or '.' not in filename:
-        return False
-    ext = filename.rsplit('.', 1)[1].lower()
-    return ext in current_app.config.get('ALLOWED_EXTENSIONS', {'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'})
+    """Employee documents accept any file type; only a non-empty name is required."""
+    return bool((filename or '').strip())
 
 
 def _sanitize_folder_segment(name: str) -> str:
@@ -143,8 +141,7 @@ def save_employee_document(
     if not file_storage or not file_storage.filename:
         raise ValueError('No file selected.')
     if not allowed_document_filename(file_storage.filename):
-        allowed = ', '.join(sorted(current_app.config.get('ALLOWED_EXTENSIONS', [])))
-        raise ValueError(f'File type not allowed. Use: {allowed}.')
+        raise ValueError('No file selected.')
 
     max_bytes = int(current_app.config.get('EMPLOYEE_DOCUMENT_MAX_BYTES', 25 * 1024 * 1024))
     file_storage.stream.seek(0, os.SEEK_END)

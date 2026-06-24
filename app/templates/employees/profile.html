@@ -109,11 +109,9 @@
                     {% include 'employees/_passport_image_block.html' %}
                 </div>
             </div>
-            {% if payroll_enabled %}
             {{ profile_field('KRA PIN', employee.kra_pin) }}
             {{ profile_field('NSSF number', employee.nssf_number) }}
             {{ profile_field('NHIF / SHIF', employee.nhif_number) }}
-            {% endif %}
         {% endcall %}
 
         {% call profile_section('building', 'Employment', 'Role and contract details') %}

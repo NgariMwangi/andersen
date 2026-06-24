@@ -28,11 +28,9 @@
                 <p class="mb-1"><strong>Gender:</strong> {{ employee.gender or '-' }}</p>
                 <p class="mb-1"><strong>National ID:</strong> {{ employee.national_id or '-' }}</p>
                 <p class="mb-1"><strong>Passport No:</strong> {{ employee.passport_number or '-' }}</p>
-                {% if payroll_enabled %}
                 <p class="mb-1"><strong>KRA PIN:</strong> {{ employee.kra_pin or '-' }}</p>
                 <p class="mb-1"><strong>NSSF No:</strong> {{ employee.nssf_number or '-' }}</p>
                 <p class="mb-1"><strong>NHIF/SHIF:</strong> {{ employee.nhif_number or '-' }}</p>
-                {% endif %}
             </div>
         </div>
     </div>

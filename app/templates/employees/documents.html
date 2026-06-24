@@ -7,7 +7,7 @@
         <h1 class="h4 mb-2">Documents – {{ employee.employee_number }} {{ employee.full_name }}</h1>
         <p class="text-muted small mb-0">
             Files are stored under <strong>{{ employee.id }}_{{ employee.full_name }}</strong> in {{ categories|length }} categories.
-            PDF, DOC, DOCX, JPG, PNG — max {{ max_upload_mb }} MB each.
+            Any file type — max {{ max_upload_mb }} MB each.
         </p>
     </div>
     <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary shrink-0">
@@ -38,8 +38,7 @@
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                 <label class="btn btn-sm btn-primary mb-0 doc-upload-label">
                     <i class="bi bi-upload me-1"></i>Choose files
-                    <input type="file" class="d-none doc-file-input" multiple
-                           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+                    <input type="file" class="d-none doc-file-input" multiple>
                 </label>
                 <span class="text-muted small">or drag and drop here — multiple files supported</span>
             </div>
@@ -201,16 +200,13 @@
     }
 
     function validateFiles(fileList) {
-        var allowed = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
         var maxBytes = maxUploadMb * 1024 * 1024;
         var valid = [];
         var rejected = [];
         for (var i = 0; i < fileList.length; i++) {
             var f = fileList[i];
-            var parts = (f.name || '').split('.');
-            var ext = parts.length > 1 ? (parts.pop() || '').toLowerCase() : '';
-            if (!ext || allowed.indexOf(ext) === -1) {
-                rejected.push({ file: f, reason: 'File type not allowed. Use PDF, DOC, DOCX, JPG, or PNG.' });
+            if (!f.name) {
+                rejected.push({ file: f, reason: 'File has no name.' });
                 continue;
             }
             if (f.size > maxBytes) {
