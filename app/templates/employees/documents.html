@@ -59,7 +59,15 @@
                 <tbody class="doc-list-body" data-category-id="{{ category.id }}">
                     {% for d in docs %}
                     <tr data-doc-id="{{ d.id }}">
-                        <td>{{ d.display_filename }}</td>
+                        <td>
+                            <button type="button" class="btn btn-link p-0 text-start text-decoration-none doc-preview-btn"
+                                    data-preview-url="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id) }}"
+                                    data-download-url="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id, download=1) }}"
+                                    data-filename="{{ d.display_filename }}"
+                                    data-extension="{{ d.file_extension }}">
+                                {{ d.display_filename }}
+                            </button>
+                        </td>
                         <td>
                             {% if d.file_extension %}
                             <span class="badge text-bg-secondary text-uppercase">{{ d.file_extension }}</span>
@@ -68,12 +76,17 @@
                         <td>{% if d.file_size %}{{ (d.file_size / 1024)|round(1) }} KB{% else %}—{% endif %}</td>
                         <td>{{ d.created_at.strftime('%d %b %Y') if d.created_at else '—' }}</td>
                         <td class="text-end text-nowrap">
-                            <a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener"
-                               href="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id) }}">
-                                <i class="bi bi-box-arrow-up-right"></i>
-                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-primary doc-preview-btn"
+                                    title="View"
+                                    data-preview-url="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id) }}"
+                                    data-download-url="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id, download=1) }}"
+                                    data-filename="{{ d.display_filename }}"
+                                    data-extension="{{ d.file_extension }}">
+                                <i class="bi bi-eye"></i>
+                            </button>
                             <a class="btn btn-sm btn-outline-secondary"
-                               href="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id, download=1) }}">
+                               href="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id, download=1) }}"
+                               title="Download">
                                 <i class="bi bi-download"></i>
                             </a>
                             {% if can_upload %}
@@ -95,6 +108,99 @@
     </div>
 </div>
 {% endfor %}
+
+<div class="modal fade" id="documentPreviewModal" tabindex="-1" aria-labelledby="documentPreviewTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-lg-down">
+        <div class="modal-content">
+            <div class="modal-header flex-wrap gap-2">
+                <h5 class="modal-title text-truncate me-auto" id="documentPreviewTitle">Document</h5>
+                <a id="documentPreviewDownload" class="btn btn-sm btn-outline-primary shrink-0" href="#">
+                    <i class="bi bi-download me-1"></i>Download
+                </a>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0 bg-body-secondary">
+                <iframe id="documentPreviewFrame" class="w-100 border-0 d-none doc-preview-pane" style="height: 78vh; min-height: 400px;" title="Document preview"></iframe>
+                <div id="documentPreviewImageWrap" class="d-none text-center p-2 doc-preview-pane">
+                    <img id="documentPreviewImage" class="img-fluid" style="max-height: 78vh; object-fit: contain;" alt="">
+                </div>
+                <div id="documentPreviewFallback" class="d-none doc-preview-pane p-5 text-center">
+                    <i class="bi bi-file-earmark-text display-4 text-muted d-block mb-3"></i>
+                    <p class="text-muted mb-3">This file type cannot be previewed in the browser. Download it to open locally.</p>
+                    <a class="btn btn-primary" id="documentPreviewFallbackDownload" href="#">
+                        <i class="bi bi-download me-1"></i>Download file
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var previewModalEl = document.getElementById('documentPreviewModal');
+    if (!previewModalEl) return;
+
+    var frame = document.getElementById('documentPreviewFrame');
+    var imageWrap = document.getElementById('documentPreviewImageWrap');
+    var image = document.getElementById('documentPreviewImage');
+    var fallback = document.getElementById('documentPreviewFallback');
+    var titleEl = document.getElementById('documentPreviewTitle');
+    var downloadBtn = document.getElementById('documentPreviewDownload');
+    var fallbackDownload = document.getElementById('documentPreviewFallbackDownload');
+    var previewModal = bootstrap.Modal.getOrCreateInstance(previewModalEl);
+
+    function hidePreviewPanes() {
+        frame.classList.add('d-none');
+        imageWrap.classList.add('d-none');
+        fallback.classList.add('d-none');
+        frame.src = 'about:blank';
+        image.removeAttribute('src');
+    }
+
+    function openDocumentPreview(btn) {
+        var url = btn.getAttribute('data-preview-url');
+        var downloadUrl = btn.getAttribute('data-download-url');
+        var filename = btn.getAttribute('data-filename') || 'Document';
+        var ext = (btn.getAttribute('data-extension') || '').toLowerCase();
+
+        hidePreviewPanes();
+        titleEl.textContent = filename;
+        downloadBtn.href = downloadUrl;
+        fallbackDownload.href = downloadUrl;
+
+        if (['jpg', 'jpeg', 'png'].indexOf(ext) !== -1) {
+            image.src = url;
+            image.alt = filename;
+            imageWrap.classList.remove('d-none');
+        } else if (ext === 'pdf') {
+            frame.src = url;
+            frame.classList.remove('d-none');
+        } else {
+            fallback.classList.remove('d-none');
+        }
+        previewModal.show();
+    }
+
+    previewModalEl.addEventListener('hidden.bs.modal', hidePreviewPanes);
+
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.doc-preview-btn');
+        if (!btn) return;
+        e.preventDefault();
+        openDocumentPreview(btn);
+    });
+
+    window.openDocumentPreviewFromDoc = function(doc) {
+        var probe = document.createElement('button');
+        probe.setAttribute('data-preview-url', doc.open_url);
+        probe.setAttribute('data-download-url', doc.download_url);
+        probe.setAttribute('data-filename', doc.original_filename || doc.name || 'Document');
+        probe.setAttribute('data-extension', (doc.extension || '').toLowerCase());
+        openDocumentPreview(probe);
+    };
+})();
+</script>
 
 {% if can_upload %}
 <script>
@@ -148,14 +254,23 @@
         var tr = document.createElement('tr');
         tr.setAttribute('data-doc-id', doc.id);
         tr.innerHTML =
-            '<td>' + escapeHtml(doc.original_filename || doc.name) + '</td>' +
+            '<td><button type="button" class="btn btn-link p-0 text-start text-decoration-none doc-preview-btn" ' +
+            'data-preview-url="' + escapeHtml(doc.open_url) + '" ' +
+            'data-download-url="' + escapeHtml(doc.download_url) + '" ' +
+            'data-filename="' + escapeHtml(doc.original_filename || doc.name) + '" ' +
+            'data-extension="' + escapeHtml((doc.extension || '').toLowerCase()) + '">' +
+            escapeHtml(doc.original_filename || doc.name) + '</button></td>' +
             '<td>' + formatExtension(doc.extension) + '</td>' +
             '<td>' + formatSize(doc.file_size) + '</td>' +
             '<td>' + escapeHtml(doc.created_at || '') + '</td>' +
             '<td class="text-end text-nowrap">' +
-            '<a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" href="' + escapeHtml(doc.open_url) + '">' +
-            '<i class="bi bi-box-arrow-up-right"></i></a> ' +
-            '<a class="btn btn-sm btn-outline-secondary" href="' + escapeHtml(doc.download_url) + '">' +
+            '<button type="button" class="btn btn-sm btn-outline-primary doc-preview-btn" title="View" ' +
+            'data-preview-url="' + escapeHtml(doc.open_url) + '" ' +
+            'data-download-url="' + escapeHtml(doc.download_url) + '" ' +
+            'data-filename="' + escapeHtml(doc.original_filename || doc.name) + '" ' +
+            'data-extension="' + escapeHtml((doc.extension || '').toLowerCase()) + '">' +
+            '<i class="bi bi-eye"></i></button> ' +
+            '<a class="btn btn-sm btn-outline-secondary" href="' + escapeHtml(doc.download_url) + '" title="Download">' +
             '<i class="bi bi-download"></i></a> ' +
             '<button type="button" class="btn btn-sm btn-outline-danger doc-delete-btn" data-doc-id="' + doc.id + '" title="Delete">' +
             '<i class="bi bi-trash"></i></button>' +
