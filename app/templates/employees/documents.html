@@ -1,5 +1,13 @@
 {% extends "layouts/base.html" %}
 {% block title %}Documents - {{ employee.full_name }} - {{ app_name }}{% endblock %}
+{% block extra_css %}
+<style>
+.doc-preview-dialog { border: none; border-radius: 0.5rem; padding: 0; width: min(96vw, 1200px); max-height: 96vh; }
+.doc-preview-dialog::backdrop { background: rgba(15, 23, 42, 0.55); }
+.doc-preview-dialog .doc-preview-body { min-height: 70vh; max-height: 78vh; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
     <div>
@@ -63,8 +71,8 @@
                             <button type="button" class="btn btn-link p-0 text-start text-decoration-none doc-preview-btn"
                                     data-preview-url="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id) }}"
                                     data-download-url="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id, download=1) }}"
-                                    data-filename="{{ d.display_filename }}"
-                                    data-extension="{{ d.file_extension }}">
+                                    data-filename="{{ d.display_filename|e }}"
+                                    data-extension="{{ d.file_extension|e }}">
                                 {{ d.display_filename }}
                             </button>
                         </td>
@@ -80,8 +88,8 @@
                                     title="View"
                                     data-preview-url="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id) }}"
                                     data-download-url="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id, download=1) }}"
-                                    data-filename="{{ d.display_filename }}"
-                                    data-extension="{{ d.file_extension }}">
+                                    data-filename="{{ d.display_filename|e }}"
+                                    data-extension="{{ d.file_extension|e }}">
                                 <i class="bi bi-eye"></i>
                             </button>
                             <a class="btn btn-sm btn-outline-secondary"
@@ -109,124 +117,113 @@
 </div>
 {% endfor %}
 
-<div class="modal fade" id="documentPreviewModal" tabindex="-1" aria-labelledby="documentPreviewTitle" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-lg-down">
-        <div class="modal-content">
-            <div class="modal-header flex-wrap gap-2">
-                <h5 class="modal-title text-truncate me-auto" id="documentPreviewTitle">Document</h5>
-                <a id="documentPreviewDownload" class="btn btn-sm btn-outline-primary shrink-0" href="#">
-                    <i class="bi bi-download me-1"></i>Download
-                </a>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<dialog id="documentPreviewDialog" class="doc-preview-dialog shadow-lg">
+    <div class="d-flex flex-column h-100 bg-body">
+        <div class="d-flex flex-wrap align-items-center gap-2 p-3 border-bottom">
+            <h5 class="h6 mb-0 text-truncate me-auto" id="documentPreviewTitle">Document</h5>
+            <a id="documentPreviewDownload" class="btn btn-sm btn-outline-primary shrink-0" href="#">
+                <i class="bi bi-download me-1"></i>Download
+            </a>
+            <button type="button" class="btn-close" id="documentPreviewClose" aria-label="Close"></button>
+        </div>
+        <div class="doc-preview-body bg-body-secondary position-relative">
+            <iframe id="documentPreviewFrame" class="w-100 h-100 border-0 d-none doc-preview-pane" title="Document preview"></iframe>
+            <div id="documentPreviewImageWrap" class="d-none text-center p-2 doc-preview-pane h-100">
+                <img id="documentPreviewImage" class="img-fluid" style="max-height: 78vh; object-fit: contain;" alt="">
             </div>
-            <div class="modal-body p-0 bg-body-secondary">
-                <iframe id="documentPreviewFrame" class="w-100 border-0 d-none doc-preview-pane" style="height: 78vh; min-height: 400px;" title="Document preview"></iframe>
-                <div id="documentPreviewImageWrap" class="d-none text-center p-2 doc-preview-pane">
-                    <img id="documentPreviewImage" class="img-fluid" style="max-height: 78vh; object-fit: contain;" alt="">
-                </div>
-                <div id="documentPreviewFallback" class="d-none doc-preview-pane p-5 text-center">
-                    <i class="bi bi-file-earmark-text display-4 text-muted d-block mb-3"></i>
-                    <p class="text-muted mb-3">This file type cannot be previewed in the browser. Download it to open locally.</p>
-                    <a class="btn btn-primary" id="documentPreviewFallbackDownload" href="#">
-                        <i class="bi bi-download me-1"></i>Download file
-                    </a>
-                </div>
+            <div id="documentPreviewFallback" class="d-none doc-preview-pane p-5 text-center h-100 flex-column align-items-center justify-content-center">
+                <i class="bi bi-file-earmark-text display-4 text-muted mb-3"></i>
+                <p class="text-muted mb-3">This file type cannot be previewed in the browser. Download it to open locally.</p>
+                <a class="btn btn-primary" id="documentPreviewFallbackDownload" href="#">
+                    <i class="bi bi-download me-1"></i>Download file
+                </a>
             </div>
         </div>
     </div>
-</div>
+</dialog>
 
 {% endblock %}
 
 {% block extra_js %}
 <script>
 (function() {
-    var previewModalEl = document.getElementById('documentPreviewModal');
-    if (!previewModalEl || typeof bootstrap === 'undefined') return;
-
-    var frame = document.getElementById('documentPreviewFrame');
-    var imageWrap = document.getElementById('documentPreviewImageWrap');
-    var image = document.getElementById('documentPreviewImage');
-    var fallback = document.getElementById('documentPreviewFallback');
-    var titleEl = document.getElementById('documentPreviewTitle');
-    var downloadBtn = document.getElementById('documentPreviewDownload');
-    var fallbackDownload = document.getElementById('documentPreviewFallbackDownload');
-    var previewModal = bootstrap.Modal.getOrCreateInstance(previewModalEl);
-
-    function hidePreviewPanes() {
-        frame.classList.add('d-none');
-        imageWrap.classList.add('d-none');
-        fallback.classList.add('d-none');
-        frame.src = 'about:blank';
-        image.removeAttribute('src');
-    }
-
-    function openDocumentPreview(btn) {
-        var url = btn.getAttribute('data-preview-url');
-        var downloadUrl = btn.getAttribute('data-download-url');
-        var filename = btn.getAttribute('data-filename') || 'Document';
-        var ext = (btn.getAttribute('data-extension') || '').toLowerCase();
-
-        hidePreviewPanes();
-        titleEl.textContent = filename;
-        downloadBtn.href = downloadUrl;
-        fallbackDownload.href = downloadUrl;
-
-        if (['jpg', 'jpeg', 'png'].indexOf(ext) !== -1) {
-            image.src = url;
-            image.alt = filename;
-            imageWrap.classList.remove('d-none');
-        } else if (ext === 'pdf') {
-            frame.src = url;
-            frame.classList.remove('d-none');
-        } else {
-            fallback.classList.remove('d-none');
-        }
-        previewModal.show();
-    }
-
-    previewModalEl.addEventListener('hidden.bs.modal', hidePreviewPanes);
-
-    document.addEventListener('click', function(e) {
-        var btn = e.target.closest('.doc-preview-btn');
-        if (!btn) return;
-        e.preventDefault();
-        openDocumentPreview(btn);
-    });
-
-    window.openDocumentPreviewFromDoc = function(doc) {
-        var probe = document.createElement('button');
-        probe.setAttribute('data-preview-url', doc.open_url);
-        probe.setAttribute('data-download-url', doc.download_url);
-        probe.setAttribute('data-filename', doc.original_filename || doc.name || 'Document');
-        probe.setAttribute('data-extension', (doc.extension || '').toLowerCase());
-        openDocumentPreview(probe);
-    };
-})();
-</script>
-{% if can_upload %}
-<script>
-(function() {
-    var employeeId = {{ employee.id }};
+    var canUpload = {{ can_upload|tojson }};
     var uploadUrl = {{ url_for('employees.document_upload', id=employee.id)|tojson }};
     var deleteUrlTemplate = {{ url_for('employees.document_delete', id=employee.id, doc_id=0)|tojson }};
     var csrfToken = {{ csrf_token()|tojson }};
     var maxUploadMb = {{ max_upload_mb }};
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text == null ? '' : String(text);
+        return div.innerHTML;
+    }
+
+    function escapeAttr(text) {
+        return String(text == null ? '' : text)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;');
+    }
 
     function formatSize(bytes) {
         if (!bytes) return '—';
         return (bytes / 1024).toFixed(1) + ' KB';
     }
 
-    function escapeHtml(text) {
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
     function formatExtension(ext) {
         if (!ext) return '—';
         return '<span class="badge text-bg-secondary text-uppercase">' + escapeHtml(ext) + '</span>';
+    }
+
+    function queueItemHtml(filename, status, message) {
+        var icon = 'bi-hourglass';
+        var cls = 'text-muted';
+        if (status === 'uploading') { icon = 'bi-arrow-repeat'; cls = 'text-primary'; }
+        if (status === 'done') { icon = 'bi-check-circle-fill'; cls = 'text-success'; }
+        if (status === 'failed') { icon = 'bi-x-circle-fill'; cls = 'text-danger'; }
+        return '<div class="list-group-item d-flex align-items-start gap-2 py-2 upload-queue-item">' +
+            '<i class="bi ' + icon + ' ' + cls + ' mt-1"></i>' +
+            '<div class="flex-grow-1 min-w-0">' +
+            '<div class="text-truncate fw-medium">' + escapeHtml(filename) + '</div>' +
+            (message ? '<div class="small ' + cls + '">' + escapeHtml(message) + '</div>' : '') +
+            '</div></div>';
+    }
+
+    async function parseUploadResponse(res) {
+        var contentType = (res.headers.get('content-type') || '').toLowerCase();
+        if (contentType.indexOf('application/json') !== -1) {
+            return await res.json();
+        }
+        if (res.status === 413) {
+            return { status: 'error', message: 'File is too large for the server (check nginx client_max_body_size).' };
+        }
+        if (res.status === 401 || res.status === 403) {
+            return { status: 'error', message: 'Permission denied or session expired. Refresh the page and sign in again.' };
+        }
+        return { status: 'error', message: 'Upload failed (HTTP ' + res.status + ').' };
+    }
+
+    function validateFiles(fileList) {
+        var allowed = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+        var maxBytes = maxUploadMb * 1024 * 1024;
+        var valid = [];
+        var rejected = [];
+        for (var i = 0; i < fileList.length; i++) {
+            var f = fileList[i];
+            var parts = (f.name || '').split('.');
+            var ext = parts.length > 1 ? (parts.pop() || '').toLowerCase() : '';
+            if (!ext || allowed.indexOf(ext) === -1) {
+                rejected.push({ file: f, reason: 'File type not allowed. Use PDF, DOC, DOCX, JPG, or PNG.' });
+                continue;
+            }
+            if (f.size > maxBytes) {
+                rejected.push({ file: f, reason: 'File exceeds ' + maxUploadMb + ' MB limit.' });
+                continue;
+            }
+            valid.push(f);
+        }
+        return { valid: valid, rejected: rejected };
     }
 
     function updateCountBadge(panel) {
@@ -248,6 +245,19 @@
         }
     }
 
+    function makePreviewButton(className, labelHtml, doc) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = className;
+        btn.classList.add('doc-preview-btn');
+        btn.setAttribute('data-preview-url', doc.open_url);
+        btn.setAttribute('data-download-url', doc.download_url);
+        btn.setAttribute('data-filename', doc.original_filename || doc.name || 'Document');
+        btn.setAttribute('data-extension', (doc.extension || '').toLowerCase());
+        btn.innerHTML = labelHtml;
+        return btn;
+    }
+
     function appendDocumentRow(panel, doc) {
         var tbody = panel.querySelector('.doc-list-body');
         var empty = tbody.querySelector('.doc-empty-row');
@@ -255,44 +265,54 @@
 
         var tr = document.createElement('tr');
         tr.setAttribute('data-doc-id', doc.id);
-        tr.innerHTML =
-            '<td><button type="button" class="btn btn-link p-0 text-start text-decoration-none doc-preview-btn" ' +
-            'data-preview-url="' + escapeHtml(doc.open_url) + '" ' +
-            'data-download-url="' + escapeHtml(doc.download_url) + '" ' +
-            'data-filename="' + escapeHtml(doc.original_filename || doc.name) + '" ' +
-            'data-extension="' + escapeHtml((doc.extension || '').toLowerCase()) + '">' +
-            escapeHtml(doc.original_filename || doc.name) + '</button></td>' +
-            '<td>' + formatExtension(doc.extension) + '</td>' +
-            '<td>' + formatSize(doc.file_size) + '</td>' +
-            '<td>' + escapeHtml(doc.created_at || '') + '</td>' +
-            '<td class="text-end text-nowrap">' +
-            '<button type="button" class="btn btn-sm btn-outline-primary doc-preview-btn" title="View" ' +
-            'data-preview-url="' + escapeHtml(doc.open_url) + '" ' +
-            'data-download-url="' + escapeHtml(doc.download_url) + '" ' +
-            'data-filename="' + escapeHtml(doc.original_filename || doc.name) + '" ' +
-            'data-extension="' + escapeHtml((doc.extension || '').toLowerCase()) + '">' +
-            '<i class="bi bi-eye"></i></button> ' +
-            '<a class="btn btn-sm btn-outline-secondary" href="' + escapeHtml(doc.download_url) + '" title="Download">' +
-            '<i class="bi bi-download"></i></a> ' +
-            '<button type="button" class="btn btn-sm btn-outline-danger doc-delete-btn" data-doc-id="' + doc.id + '" title="Delete">' +
-            '<i class="bi bi-trash"></i></button>' +
-            '</td>';
+
+        var nameTd = document.createElement('td');
+        nameTd.appendChild(makePreviewButton(
+            'btn btn-link p-0 text-start text-decoration-none',
+            escapeHtml(doc.original_filename || doc.name),
+            doc
+        ));
+
+        var typeTd = document.createElement('td');
+        typeTd.innerHTML = formatExtension(doc.extension);
+
+        var sizeTd = document.createElement('td');
+        sizeTd.textContent = formatSize(doc.file_size);
+
+        var dateTd = document.createElement('td');
+        dateTd.textContent = doc.created_at || '';
+
+        var actionsTd = document.createElement('td');
+        actionsTd.className = 'text-end text-nowrap';
+        actionsTd.appendChild(makePreviewButton('btn btn-sm btn-outline-primary', '<i class="bi bi-eye"></i>', doc));
+        actionsTd.lastChild.title = 'View';
+
+        var downloadA = document.createElement('a');
+        downloadA.className = 'btn btn-sm btn-outline-secondary';
+        downloadA.href = doc.download_url;
+        downloadA.title = 'Download';
+        downloadA.innerHTML = '<i class="bi bi-download"></i>';
+        actionsTd.appendChild(document.createTextNode(' '));
+        actionsTd.appendChild(downloadA);
+
+        if (canUpload) {
+            var delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'btn btn-sm btn-outline-danger doc-delete-btn';
+            delBtn.setAttribute('data-doc-id', doc.id);
+            delBtn.title = 'Delete';
+            delBtn.innerHTML = '<i class="bi bi-trash"></i>';
+            actionsTd.appendChild(document.createTextNode(' '));
+            actionsTd.appendChild(delBtn);
+        }
+
+        tr.appendChild(nameTd);
+        tr.appendChild(typeTd);
+        tr.appendChild(sizeTd);
+        tr.appendChild(dateTd);
+        tr.appendChild(actionsTd);
         tbody.insertBefore(tr, tbody.firstChild);
         updateCountBadge(panel);
-    }
-
-    function queueItemHtml(filename, status, message) {
-        var icon = 'bi-hourglass';
-        var cls = 'text-muted';
-        if (status === 'uploading') { icon = 'bi-arrow-repeat'; cls = 'text-primary'; }
-        if (status === 'done') { icon = 'bi-check-circle-fill'; cls = 'text-success'; }
-        if (status === 'failed') { icon = 'bi-x-circle-fill'; cls = 'text-danger'; }
-        return '<div class="list-group-item d-flex align-items-start gap-2 py-2 upload-queue-item">' +
-            '<i class="bi ' + icon + ' ' + cls + ' mt-1"></i>' +
-            '<div class="flex-grow-1 min-w-0">' +
-            '<div class="text-truncate fw-medium">' + escapeHtml(filename) + '</div>' +
-            (message ? '<div class="small ' + cls + '">' + escapeHtml(message) + '</div>' : '') +
-            '</div></div>';
     }
 
     async function uploadOneFile(panel, categoryCode, file, queueEl, queueRow) {
@@ -342,114 +362,152 @@
         }, 4000);
     }
 
-    function validateFiles(fileList) {
-        var allowed = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
-        var maxBytes = maxUploadMb * 1024 * 1024;
-        var valid = [];
-        var rejected = [];
-        for (var i = 0; i < fileList.length; i++) {
-            var f = fileList[i];
-            var parts = (f.name || '').split('.');
-            var ext = parts.length > 1 ? (parts.pop() || '').toLowerCase() : '';
-            if (!ext || allowed.indexOf(ext) === -1) {
-                rejected.push({ file: f, reason: 'File type not allowed. Use PDF, DOC, DOCX, JPG, or PNG.' });
-                continue;
+    function initUpload() {
+        if (!canUpload) return;
+        document.querySelectorAll('.doc-category-panel').forEach(function(panel) {
+            var categoryCode = panel.getAttribute('data-category-code');
+            var dropzone = panel.querySelector('.upload-dropzone');
+            if (!dropzone) return;
+            var fileInput = dropzone.querySelector('.doc-file-input');
+            var queueEl = dropzone.querySelector('.upload-queue');
+
+            function showRejectedFiles(rejected) {
+                rejected.forEach(function(item) {
+                    var row = document.createElement('div');
+                    row.innerHTML = queueItemHtml(item.file.name, 'failed', item.reason);
+                    queueEl.appendChild(row.firstChild);
+                });
             }
-            if (f.size > maxBytes) {
-                rejected.push({ file: f, reason: 'File exceeds ' + maxUploadMb + ' MB limit.' });
-                continue;
+
+            function startUpload(fileList) {
+                var result = validateFiles(fileList);
+                if (!result.valid.length && !result.rejected.length) return;
+                queueEl.classList.remove('d-none');
+                showRejectedFiles(result.rejected);
+                if (result.valid.length) {
+                    processQueue(panel, categoryCode, result.valid, queueEl);
+                }
+                fileInput.value = '';
             }
-            valid.push(f);
-        }
-        return { valid: valid, rejected: rejected };
-    }
 
-    function showRejectedFiles(queueEl, rejected) {
-        rejected.forEach(function(item) {
-            var row = document.createElement('div');
-            row.innerHTML = queueItemHtml(item.file.name, 'failed', item.reason);
-            queueEl.appendChild(row.firstChild);
-        });
-    }
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files && fileInput.files.length) {
+                    startUpload(fileInput.files);
+                }
+            });
 
-    async function parseUploadResponse(res) {
-        var contentType = (res.headers.get('content-type') || '').toLowerCase();
-        if (contentType.indexOf('application/json') !== -1) {
-            return await res.json();
-        }
-        var text = await res.text();
-        if (res.status === 413) {
-            return { status: 'error', message: 'File is too large for the server (check nginx client_max_body_size).' };
-        }
-        if (res.status === 401 || res.status === 403) {
-            return { status: 'error', message: 'Permission denied or session expired. Refresh the page and sign in again.' };
-        }
-        return { status: 'error', message: 'Upload failed (HTTP ' + res.status + ').' };
-    }
-
-    document.querySelectorAll('.doc-category-panel').forEach(function(panel) {
-        var categoryCode = panel.getAttribute('data-category-code');
-        var dropzone = panel.querySelector('.upload-dropzone');
-        if (!dropzone) return;
-        var fileInput = dropzone.querySelector('.doc-file-input');
-        var queueEl = dropzone.querySelector('.upload-queue');
-
-        function startUpload(fileList) {
-            var result = validateFiles(fileList);
-            if (!result.valid.length && !result.rejected.length) return;
-            queueEl.classList.remove('d-none');
-            showRejectedFiles(queueEl, result.rejected);
-            if (result.valid.length) {
-                processQueue(panel, categoryCode, result.valid, queueEl);
-            }
-            fileInput.value = '';
-        }
-
-        fileInput.addEventListener('change', function() {
-            if (fileInput.files.length) startUpload(fileInput.files);
-        });
-
-        ['dragenter', 'dragover'].forEach(function(evt) {
-            dropzone.addEventListener(evt, function(e) {
-                e.preventDefault();
-                dropzone.classList.add('border-primary', 'bg-primary-subtle');
+            ['dragenter', 'dragover'].forEach(function(evt) {
+                dropzone.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.add('border-primary', 'bg-primary-subtle');
+                });
+            });
+            ['dragleave', 'drop'].forEach(function(evt) {
+                dropzone.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.remove('border-primary', 'bg-primary-subtle');
+                });
+            });
+            dropzone.addEventListener('drop', function(e) {
+                if (e.dataTransfer.files && e.dataTransfer.files.length) {
+                    startUpload(e.dataTransfer.files);
+                }
             });
         });
-        ['dragleave', 'drop'].forEach(function(evt) {
-            dropzone.addEventListener(evt, function(e) {
-                e.preventDefault();
-                dropzone.classList.remove('border-primary', 'bg-primary-subtle');
-            });
-        });
-        dropzone.addEventListener('drop', function(e) {
-            if (e.dataTransfer.files.length) startUpload(e.dataTransfer.files);
-        });
-    });
 
-    document.addEventListener('click', function(e) {
-        var btn = e.target.closest('.doc-delete-btn');
-        if (!btn) return;
-        if (!confirm('Delete this document?')) return;
-        var docId = btn.getAttribute('data-doc-id');
-        var panel = btn.closest('.doc-category-panel');
-        var fd = new FormData();
-        fd.append('csrf_token', csrfToken);
-        fetch(deleteUrlTemplate.replace('/0/delete', '/' + docId + '/delete'), {
-            method: 'POST',
-            body: fd,
-            credentials: 'same-origin',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        }).then(function(res) { return res.json(); }).then(function(data) {
-            if (data.status === 'ok') {
-                var row = btn.closest('tr[data-doc-id]');
-                if (row) row.remove();
-                if (panel) updateCountBadge(panel);
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.doc-delete-btn');
+            if (!btn) return;
+            e.preventDefault();
+            if (!confirm('Delete this document?')) return;
+            var docId = btn.getAttribute('data-doc-id');
+            var panel = btn.closest('.doc-category-panel');
+            var fd = new FormData();
+            fd.append('csrf_token', csrfToken);
+            fetch(deleteUrlTemplate.replace('/0/delete', '/' + docId + '/delete'), {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrfToken },
+            }).then(function(res) { return res.json(); }).then(function(data) {
+                if (data.status === 'ok') {
+                    var row = btn.closest('tr[data-doc-id]');
+                    if (row) row.remove();
+                    if (panel) updateCountBadge(panel);
+                } else {
+                    alert(data.message || 'Could not delete document.');
+                }
+            }).catch(function() { alert('Could not delete document.'); });
+        });
+    }
+
+    function initPreview() {
+        var dialog = document.getElementById('documentPreviewDialog');
+        if (!dialog || typeof dialog.showModal !== 'function') return;
+
+        var frame = document.getElementById('documentPreviewFrame');
+        var imageWrap = document.getElementById('documentPreviewImageWrap');
+        var image = document.getElementById('documentPreviewImage');
+        var fallback = document.getElementById('documentPreviewFallback');
+        var titleEl = document.getElementById('documentPreviewTitle');
+        var downloadBtn = document.getElementById('documentPreviewDownload');
+        var fallbackDownload = document.getElementById('documentPreviewFallbackDownload');
+        var closeBtn = document.getElementById('documentPreviewClose');
+
+        function hidePreviewPanes() {
+            frame.classList.add('d-none');
+            imageWrap.classList.add('d-none');
+            fallback.classList.add('d-none');
+            fallback.classList.remove('d-flex');
+            frame.src = 'about:blank';
+            image.removeAttribute('src');
+        }
+
+        function openDocumentPreview(btn) {
+            var url = btn.getAttribute('data-preview-url');
+            var downloadUrl = btn.getAttribute('data-download-url');
+            var filename = btn.getAttribute('data-filename') || 'Document';
+            var ext = (btn.getAttribute('data-extension') || '').toLowerCase();
+
+            hidePreviewPanes();
+            titleEl.textContent = filename;
+            downloadBtn.href = downloadUrl;
+            fallbackDownload.href = downloadUrl;
+
+            if (['jpg', 'jpeg', 'png'].indexOf(ext) !== -1) {
+                image.src = url;
+                image.alt = filename;
+                imageWrap.classList.remove('d-none');
+            } else if (ext === 'pdf') {
+                frame.src = url;
+                frame.classList.remove('d-none');
             } else {
-                alert(data.message || 'Could not delete document.');
+                fallback.classList.remove('d-none');
+                fallback.classList.add('d-flex');
             }
-        }).catch(function() { alert('Could not delete document.'); });
-    });
+            dialog.showModal();
+        }
+
+        dialog.addEventListener('close', hidePreviewPanes);
+        if (closeBtn) closeBtn.addEventListener('click', function() { dialog.close(); });
+        dialog.addEventListener('click', function(e) {
+            if (e.target === dialog) dialog.close();
+        });
+
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.upload-dropzone') || e.target.closest('.doc-file-input')) return;
+            var btn = e.target.closest('.doc-preview-btn');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+            openDocumentPreview(btn);
+        });
+    }
+
+    initUpload();
+    initPreview();
 })();
 </script>
-{% endif %}
 {% endblock %}
