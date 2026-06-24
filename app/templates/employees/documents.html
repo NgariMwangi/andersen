@@ -136,10 +136,13 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
 <script>
 (function() {
     var previewModalEl = document.getElementById('documentPreviewModal');
-    if (!previewModalEl) return;
+    if (!previewModalEl || typeof bootstrap === 'undefined') return;
 
     var frame = document.getElementById('documentPreviewFrame');
     var imageWrap = document.getElementById('documentPreviewImageWrap');
@@ -201,7 +204,6 @@
     };
 })();
 </script>
-
 {% if can_upload %}
 <script>
 (function() {
