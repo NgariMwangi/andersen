@@ -9,7 +9,7 @@ from flask import current_app
 from werkzeug.utils import secure_filename
 
 LEAVE_DOC_EXTENSIONS = {'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp', 'heic'}
-_DEFAULT_LEAVE_MAX_BYTES = 100 * 1024 * 1024
+_DEFAULT_LEAVE_MAX_BYTES = 500 * 1024 * 1024
 
 
 def leave_max_attachment_bytes() -> int:

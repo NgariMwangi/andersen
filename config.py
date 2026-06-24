@@ -94,12 +94,13 @@ class Config:
     # annual = basic_salary stored as per-year figure (default); monthly = per-month (payroll-native).
     SALARY_BASIS = os.environ.get('SALARY_BASIS', 'annual').strip().lower()
 
-    # File uploads
+    # File uploads (default 500 MB per request; override with UPLOAD_MAX_BYTES)
+    _UPLOAD_MAX_BYTES = int(os.environ.get('UPLOAD_MAX_BYTES', str(500 * 1024 * 1024)))
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(
         os.path.dirname(os.path.abspath(__file__)), 'uploads'
     )
-    MAX_CONTENT_LENGTH = 105 * 1024 * 1024  # must cover largest single upload (+ form fields)
-    LEAVE_MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024  # 100MB for leave supporting documents
+    MAX_CONTENT_LENGTH = _UPLOAD_MAX_BYTES
+    LEAVE_MAX_ATTACHMENT_BYTES = int(os.environ.get('LEAVE_MAX_ATTACHMENT_BYTES', str(_UPLOAD_MAX_BYTES)))
     ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'}
     # Cloudinary (optional) for employee document storage
     CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME') or ''
@@ -108,7 +109,7 @@ class Config:
     CLOUDINARY_DOCS_FOLDER = os.environ.get('CLOUDINARY_DOCS_FOLDER') or 'hrms/employee_docs'
     # Local employee documents — sibling of repo (e.g. Andersen/employeeuploads next to Andersen/andersen_hrms)
     EMPLOYEE_UPLOADS_ROOT = os.environ.get('EMPLOYEE_UPLOADS_ROOT') or str(_DEFAULT_EMPLOYEE_UPLOADS)
-    EMPLOYEE_DOCUMENT_MAX_BYTES = int(os.environ.get('EMPLOYEE_DOCUMENT_MAX_BYTES', str(25 * 1024 * 1024)))
+    EMPLOYEE_DOCUMENT_MAX_BYTES = int(os.environ.get('EMPLOYEE_DOCUMENT_MAX_BYTES', str(_UPLOAD_MAX_BYTES)))
 
     # Mail
     MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'localhost'

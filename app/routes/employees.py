@@ -1949,6 +1949,7 @@ def document_upload(id):
             document={
                 'id': doc.id,
                 'name': doc.name,
+                'extension': doc.file_extension,
                 'file_size': doc.file_size,
                 'created_at': doc.created_at.strftime('%d %b %Y') if doc.created_at else '',
                 'open_url': url_for('employees.document_open', id=id, doc_id=doc.id),

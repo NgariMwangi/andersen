@@ -37,3 +37,14 @@ class EmployeeDocument(BaseModel):
 
     employee = db.relationship('Employee', backref='documents')
     category = db.relationship('DocumentCategory', backref='documents')
+
+    @property
+    def file_extension(self) -> str:
+        """Lowercase extension from stored path, e.g. pdf, docx."""
+        path = (self.file_path or '').replace('\\', '/').strip()
+        if not path or path.startswith('cld::') or path.startswith(('http://', 'https://')):
+            return ''
+        filename = path.rsplit('/', 1)[-1]
+        if '.' not in filename:
+            return ''
+        return filename.rsplit('.', 1)[-1].lower()

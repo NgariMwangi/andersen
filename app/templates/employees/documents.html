@@ -50,6 +50,7 @@
                 <thead class="table-light">
                     <tr>
                         <th>Name</th>
+                        <th>Type</th>
                         <th>Size</th>
                         <th>Uploaded</th>
                         <th class="text-end">Actions</th>
@@ -59,6 +60,11 @@
                     {% for d in docs %}
                     <tr data-doc-id="{{ d.id }}">
                         <td>{{ d.name }}</td>
+                        <td>
+                            {% if d.file_extension %}
+                            <span class="badge text-bg-secondary text-uppercase">{{ d.file_extension }}</span>
+                            {% else %}—{% endif %}
+                        </td>
                         <td>{% if d.file_size %}{{ (d.file_size / 1024)|round(1) }} KB{% else %}—{% endif %}</td>
                         <td>{{ d.created_at.strftime('%d %b %Y') if d.created_at else '—' }}</td>
                         <td class="text-end text-nowrap">
@@ -80,7 +86,7 @@
                     </tr>
                     {% else %}
                     <tr class="doc-empty-row">
-                        <td colspan="4" class="text-muted small py-3">No documents in this category yet.</td>
+                        <td colspan="5" class="text-muted small py-3">No documents in this category yet.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -110,6 +116,11 @@
         return div.innerHTML;
     }
 
+    function formatExtension(ext) {
+        if (!ext) return '—';
+        return '<span class="badge text-bg-secondary text-uppercase">' + escapeHtml(ext) + '</span>';
+    }
+
     function updateCountBadge(panel) {
         var tbody = panel.querySelector('.doc-list-body');
         var count = tbody.querySelectorAll('tr[data-doc-id]').length;
@@ -121,7 +132,7 @@
         if (!empty && count === 0) {
             empty = document.createElement('tr');
             empty.className = 'doc-empty-row';
-            empty.innerHTML = '<td colspan="4" class="text-muted small py-3">No documents in this category yet.</td>';
+            empty.innerHTML = '<td colspan="5" class="text-muted small py-3">No documents in this category yet.</td>';
             tbody.appendChild(empty);
         }
         if (empty) {
@@ -138,6 +149,7 @@
         tr.setAttribute('data-doc-id', doc.id);
         tr.innerHTML =
             '<td>' + escapeHtml(doc.name) + '</td>' +
+            '<td>' + formatExtension(doc.extension) + '</td>' +
             '<td>' + formatSize(doc.file_size) + '</td>' +
             '<td>' + escapeHtml(doc.created_at || '') + '</td>' +
             '<td class="text-end text-nowrap">' +
