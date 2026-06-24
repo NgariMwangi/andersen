@@ -352,7 +352,15 @@ def _register_blueprints(app):
 
 def _register_error_handlers(app):
     """Register custom error handlers."""
-    from flask import render_template, redirect, url_for, request, flash
+    from flask import jsonify, render_template, redirect, url_for, request, flash
+    from werkzeug.exceptions import RequestEntityTooLarge
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def request_entity_too_large(e):
+        if request.path.endswith('/documents/upload'):
+            max_mb = max(1, int(app.config.get('EMPLOYEE_DOCUMENT_MAX_BYTES', 500 * 1024 * 1024)) // (1024 * 1024))
+            return jsonify(status='error', message=f'File is too large. Maximum size is {max_mb} MB.'), 413
+        return render_template('errors/500.html'), 413
 
     @app.errorhandler(403)
     def forbidden(e):
@@ -372,6 +380,8 @@ def _register_error_handlers(app):
         Handle expired/invalid CSRF tokens gracefully.
         Common when a user leaves a form open and session expires.
         """
+        if request.path.endswith('/documents/upload') or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(status='error', message='Your session expired. Refresh the page and try again.'), 400
         flash('Your session expired. Please log in again and retry.', 'warning')
         return redirect(url_for('auth.login', next=request.path))
 

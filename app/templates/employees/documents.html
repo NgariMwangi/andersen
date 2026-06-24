@@ -302,16 +302,26 @@
         fd.append('category_code', categoryCode);
         fd.append('file', file);
         try {
-            var res = await fetch(uploadUrl, { method: 'POST', body: fd, credentials: 'same-origin' });
-            var data = await res.json();
-            if (data.status === 'ok' && data.document) {
+            var res = await fetch(uploadUrl, {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+            });
+            var data = await parseUploadResponse(res);
+            if (res.ok && data.status === 'ok' && data.document) {
                 queueRow.innerHTML = queueItemHtml(file.name, 'done', 'Uploaded');
                 appendDocumentRow(panel, data.document);
             } else {
                 queueRow.innerHTML = queueItemHtml(file.name, 'failed', data.message || 'Upload failed');
             }
         } catch (err) {
-            queueRow.innerHTML = queueItemHtml(file.name, 'failed', 'Network error');
+            console.error('Document upload error:', err);
+            queueRow.innerHTML = queueItemHtml(file.name, 'failed', 'Network error — check connection and try again.');
         }
     }
 
@@ -332,18 +342,49 @@
         }, 4000);
     }
 
-    function validateFiles(files) {
+    function validateFiles(fileList) {
         var allowed = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
         var maxBytes = maxUploadMb * 1024 * 1024;
         var valid = [];
-        for (var i = 0; i < files.length; i++) {
-            var f = files[i];
-            var ext = (f.name.split('.').pop() || '').toLowerCase();
-            if (allowed.indexOf(ext) === -1) continue;
-            if (f.size > maxBytes) continue;
+        var rejected = [];
+        for (var i = 0; i < fileList.length; i++) {
+            var f = fileList[i];
+            var parts = (f.name || '').split('.');
+            var ext = parts.length > 1 ? (parts.pop() || '').toLowerCase() : '';
+            if (!ext || allowed.indexOf(ext) === -1) {
+                rejected.push({ file: f, reason: 'File type not allowed. Use PDF, DOC, DOCX, JPG, or PNG.' });
+                continue;
+            }
+            if (f.size > maxBytes) {
+                rejected.push({ file: f, reason: 'File exceeds ' + maxUploadMb + ' MB limit.' });
+                continue;
+            }
             valid.push(f);
         }
-        return valid;
+        return { valid: valid, rejected: rejected };
+    }
+
+    function showRejectedFiles(queueEl, rejected) {
+        rejected.forEach(function(item) {
+            var row = document.createElement('div');
+            row.innerHTML = queueItemHtml(item.file.name, 'failed', item.reason);
+            queueEl.appendChild(row.firstChild);
+        });
+    }
+
+    async function parseUploadResponse(res) {
+        var contentType = (res.headers.get('content-type') || '').toLowerCase();
+        if (contentType.indexOf('application/json') !== -1) {
+            return await res.json();
+        }
+        var text = await res.text();
+        if (res.status === 413) {
+            return { status: 'error', message: 'File is too large for the server (check nginx client_max_body_size).' };
+        }
+        if (res.status === 401 || res.status === 403) {
+            return { status: 'error', message: 'Permission denied or session expired. Refresh the page and sign in again.' };
+        }
+        return { status: 'error', message: 'Upload failed (HTTP ' + res.status + ').' };
     }
 
     document.querySelectorAll('.doc-category-panel').forEach(function(panel) {
@@ -354,10 +395,13 @@
         var queueEl = dropzone.querySelector('.upload-queue');
 
         function startUpload(fileList) {
-            var files = validateFiles(fileList);
-            if (!files.length) return;
+            var result = validateFiles(fileList);
+            if (!result.valid.length && !result.rejected.length) return;
             queueEl.classList.remove('d-none');
-            processQueue(panel, categoryCode, files, queueEl);
+            showRejectedFiles(queueEl, result.rejected);
+            if (result.valid.length) {
+                processQueue(panel, categoryCode, result.valid, queueEl);
+            }
             fileInput.value = '';
         }
 
