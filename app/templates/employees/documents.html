@@ -147,7 +147,7 @@
 {% block extra_js %}
 <script>
 (function() {
-    var canUpload = {{ can_upload|tojson }};
+    var canUpload = {{ has_permission('edit_employees')|tojson }};
     var uploadUrl = {{ url_for('employees.document_upload', id=employee.id)|tojson }};
     var deleteUrlTemplate = {{ url_for('employees.document_delete', id=employee.id, doc_id=0)|tojson }};
     var csrfToken = {{ csrf_token()|tojson }};
