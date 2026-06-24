@@ -1957,6 +1957,13 @@ def document_upload(id):
         )
     except ValueError as e:
         return jsonify(status='error', message=str(e), filename=original_name), 400
+    except PermissionError as e:
+        current_app.logger.exception('Document upload permission error for employee %s', id)
+        return jsonify(
+            status='error',
+            message=str(e) or 'Storage folder is not writable. Contact your administrator.',
+            filename=original_name,
+        ), 500
     except Exception as e:
         db.session.rollback()
         current_app.logger.exception('Document upload failed for employee %s', id)

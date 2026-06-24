@@ -97,7 +97,16 @@ def get_category_by_code(company_id: int, category_code: str) -> DocumentCategor
 def ensure_employee_category_dir(employee: Employee, category: DocumentCategory) -> Path:
     ensure_employee_uploads_root()
     path = employee_uploads_root() / employee_folder_name(employee) / category_folder_name(category)
-    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except PermissionError as e:
+        root = employee_uploads_root()
+        raise PermissionError(
+            f'Cannot create folder under {root}. '
+            f'On the server run: sudo chown -R 1000:1000 {root}'
+        ) from e
+    except OSError as e:
+        raise OSError(f'Cannot create document folder: {path}') from e
     return path
 
 
