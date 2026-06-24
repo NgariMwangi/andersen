@@ -49,12 +49,10 @@ def bootstrap_company_defaults(company_id: int, country_code: str = 'KE') -> Non
         )
 
     for code, name, track_expiry in [
-        ('CONTRACT', 'Contract', True),
-        ('ID', 'National ID', True),
-        ('KRA_PIN', 'KRA PIN', False),
-        ('NSSF', 'NSSF', False),
-        ('CERTIFICATE', 'Certificate', True),
-        ('OTHER', 'Other', False),
+        ('PERSONAL', 'Personal Documents', True),
+        ('WORK', 'Work Related Documents', True),
+        ('EDUCATION', 'Education Documents', False),
+        ('OTHER', 'Others', False),
     ]:
         if (
             db.session.query(DocumentCategory)

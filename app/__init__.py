@@ -95,6 +95,10 @@ def create_app(config_object=None):
     if upload_fallback:
         app.config['UPLOAD_FOLDER'] = str(upload_dir)
 
+    eu_dir, eu_fallback = _ensure_writable_dir(app.config['EMPLOYEE_UPLOADS_ROOT'], 'employeeuploads')
+    if eu_fallback:
+        app.config['EMPLOYEE_UPLOADS_ROOT'] = str(eu_dir)
+
     if not app.config.get('TESTING'):
         log_dir, log_fallback = _ensure_writable_dir(app.config['LOG_DIR'], 'logs')
         if log_fallback:

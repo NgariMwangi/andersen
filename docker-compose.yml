@@ -15,8 +15,10 @@ services:
       APP_BASE_URL: http://197.232.12.38:5002
       SALARY_BASIS: annual
       SESSION_LIFETIME_HOURS: "2"
+      EMPLOYEE_UPLOADS_ROOT: /employeeuploads
     ports:
       - "5002:5002"
+    volumes:
+      - ../employeeuploads:/employeeuploads
     # Optional: mount app/static to provide logo.jpg without rebuilding
-    # volumes:
     #   - ./app/static:/app/app/static:ro

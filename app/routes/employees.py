@@ -3,7 +3,7 @@ import calendar
 from datetime import date, timedelta
 import os
 import mimetypes
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, send_file
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, send_file, jsonify
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from sqlalchemy.orm import joinedload
@@ -15,14 +15,15 @@ from app.models.department import Department
 from app.models.job_title import JobTitle
 from app.models.payroll import EmployeeSalary, EmployeeAllowance, Allowance, EmployeeDeduction
 from app.models.user import User, Role, UserRole
-from app.models.document import EmployeeDocument, DocumentCategory
+from app.models.document import EmployeeDocument
 from app.models.benefit import EmployeeBenefit
 from app.forms.employee_forms import EmployeeForm, EmployeeSalaryForm, EmployeeSelfContactForm
 from app.decorators.permissions import permission_required
 from app.decorators.features import require_payroll
 from app.utils.tenant import require_company_id
 from app.utils.currency import currency_for_branch
-from app.services.audit_service import log_create, log_update, model_to_audit_dict
+from app.utils.validators import normalize_phone
+from app.services.audit_service import log_create, log_update, log_delete, model_to_audit_dict
 from app.services.employee_history_service import (
     assignment_snapshot,
     backfill_assignment_history_if_missing,
@@ -34,7 +35,14 @@ from app.services.employee_relations_service import (
     sync_employee_next_of_kin,
     sync_employee_supervisors,
 )
-from app.utils.validators import normalize_phone
+from app.services.employee_document_service import (
+    delete_employee_document,
+    documents_grouped_by_category,
+    ensure_standard_document_categories,
+    get_category_by_code,
+    resolve_document_full_path,
+    save_employee_document,
+)
 
 try:
     import cloudinary
@@ -1887,7 +1895,7 @@ def _cloudinary_upload_employee_doc(file_storage, employee_id: int) -> tuple[str
     return f"cld::{resource_type}::{public_id}", size_bytes
 
 
-@employees_bp.route('/<int:id>/documents', methods=['GET', 'POST'])
+@employees_bp.route('/<int:id>/documents', methods=['GET'])
 @login_required
 def documents(id):
     emp = db.session.get(Employee, id)
@@ -1895,80 +1903,89 @@ def documents(id):
         abort(404)
     if not _can_access_employee_documents(id):
         abort(403)
-    docs = db.session.query(EmployeeDocument).filter(EmployeeDocument.employee_id == id).order_by(
-        EmployeeDocument.created_at.desc()).all()
-    categories = (
-        db.session.query(DocumentCategory)
-        .filter(DocumentCategory.company_id == emp.company_id)
-        .order_by(DocumentCategory.name)
-        .all()
+    categories = ensure_standard_document_categories(emp.company_id)
+    grouped = documents_grouped_by_category(id, categories)
+    max_mb = max(1, int(current_app.config.get('EMPLOYEE_DOCUMENT_MAX_BYTES', 25 * 1024 * 1024)) // (1024 * 1024))
+    return render_template(
+        'employees/documents.html',
+        employee=emp,
+        categories=categories,
+        grouped_documents=grouped,
+        max_upload_mb=max_mb,
     )
-    if not categories:
-        for code, name in [('CONTRACT', 'Contract'), ('ID', 'National ID'), ('KRA_PIN', 'KRA PIN'),
-                           ('NSSF', 'NSSF'), ('CERTIFICATE', 'Certificate'), ('OTHER', 'Other')]:
-            db.session.add(
-                DocumentCategory(
-                    company_id=emp.company_id,
-                    code=code,
-                    name=name,
-                    track_expiry=(code in ('CONTRACT', 'ID', 'CERTIFICATE')),
-                )
-            )
-        db.session.commit()
-        categories = (
-            db.session.query(DocumentCategory)
-            .filter(DocumentCategory.company_id == emp.company_id)
-            .order_by(DocumentCategory.name)
-            .all()
+
+
+@employees_bp.route('/<int:id>/documents/upload', methods=['POST'])
+@login_required
+def document_upload(id):
+    emp = db.session.get(Employee, id)
+    if not emp or emp.company_id != require_company_id():
+        return jsonify(status='error', message='Employee not found.'), 404
+    if not current_user.has_permission('edit_employees'):
+        return jsonify(status='error', message='Permission denied.'), 403
+
+    category_code = (request.form.get('category_code') or '').strip().upper()
+    category = get_category_by_code(emp.company_id, category_code)
+    if not category:
+        return jsonify(status='error', message='Invalid document category.'), 400
+
+    f = request.files.get('file')
+    notes = (request.form.get('notes') or '').strip() or None
+    name = (request.form.get('name') or '').strip() or None
+    original_name = f.filename if f and f.filename else 'file'
+
+    try:
+        doc = save_employee_document(emp, category, f, name=name, notes=notes)
+        log_create(
+            'EmployeeDocument',
+            doc.id,
+            model_to_audit_dict(doc),
+            user_id=current_user.id,
+            description=f'Document uploaded for employee {emp.id}',
         )
-    if request.method == 'POST':
-        if not current_user.has_permission('edit_employees'):
-            abort(403)
-        name = (request.form.get('name') or '').strip() or 'Document'
-        category_id = request.form.get('category_id', type=int) or None
-        notes = (request.form.get('notes') or '').strip() or None
-        f = request.files.get('file')
-        if not f or not f.filename:
-            flash('Please select a file to upload.', 'danger')
-            return redirect(url_for('employees.documents', id=id))
-        if not _allowed_file(f.filename):
-            flash('File type not allowed. Use PDF, DOC, DOCX, JPG, PNG.', 'danger')
-            return redirect(url_for('employees.documents', id=id))
-        file_path = ''
-        size_bytes = None
-        if _cloudinary_enabled():
-            try:
-                file_path, size_bytes = _cloudinary_upload_employee_doc(f, id)
-            except Exception:
-                current_app.logger.exception('Cloudinary upload failed; falling back to local storage.')
-                # reset stream pointer in case cloud upload consumed it
-                try:
-                    f.stream.seek(0)
-                except Exception:
-                    pass
-        if not file_path:
-            upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'employee_docs', str(id))
-            os.makedirs(upload_dir, exist_ok=True)
-            filename = secure_filename(f.filename)
-            base, ext = os.path.splitext(filename)
-            unique = f"{base}_{os.urandom(4).hex()}{ext}"
-            file_path = os.path.join('employee_docs', str(id), unique)
-            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], file_path)
-            f.save(full_path)
-            size_bytes = os.path.getsize(full_path)
-        doc = EmployeeDocument(
-            employee_id=id,
-            category_id=category_id,
-            name=name,
-            file_path=file_path.replace('\\', '/'),
-            file_size=size_bytes,
-            notes=notes,
+        return jsonify(
+            status='ok',
+            message='Uploaded.',
+            document={
+                'id': doc.id,
+                'name': doc.name,
+                'file_size': doc.file_size,
+                'created_at': doc.created_at.strftime('%d %b %Y') if doc.created_at else '',
+                'open_url': url_for('employees.document_open', id=id, doc_id=doc.id),
+                'download_url': url_for('employees.document_open', id=id, doc_id=doc.id, download=1),
+            },
         )
-        db.session.add(doc)
-        db.session.commit()
-        flash('Document uploaded.', 'success')
-        return redirect(url_for('employees.documents', id=id))
-    return render_template('employees/documents.html', employee=emp, documents=docs, categories=categories)
+    except ValueError as e:
+        return jsonify(status='error', message=str(e), filename=original_name), 400
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception('Document upload failed for employee %s', id)
+        return jsonify(status='error', message=f'Upload failed: {e}', filename=original_name), 500
+
+
+@employees_bp.route('/<int:id>/documents/<int:doc_id>/delete', methods=['POST'])
+@login_required
+@permission_required('edit_employees')
+def document_delete(id, doc_id):
+    emp = db.session.get(Employee, id)
+    if not emp or emp.company_id != require_company_id():
+        abort(404)
+    doc = db.session.get(EmployeeDocument, doc_id)
+    if not doc or doc.employee_id != id:
+        abort(404)
+    old = model_to_audit_dict(doc)
+    delete_employee_document(doc)
+    log_delete(
+        'EmployeeDocument',
+        doc_id,
+        old,
+        user_id=current_user.id,
+        description=f'Document deleted for employee {id}',
+    )
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify(status='ok', message='Document deleted.')
+    flash('Document deleted.', 'success')
+    return redirect(url_for('employees.documents', id=id))
 
 
 @employees_bp.route('/<int:id>/documents/<int:doc_id>/open')
@@ -1986,7 +2003,7 @@ def document_open(id, doc_id):
     rel_path = (doc.file_path or '').replace('\\', '/').lstrip('/').strip()
     if not rel_path:
         abort(404)
-    # Cloudinary-backed reference
+    # Cloudinary-backed reference (legacy)
     if rel_path.startswith('cld::'):
         parts = rel_path.split('::', 2)
         if len(parts) != 3 or not cloudinary_url:
@@ -2000,16 +2017,14 @@ def document_open(id, doc_id):
             flags=flags,
         )
         return redirect(file_url)
-    # Backward compatibility: if direct URL was stored, redirect it.
     if rel_path.startswith('http://') or rel_path.startswith('https://'):
         return redirect(rel_path)
-    upload_root = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
-    full_path = os.path.abspath(os.path.join(upload_root, rel_path))
-    if not full_path.startswith(upload_root + os.sep):
-        abort(403)
-    if not os.path.exists(full_path) or not os.path.isfile(full_path):
+
+    full_path = resolve_document_full_path(doc)
+    if not full_path:
         flash('Document file is missing from storage.', 'danger')
         return redirect(url_for('employees.documents', id=id))
+
     download = request.args.get('download') in {'1', 'true', 'yes'}
     mime, _ = mimetypes.guess_type(full_path)
     return send_file(

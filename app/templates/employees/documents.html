@@ -1,78 +1,282 @@
 {% extends "layouts/base.html" %}
 {% block title %}Documents - {{ employee.full_name }} - {{ app_name }}{% endblock %}
 {% block content %}
-<h1 class="h4 mb-4">Documents – {{ employee.employee_number }} {{ employee.full_name }}</h1>
-
-{% if has_permission('edit_employees') %}
-<div class="card mb-4">
-    <div class="card-header">Upload document</div>
-    <div class="card-body">
-        <form method="post" action="{{ url_for('employees.documents', id=employee.id) }}" enctype="multipart/form-data">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label">Name *</label>
-                    <input type="text" name="name" class="form-control" required placeholder="e.g. Contract, ID, KRA PIN">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Category</label>
-                    <select name="category_id" class="form-select">
-                        <option value="">-- None --</option>
-                        {% for c in categories %}
-                        <option value="{{ c.id }}">{{ c.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-12">
-                    <label class="form-label">File * (PDF, DOC, DOCX, JPG, PNG, max 5MB)</label>
-                    <input type="file" name="file" class="form-control" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Notes</label>
-                    <textarea name="notes" class="form-control" rows="2" placeholder="Optional"></textarea>
-                </div>
-                <div class="col-12">
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-upload me-1"></i>Upload</button>
-                    <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary">Back to employee</a>
-                </div>
-            </div>
-        </form>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-2">Documents – {{ employee.employee_number }} {{ employee.full_name }}</h1>
+        <p class="text-muted small mb-0">
+            Files are stored under <strong>{{ employee.id }}_{{ employee.full_name }}</strong> in four categories.
+            PDF, DOC, DOCX, JPG, PNG — max {{ max_upload_mb }} MB each.
+        </p>
     </div>
+    <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary shrink-0">
+        <i class="bi bi-arrow-left me-1"></i>Back to employee
+    </a>
 </div>
-{% endif %}
 
-<div class="card">
-    <div class="card-header">Documents</div>
+{% set can_upload = has_permission('edit_employees') %}
+
+{% for category in categories %}
+{% set docs = grouped_documents.get(category.id, []) %}
+<div class="card mb-4 doc-category-panel" data-category-code="{{ category.code }}">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span>
+            {% if category.code == 'PERSONAL' %}<i class="bi bi-person-vcard me-1"></i>
+            {% elif category.code == 'WORK' %}<i class="bi bi-briefcase me-1"></i>
+            {% elif category.code == 'EDUCATION' %}<i class="bi bi-mortarboard me-1"></i>
+            {% else %}<i class="bi bi-folder me-1"></i>{% endif %}
+            {{ category.name }}
+        </span>
+        <span class="badge text-bg-light border doc-count-badge">{{ docs|length }} file{{ 's' if docs|length != 1 else '' }}</span>
+    </div>
     <div class="card-body">
-        {% if documents %}
+        {% if can_upload %}
+        <div class="mb-3 p-3 border border-dashed rounded bg-light-subtle upload-dropzone"
+             data-category="{{ category.code }}">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <label class="btn btn-sm btn-primary mb-0">
+                    <i class="bi bi-upload me-1"></i>Choose files
+                    <input type="file" class="d-none doc-file-input" multiple
+                           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+                </label>
+                <span class="text-muted small">or drag and drop here — multiple files supported</span>
+            </div>
+            <div class="upload-queue list-group list-group-flush d-none" aria-live="polite"></div>
+        </div>
+        {% endif %}
+
         <div class="table-responsive">
-            <table class="table table-sm">
-                <thead><tr><th>Name</th><th>Category</th><th>Size</th><th>Uploaded</th><th>Actions</th></tr></thead>
-                <tbody>
-                {% for d in documents %}
-                <tr>
-                    <td>{{ d.name }}</td>
-                    <td>{{ d.category.name if d.category else '-' }}</td>
-                    <td>{% if d.file_size %}{{ (d.file_size / 1024)|round(1) }} KB{% else %}-{% endif %}</td>
-                    <td>{{ d.created_at.strftime('%d %b %Y') if d.created_at else '-' }}</td>
-                    <td class="text-nowrap">
-                        <a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener"
-                           href="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id) }}">
-                            <i class="bi bi-box-arrow-up-right me-1"></i>Open
-                        </a>
-                        <a class="btn btn-sm btn-outline-secondary"
-                           href="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id, download=1) }}">
-                            <i class="bi bi-download me-1"></i>Download
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
+            <table class="table table-sm align-middle mb-0 doc-list-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Size</th>
+                        <th>Uploaded</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="doc-list-body" data-category-id="{{ category.id }}">
+                    {% for d in docs %}
+                    <tr data-doc-id="{{ d.id }}">
+                        <td>{{ d.name }}</td>
+                        <td>{% if d.file_size %}{{ (d.file_size / 1024)|round(1) }} KB{% else %}—{% endif %}</td>
+                        <td>{{ d.created_at.strftime('%d %b %Y') if d.created_at else '—' }}</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener"
+                               href="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id) }}">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id, download=1) }}">
+                                <i class="bi bi-download"></i>
+                            </a>
+                            {% if can_upload %}
+                            <button type="button" class="btn btn-sm btn-outline-danger doc-delete-btn"
+                                    data-doc-id="{{ d.id }}" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr class="doc-empty-row">
+                        <td colspan="4" class="text-muted small py-3">No documents in this category yet.</td>
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
-        {% else %}
-        <p class="text-muted mb-0">No documents yet. Upload one above.</p>
-        {% endif %}
     </div>
 </div>
+{% endfor %}
+
+{% if can_upload %}
+<script>
+(function() {
+    var employeeId = {{ employee.id }};
+    var uploadUrl = {{ url_for('employees.document_upload', id=employee.id)|tojson }};
+    var deleteUrlTemplate = {{ url_for('employees.document_delete', id=employee.id, doc_id=0)|tojson }};
+    var csrfToken = {{ csrf_token()|tojson }};
+    var maxUploadMb = {{ max_upload_mb }};
+
+    function formatSize(bytes) {
+        if (!bytes) return '—';
+        return (bytes / 1024).toFixed(1) + ' KB';
+    }
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function updateCountBadge(panel) {
+        var tbody = panel.querySelector('.doc-list-body');
+        var count = tbody.querySelectorAll('tr[data-doc-id]').length;
+        var badge = panel.querySelector('.doc-count-badge');
+        if (badge) {
+            badge.textContent = count + ' file' + (count === 1 ? '' : 's');
+        }
+        var empty = tbody.querySelector('.doc-empty-row');
+        if (!empty && count === 0) {
+            empty = document.createElement('tr');
+            empty.className = 'doc-empty-row';
+            empty.innerHTML = '<td colspan="4" class="text-muted small py-3">No documents in this category yet.</td>';
+            tbody.appendChild(empty);
+        }
+        if (empty) {
+            empty.classList.toggle('d-none', count > 0);
+        }
+    }
+
+    function appendDocumentRow(panel, doc) {
+        var tbody = panel.querySelector('.doc-list-body');
+        var empty = tbody.querySelector('.doc-empty-row');
+        if (empty) empty.classList.add('d-none');
+
+        var tr = document.createElement('tr');
+        tr.setAttribute('data-doc-id', doc.id);
+        tr.innerHTML =
+            '<td>' + escapeHtml(doc.name) + '</td>' +
+            '<td>' + formatSize(doc.file_size) + '</td>' +
+            '<td>' + escapeHtml(doc.created_at || '') + '</td>' +
+            '<td class="text-end text-nowrap">' +
+            '<a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" href="' + escapeHtml(doc.open_url) + '">' +
+            '<i class="bi bi-box-arrow-up-right"></i></a> ' +
+            '<a class="btn btn-sm btn-outline-secondary" href="' + escapeHtml(doc.download_url) + '">' +
+            '<i class="bi bi-download"></i></a> ' +
+            '<button type="button" class="btn btn-sm btn-outline-danger doc-delete-btn" data-doc-id="' + doc.id + '" title="Delete">' +
+            '<i class="bi bi-trash"></i></button>' +
+            '</td>';
+        tbody.insertBefore(tr, tbody.firstChild);
+        updateCountBadge(panel);
+    }
+
+    function queueItemHtml(filename, status, message) {
+        var icon = 'bi-hourglass';
+        var cls = 'text-muted';
+        if (status === 'uploading') { icon = 'bi-arrow-repeat'; cls = 'text-primary'; }
+        if (status === 'done') { icon = 'bi-check-circle-fill'; cls = 'text-success'; }
+        if (status === 'failed') { icon = 'bi-x-circle-fill'; cls = 'text-danger'; }
+        return '<div class="list-group-item d-flex align-items-start gap-2 py-2 upload-queue-item">' +
+            '<i class="bi ' + icon + ' ' + cls + ' mt-1"></i>' +
+            '<div class="flex-grow-1 min-w-0">' +
+            '<div class="text-truncate fw-medium">' + escapeHtml(filename) + '</div>' +
+            (message ? '<div class="small ' + cls + '">' + escapeHtml(message) + '</div>' : '') +
+            '</div></div>';
+    }
+
+    async function uploadOneFile(panel, categoryCode, file, queueEl, queueRow) {
+        queueRow.innerHTML = queueItemHtml(file.name, 'uploading', 'Uploading…');
+        var fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        fd.append('category_code', categoryCode);
+        fd.append('file', file);
+        try {
+            var res = await fetch(uploadUrl, { method: 'POST', body: fd, credentials: 'same-origin' });
+            var data = await res.json();
+            if (data.status === 'ok' && data.document) {
+                queueRow.innerHTML = queueItemHtml(file.name, 'done', 'Uploaded');
+                appendDocumentRow(panel, data.document);
+            } else {
+                queueRow.innerHTML = queueItemHtml(file.name, 'failed', data.message || 'Upload failed');
+            }
+        } catch (err) {
+            queueRow.innerHTML = queueItemHtml(file.name, 'failed', 'Network error');
+        }
+    }
+
+    async function processQueue(panel, categoryCode, files, queueEl) {
+        for (var i = 0; i < files.length; i++) {
+            var row = document.createElement('div');
+            row.innerHTML = queueItemHtml(files[i].name, 'queued', 'Queued');
+            queueEl.appendChild(row.firstChild);
+            var queueRow = queueEl.lastElementChild;
+            await uploadOneFile(panel, categoryCode, files[i], queueEl, queueRow);
+        }
+        setTimeout(function() {
+            if (queueEl.querySelectorAll('.upload-queue-item').length &&
+                !queueEl.querySelector('.upload-queue-item .bi-arrow-repeat')) {
+                queueEl.classList.add('d-none');
+                queueEl.innerHTML = '';
+            }
+        }, 4000);
+    }
+
+    function validateFiles(files) {
+        var allowed = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+        var maxBytes = maxUploadMb * 1024 * 1024;
+        var valid = [];
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            var ext = (f.name.split('.').pop() || '').toLowerCase();
+            if (allowed.indexOf(ext) === -1) continue;
+            if (f.size > maxBytes) continue;
+            valid.push(f);
+        }
+        return valid;
+    }
+
+    document.querySelectorAll('.doc-category-panel').forEach(function(panel) {
+        var categoryCode = panel.getAttribute('data-category-code');
+        var dropzone = panel.querySelector('.upload-dropzone');
+        if (!dropzone) return;
+        var fileInput = dropzone.querySelector('.doc-file-input');
+        var queueEl = dropzone.querySelector('.upload-queue');
+
+        function startUpload(fileList) {
+            var files = validateFiles(fileList);
+            if (!files.length) return;
+            queueEl.classList.remove('d-none');
+            processQueue(panel, categoryCode, files, queueEl);
+            fileInput.value = '';
+        }
+
+        fileInput.addEventListener('change', function() {
+            if (fileInput.files.length) startUpload(fileInput.files);
+        });
+
+        ['dragenter', 'dragover'].forEach(function(evt) {
+            dropzone.addEventListener(evt, function(e) {
+                e.preventDefault();
+                dropzone.classList.add('border-primary', 'bg-primary-subtle');
+            });
+        });
+        ['dragleave', 'drop'].forEach(function(evt) {
+            dropzone.addEventListener(evt, function(e) {
+                e.preventDefault();
+                dropzone.classList.remove('border-primary', 'bg-primary-subtle');
+            });
+        });
+        dropzone.addEventListener('drop', function(e) {
+            if (e.dataTransfer.files.length) startUpload(e.dataTransfer.files);
+        });
+    });
+
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.doc-delete-btn');
+        if (!btn) return;
+        if (!confirm('Delete this document?')) return;
+        var docId = btn.getAttribute('data-doc-id');
+        var panel = btn.closest('.doc-category-panel');
+        var fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        fetch(deleteUrlTemplate.replace('/0/delete', '/' + docId + '/delete'), {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function(res) { return res.json(); }).then(function(data) {
+            if (data.status === 'ok') {
+                var row = btn.closest('tr[data-doc-id]');
+                if (row) row.remove();
+                if (panel) updateCountBadge(panel);
+            } else {
+                alert(data.message || 'Could not delete document.');
+            }
+        }).catch(function() { alert('Could not delete document.'); });
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}

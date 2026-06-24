@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent / '.env')
 
+# Repo root (andersen_hrms/). Employee documents live in a sibling folder, not inside the repo.
+_PROJECT_ROOT = Path(__file__).resolve().parent
+_DEFAULT_EMPLOYEE_UPLOADS = _PROJECT_ROOT.parent / 'employeeuploads'
+
 
 def _env_bool(name: str, default: bool = False) -> bool:
     raw = os.environ.get(name)
@@ -102,6 +106,9 @@ class Config:
     CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY') or ''
     CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET') or ''
     CLOUDINARY_DOCS_FOLDER = os.environ.get('CLOUDINARY_DOCS_FOLDER') or 'hrms/employee_docs'
+    # Local employee documents — sibling of repo (e.g. Andersen/employeeuploads next to Andersen/andersen_hrms)
+    EMPLOYEE_UPLOADS_ROOT = os.environ.get('EMPLOYEE_UPLOADS_ROOT') or str(_DEFAULT_EMPLOYEE_UPLOADS)
+    EMPLOYEE_DOCUMENT_MAX_BYTES = int(os.environ.get('EMPLOYEE_DOCUMENT_MAX_BYTES', str(25 * 1024 * 1024)))
 
     # Mail
     MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'localhost'
