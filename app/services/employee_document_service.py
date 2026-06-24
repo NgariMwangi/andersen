@@ -18,6 +18,7 @@ from app.models.employee import Employee
 STANDARD_DOCUMENT_CATEGORIES: tuple[tuple[str, str, bool], ...] = (
     ('PERSONAL', 'Personal Documents', True),
     ('WORK', 'Work Related Documents', True),
+    ('PERFORMANCE', 'Performance Management', False),
     ('EDUCATION', 'Education Documents', False),
     ('OTHER', 'Others', False),
 )
@@ -58,7 +59,7 @@ def ensure_employee_uploads_root() -> Path:
 
 
 def ensure_standard_document_categories(company_id: int) -> list[DocumentCategory]:
-    """Ensure the four standard categories exist; return them in display order."""
+    """Ensure the standard document categories exist; return them in display order."""
     existing = {
         row.code: row
         for row in db.session.query(DocumentCategory)

@@ -51,6 +51,7 @@ def bootstrap_company_defaults(company_id: int, country_code: str = 'KE') -> Non
     for code, name, track_expiry in [
         ('PERSONAL', 'Personal Documents', True),
         ('WORK', 'Work Related Documents', True),
+        ('PERFORMANCE', 'Performance Management', False),
         ('EDUCATION', 'Education Documents', False),
         ('OTHER', 'Others', False),
     ]:

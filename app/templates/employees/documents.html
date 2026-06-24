@@ -1,19 +1,12 @@
 {% extends "layouts/base.html" %}
 {% block title %}Documents - {{ employee.full_name }} - {{ app_name }}{% endblock %}
-{% block extra_css %}
-<style>
-.doc-preview-dialog { border: none; border-radius: 0.5rem; padding: 0; width: min(96vw, 1200px); max-height: 96vh; }
-.doc-preview-dialog::backdrop { background: rgba(15, 23, 42, 0.55); }
-.doc-preview-dialog .doc-preview-body { min-height: 70vh; max-height: 78vh; }
-</style>
-{% endblock %}
 
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
     <div>
         <h1 class="h4 mb-2">Documents – {{ employee.employee_number }} {{ employee.full_name }}</h1>
         <p class="text-muted small mb-0">
-            Files are stored under <strong>{{ employee.id }}_{{ employee.full_name }}</strong> in four categories.
+            Files are stored under <strong>{{ employee.id }}_{{ employee.full_name }}</strong> in {{ categories|length }} categories.
             PDF, DOC, DOCX, JPG, PNG — max {{ max_upload_mb }} MB each.
         </p>
     </div>
@@ -31,6 +24,7 @@
         <span>
             {% if category.code == 'PERSONAL' %}<i class="bi bi-person-vcard me-1"></i>
             {% elif category.code == 'WORK' %}<i class="bi bi-briefcase me-1"></i>
+            {% elif category.code == 'PERFORMANCE' %}<i class="bi bi-clipboard-data me-1"></i>
             {% elif category.code == 'EDUCATION' %}<i class="bi bi-mortarboard me-1"></i>
             {% else %}<i class="bi bi-folder me-1"></i>{% endif %}
             {{ category.name }}
@@ -42,7 +36,7 @@
         <div class="mb-3 p-3 border border-dashed rounded bg-light-subtle upload-dropzone"
              data-category="{{ category.code }}">
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                <label class="btn btn-sm btn-primary mb-0">
+                <label class="btn btn-sm btn-primary mb-0 doc-upload-label">
                     <i class="bi bi-upload me-1"></i>Choose files
                     <input type="file" class="d-none doc-file-input" multiple
                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
@@ -117,30 +111,32 @@
 </div>
 {% endfor %}
 
-<dialog id="documentPreviewDialog" class="doc-preview-dialog shadow-lg">
-    <div class="d-flex flex-column h-100 bg-body">
-        <div class="d-flex flex-wrap align-items-center gap-2 p-3 border-bottom">
-            <h5 class="h6 mb-0 text-truncate me-auto" id="documentPreviewTitle">Document</h5>
-            <a id="documentPreviewDownload" class="btn btn-sm btn-outline-primary shrink-0" href="#">
-                <i class="bi bi-download me-1"></i>Download
-            </a>
-            <button type="button" class="btn-close" id="documentPreviewClose" aria-label="Close"></button>
-        </div>
-        <div class="doc-preview-body bg-body-secondary position-relative">
-            <iframe id="documentPreviewFrame" class="w-100 h-100 border-0 d-none doc-preview-pane" title="Document preview"></iframe>
-            <div id="documentPreviewImageWrap" class="d-none text-center p-2 doc-preview-pane h-100">
-                <img id="documentPreviewImage" class="img-fluid" style="max-height: 78vh; object-fit: contain;" alt="">
-            </div>
-            <div id="documentPreviewFallback" class="d-none doc-preview-pane p-5 text-center h-100 flex-column align-items-center justify-content-center">
-                <i class="bi bi-file-earmark-text display-4 text-muted mb-3"></i>
-                <p class="text-muted mb-3">This file type cannot be previewed in the browser. Download it to open locally.</p>
-                <a class="btn btn-primary" id="documentPreviewFallbackDownload" href="#">
-                    <i class="bi bi-download me-1"></i>Download file
+<div class="modal fade" id="documentPreviewModal" tabindex="-1" aria-labelledby="documentPreviewTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-lg-down">
+        <div class="modal-content">
+            <div class="modal-header flex-wrap gap-2">
+                <h5 class="modal-title text-truncate me-auto" id="documentPreviewTitle">Document</h5>
+                <a id="documentPreviewDownload" class="btn btn-sm btn-outline-primary shrink-0" href="#">
+                    <i class="bi bi-download me-1"></i>Download
                 </a>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0 bg-body-secondary">
+                <iframe id="documentPreviewFrame" class="w-100 border-0 d-none doc-preview-pane" style="height: 78vh; min-height: 400px;" title="Document preview"></iframe>
+                <div id="documentPreviewImageWrap" class="d-none text-center p-2 doc-preview-pane">
+                    <img id="documentPreviewImage" class="img-fluid" style="max-height: 78vh; object-fit: contain;" alt="">
+                </div>
+                <div id="documentPreviewFallback" class="d-none doc-preview-pane p-5 text-center">
+                    <i class="bi bi-file-earmark-text display-4 text-muted d-block mb-3"></i>
+                    <p class="text-muted mb-3">This file type cannot be previewed in the browser. Download it to open locally.</p>
+                    <a class="btn btn-primary" id="documentPreviewFallbackDownload" href="#">
+                        <i class="bi bi-download me-1"></i>Download file
+                    </a>
+                </div>
             </div>
         </div>
     </div>
-</dialog>
+</div>
 
 {% endblock %}
 
@@ -444,66 +440,63 @@
     }
 
     function initPreview() {
-        var dialog = document.getElementById('documentPreviewDialog');
-        if (!dialog || typeof dialog.showModal !== 'function') return;
+        try {
+            var modalEl = document.getElementById('documentPreviewModal');
+            if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
 
-        var frame = document.getElementById('documentPreviewFrame');
-        var imageWrap = document.getElementById('documentPreviewImageWrap');
-        var image = document.getElementById('documentPreviewImage');
-        var fallback = document.getElementById('documentPreviewFallback');
-        var titleEl = document.getElementById('documentPreviewTitle');
-        var downloadBtn = document.getElementById('documentPreviewDownload');
-        var fallbackDownload = document.getElementById('documentPreviewFallbackDownload');
-        var closeBtn = document.getElementById('documentPreviewClose');
+            var frame = document.getElementById('documentPreviewFrame');
+            var imageWrap = document.getElementById('documentPreviewImageWrap');
+            var image = document.getElementById('documentPreviewImage');
+            var fallback = document.getElementById('documentPreviewFallback');
+            var titleEl = document.getElementById('documentPreviewTitle');
+            var downloadBtn = document.getElementById('documentPreviewDownload');
+            var fallbackDownload = document.getElementById('documentPreviewFallbackDownload');
+            var previewModal = bootstrap.Modal.getOrCreateInstance(modalEl);
 
-        function hidePreviewPanes() {
-            frame.classList.add('d-none');
-            imageWrap.classList.add('d-none');
-            fallback.classList.add('d-none');
-            fallback.classList.remove('d-flex');
-            frame.src = 'about:blank';
-            image.removeAttribute('src');
-        }
-
-        function openDocumentPreview(btn) {
-            var url = btn.getAttribute('data-preview-url');
-            var downloadUrl = btn.getAttribute('data-download-url');
-            var filename = btn.getAttribute('data-filename') || 'Document';
-            var ext = (btn.getAttribute('data-extension') || '').toLowerCase();
-
-            hidePreviewPanes();
-            titleEl.textContent = filename;
-            downloadBtn.href = downloadUrl;
-            fallbackDownload.href = downloadUrl;
-
-            if (['jpg', 'jpeg', 'png'].indexOf(ext) !== -1) {
-                image.src = url;
-                image.alt = filename;
-                imageWrap.classList.remove('d-none');
-            } else if (ext === 'pdf') {
-                frame.src = url;
-                frame.classList.remove('d-none');
-            } else {
-                fallback.classList.remove('d-none');
-                fallback.classList.add('d-flex');
+            function hidePreviewPanes() {
+                frame.classList.add('d-none');
+                imageWrap.classList.add('d-none');
+                fallback.classList.add('d-none');
+                frame.src = 'about:blank';
+                image.removeAttribute('src');
             }
-            dialog.showModal();
+
+            function openDocumentPreview(btn) {
+                var url = btn.getAttribute('data-preview-url');
+                var downloadUrl = btn.getAttribute('data-download-url');
+                var filename = btn.getAttribute('data-filename') || 'Document';
+                var ext = (btn.getAttribute('data-extension') || '').toLowerCase();
+
+                hidePreviewPanes();
+                titleEl.textContent = filename;
+                downloadBtn.href = downloadUrl;
+                fallbackDownload.href = downloadUrl;
+
+                if (['jpg', 'jpeg', 'png'].indexOf(ext) !== -1) {
+                    image.src = url;
+                    image.alt = filename;
+                    imageWrap.classList.remove('d-none');
+                } else if (ext === 'pdf') {
+                    frame.src = url;
+                    frame.classList.remove('d-none');
+                } else {
+                    fallback.classList.remove('d-none');
+                }
+                previewModal.show();
+            }
+
+            modalEl.addEventListener('hidden.bs.modal', hidePreviewPanes);
+
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.upload-dropzone, .doc-file-input, .doc-upload-label')) return;
+                var btn = e.target.closest('.doc-preview-btn');
+                if (!btn) return;
+                e.preventDefault();
+                openDocumentPreview(btn);
+            });
+        } catch (err) {
+            console.warn('Document preview unavailable:', err);
         }
-
-        dialog.addEventListener('close', hidePreviewPanes);
-        if (closeBtn) closeBtn.addEventListener('click', function() { dialog.close(); });
-        dialog.addEventListener('click', function(e) {
-            if (e.target === dialog) dialog.close();
-        });
-
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('.upload-dropzone') || e.target.closest('.doc-file-input')) return;
-            var btn = e.target.closest('.doc-preview-btn');
-            if (!btn) return;
-            e.preventDefault();
-            e.stopPropagation();
-            openDocumentPreview(btn);
-        });
     }
 
     initUpload();
