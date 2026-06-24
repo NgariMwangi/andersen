@@ -59,7 +59,7 @@
                 <tbody class="doc-list-body" data-category-id="{{ category.id }}">
                     {% for d in docs %}
                     <tr data-doc-id="{{ d.id }}">
-                        <td>{{ d.name }}</td>
+                        <td>{{ d.display_filename }}</td>
                         <td>
                             {% if d.file_extension %}
                             <span class="badge text-bg-secondary text-uppercase">{{ d.file_extension }}</span>
@@ -148,7 +148,7 @@
         var tr = document.createElement('tr');
         tr.setAttribute('data-doc-id', doc.id);
         tr.innerHTML =
-            '<td>' + escapeHtml(doc.name) + '</td>' +
+            '<td>' + escapeHtml(doc.original_filename || doc.name) + '</td>' +
             '<td>' + formatExtension(doc.extension) + '</td>' +
             '<td>' + formatSize(doc.file_size) + '</td>' +
             '<td>' + escapeHtml(doc.created_at || '') + '</td>' +

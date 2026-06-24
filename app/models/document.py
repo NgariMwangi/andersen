@@ -30,7 +30,8 @@ class EmployeeDocument(BaseModel):
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id', ondelete='CASCADE'), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('document_categories.id', ondelete='SET NULL'), nullable=True)
     name = db.Column(db.String(255), nullable=False)
-    file_path = db.Column(db.String(500), nullable=False)  # relative to UPLOAD_FOLDER
+    original_filename = db.Column(db.String(255), nullable=True)  # as chosen at upload
+    file_path = db.Column(db.String(500), nullable=False)  # relative storage path
     file_size = db.Column(db.Integer, nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)
     notes = db.Column(db.Text, nullable=True)
@@ -48,3 +49,14 @@ class EmployeeDocument(BaseModel):
         if '.' not in filename:
             return ''
         return filename.rsplit('.', 1)[-1].lower()
+
+    @property
+    def display_filename(self) -> str:
+        """Filename as shown to users (original upload name when available)."""
+        if self.original_filename:
+            return self.original_filename
+        ext = self.file_extension
+        name = (self.name or '').strip() or 'Document'
+        if ext and not name.lower().endswith(f'.{ext}'):
+            return f'{name}.{ext}'
+        return name

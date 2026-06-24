@@ -110,6 +110,18 @@ def ensure_employee_category_dir(employee: Employee, category: DocumentCategory)
     return path
 
 
+def original_upload_basename(filename: str | None) -> str:
+    """Client-side filename (basename only), preserving spaces and casing."""
+    if not filename:
+        return 'Document'
+    base = filename.replace('\\', '/').rsplit('/', 1)[-1].strip()
+    return base or 'Document'
+
+
+def document_download_filename(doc: EmployeeDocument) -> str:
+    return doc.display_filename
+
+
 def _unique_disk_filename(original_filename: str) -> str:
     safe = secure_filename(original_filename) or 'document'
     base, ext = os.path.splitext(safe)
@@ -147,13 +159,17 @@ def save_employee_document(
     file_storage.save(str(full_path))
     size_bytes = full_path.stat().st_size
 
-    display_name = (name or '').strip() or os.path.splitext(secure_filename(file_storage.filename))[0] or 'Document'
+    original_filename = original_upload_basename(file_storage.filename)[:255]
+    display_name = (name or '').strip() or original_filename
+    display_name = display_name[:255]
+
     rel_path = f'{employee_folder_name(employee)}/{category_folder_name(category)}/{disk_name}'
 
     doc = EmployeeDocument(
         employee_id=employee.id,
         category_id=category.id,
         name=display_name,
+        original_filename=original_filename,
         file_path=rel_path.replace('\\', '/'),
         file_size=size_bytes,
         notes=(notes or '').strip() or None,

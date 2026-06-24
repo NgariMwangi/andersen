@@ -37,6 +37,7 @@ from app.services.employee_relations_service import (
 )
 from app.services.employee_document_service import (
     delete_employee_document,
+    document_download_filename,
     documents_grouped_by_category,
     ensure_standard_document_categories,
     get_category_by_code,
@@ -1948,7 +1949,8 @@ def document_upload(id):
             message='Uploaded.',
             document={
                 'id': doc.id,
-                'name': doc.name,
+                'name': doc.display_filename,
+                'original_filename': doc.original_filename or doc.display_filename,
                 'extension': doc.file_extension,
                 'file_size': doc.file_size,
                 'created_at': doc.created_at.strftime('%d %b %Y') if doc.created_at else '',
@@ -2039,5 +2041,5 @@ def document_open(id, doc_id):
         full_path,
         mimetype=mime or 'application/octet-stream',
         as_attachment=download,
-        download_name=os.path.basename(full_path),
+        download_name=document_download_filename(doc),
     )

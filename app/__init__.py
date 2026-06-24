@@ -161,6 +161,7 @@ def create_app(config_object=None):
         from app.models.company_asset import AssetCategory, CompanyAsset, AssetAssignment  # noqa: F401
         from app.models.it_ticket import TicketCategory, Ticket, TicketComment  # noqa: F401
         _create_tables_safe(app)
+        _apply_schema_patches(app)
 
     # Register blueprints (after tables so route imports don't affect metadata)
     _register_blueprints(app)
@@ -247,6 +248,29 @@ def _create_tables_safe(app):
                     pass
                 else:
                     app.logger.warning("Could not create table %s: %s", name, e)
+
+
+def _apply_schema_patches(app):
+    """Lightweight ALTERs for columns added after initial deploy (PostgreSQL)."""
+    if app.config.get('TESTING'):
+        return
+    from sqlalchemy import text
+
+    patches = (
+        "ALTER TABLE employee_documents ADD COLUMN IF NOT EXISTS original_filename VARCHAR(255) NULL",
+        """
+        UPDATE employee_documents
+        SET original_filename = name
+        WHERE original_filename IS NULL AND name IS NOT NULL
+        """,
+    )
+    try:
+        with db.engine.begin() as conn:
+            for stmt in patches:
+                conn.execute(text(stmt))
+    except Exception as e:
+        app.logger.warning('Schema patches skipped or partial: %s', e)
+
 
 def _init_extensions(app):
     """Initialize Flask extensions with app."""
