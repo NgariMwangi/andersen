@@ -61,7 +61,7 @@
                 {% endif %}
                 <td>
                     <div class="small d-flex flex-wrap gap-1">
-                        {% for lt in leave_types %}
+                        {% for lt in row.visible_leave_types %}
                         <span class="badge text-bg-light border">
                             {{ lt.code or lt.name }}: U {{ row.used_by_type[lt.id]|fmt_days }} /
                             R {% if row.remaining_by_type[lt.id] is not none %}{{ row.remaining_by_type[lt.id]|fmt_days }}{% else %}—{% endif %}

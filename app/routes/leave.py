@@ -1025,10 +1025,13 @@ def tracker():
     for emp in employees:
         stats = statistics_for_employee(emp.id, year)
         stat_map = {row['leave_type_id']: row for row in stats}
+        visible_leave_types = leave_types_visible_for_gender(
+            leave_types, normalize_gender(emp.gender)
+        )
         used_by_type = {}
         remaining_by_type = {}
         carry_forward_total = Decimal('0')
-        for lt in leave_types:
+        for lt in visible_leave_types:
             s = stat_map.get(lt.id)
             used = s.get('used') if s else Decimal('0')
             remaining = s.get('remaining') if s else None
@@ -1039,6 +1042,7 @@ def tracker():
         rows.append(
             {
                 'employee': emp,
+                'visible_leave_types': visible_leave_types,
                 'carry_forward_total': carry_forward_total,
                 'used_by_type': used_by_type,
                 'remaining_by_type': remaining_by_type,
