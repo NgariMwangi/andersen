@@ -3,7 +3,9 @@
 {% block content %}
 <h1 class="h4 mb-3">Leave balances</h1>
 <p class="text-muted small mb-4">
-    Set <strong>opening balance</strong> only for mid-year go-live (days from before this system — not year-end carry).
+    {% if leave_carry_forward_enabled %}
+    Set <strong>opening balance</strong> for mid-year go-live (days from before this system — not year-end carry).
+    {% endif %}
     Monthly <strong>earned</strong> days come from each leave type’s accrual settings. Use <strong>adjustment</strong> for one-off corrections.
     {% if leave_carry_forward_enabled %}
     At year-end, run <strong>rollover</strong> to copy capped unused days into the next year’s opening (see max carry on each leave type).
@@ -50,7 +52,9 @@
             <thead>
                 <tr>
                     <th>Leave type</th>
-                    <th class="text-end">Opening / carry-in</th>
+                    {% if leave_carry_forward_enabled %}
+                    <th class="text-end">Opening balance</th>
+                    {% endif %}
                     <th class="text-end">Earned YTD</th>
                     <th class="text-end">Adjustment</th>
                     <th class="text-end">Used (approved)</th>
@@ -69,9 +73,13 @@
                         <div class="fw-semibold">{{ lt.name }}</div>
                         <div class="text-muted small">{{ lt.code }} · {{ lt.days_per_month or '—' }} days/mo{% if lt.days_per_year %} · cap {{ lt.days_per_year }}/yr{% endif %}</div>
                     </td>
+                    {% if leave_carry_forward_enabled %}
                     <td class="text-end" style="max-width:7rem;">
                         <input type="text" class="form-control form-control-sm text-end" name="opening_{{ lt.id }}" value="{{ br.opening_field }}"/>
                     </td>
+                    {% else %}
+                    <input type="hidden" name="opening_{{ lt.id }}" value="0"/>
+                    {% endif %}
                     <td class="text-end">{{ sn.accrued | fmt_days if sn else '—' }}</td>
                     <td class="text-end" style="max-width:7rem;">
                         <input type="text" class="form-control form-control-sm text-end" name="adjusted_{{ lt.id }}" value="{{ br.adjusted_field }}"/>

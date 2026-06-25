@@ -11,6 +11,7 @@
 (function() {
     var balanceUrl = {{ url_for('leave.leave_balance_preview') | tojson }};
     var requiresEmpPick = {{ _req_emp | tojson }};
+    var showOpeningCarry = {{ leave_carry_forward_enabled | tojson }};
 
     function escapeHtml(s) {
         if (s === undefined || s === null) return '';
@@ -57,7 +58,9 @@
                     rows.push('<dl class="row small mb-0">');
                     rows.push('<dt class="col-7 col-md-5 text-muted">Available now</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.available) + ' days</dd>');
                     rows.push('<dt class="col-7 col-md-5 text-muted">Earned this year (YTD)</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.accrued) + ' days</dd>');
-                    rows.push('<dt class="col-7 col-md-5 text-muted">Opening / carry-in</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.opening_balance) + ' days</dd>');
+                    if (showOpeningCarry && parseFloat(data.opening_balance) > 0) {
+                        rows.push('<dt class="col-7 col-md-5 text-muted">Opening balance</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.opening_balance) + ' days</dd>');
+                    }
                     if (data.adjusted && data.adjusted !== '0') {
                         rows.push('<dt class="col-7 col-md-5 text-muted">Adjustment</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.adjusted) + ' days</dd>');
                     }

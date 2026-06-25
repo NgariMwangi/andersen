@@ -76,7 +76,7 @@
         <h2 class="h6 text-uppercase text-muted mb-3">Your leave summary ({{ stats_year }})</h2>
         <p class="text-muted small mb-3 mb-md-2">
             Leave types are filtered by the gender on your employee profile (e.g. maternity hidden for male, paternity hidden for female).
-            For types with <strong>monthly accrual</strong>, <strong>Book total</strong> is opening/carry-in plus earned days plus adjustments; <strong>Remaining</strong> is that minus approved use.
+            For types with <strong>monthly accrual</strong>, <strong>Book total</strong> is earned days plus adjustments; <strong>Remaining</strong> is that minus approved use.
             Other types use yearly entitlement minus <strong>Used</strong> (approved days overlapping {{ stats_year }}).
         </p>
         <div class="row g-3">
@@ -86,8 +86,10 @@
                     <div class="fw-semibold mb-2">{{ row.name }}</div>
                     <dl class="row small mb-0">
                         {% if row.mode == 'ledger' %}
-                        <dt class="col-6 text-muted">Opening / carry</dt>
+                        {% if leave_carry_forward_enabled and row.opening_balance and row.opening_balance != 0 %}
+                        <dt class="col-6 text-muted">Opening balance</dt>
                         <dd class="col-6 text-end mb-1">{{ row.opening_balance | fmt_days }} <span class="text-muted">days</span></dd>
+                        {% endif %}
                         <dt class="col-6 text-muted">Earned YTD</dt>
                         <dd class="col-6 text-end mb-1">{{ row.accrued | fmt_days }} <span class="text-muted">days</span></dd>
                         {% if row.adjusted %}
