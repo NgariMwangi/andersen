@@ -92,6 +92,8 @@ class Config:
     ENABLE_ATTENDANCE = os.environ.get('ENABLE_ATTENDANCE', 'false').lower() in ('1', 'true', 'yes')
     ENABLE_OVERTIME = os.environ.get('ENABLE_OVERTIME', 'false').lower() in ('1', 'true', 'yes')
     ENABLE_BRANCHES = os.environ.get('ENABLE_BRANCHES', 'false').lower() in ('1', 'true', 'yes')
+    # When false (default), leave days do not carry from one calendar year to the next.
+    LEAVE_ALLOW_CARRY_FORWARD = _env_bool('LEAVE_ALLOW_CARRY_FORWARD', False)
     # annual = basic_salary stored as per-year figure (default); monthly = per-month (payroll-native).
     SALARY_BASIS = os.environ.get('SALARY_BASIS', 'annual').strip().lower()
 

@@ -258,7 +258,10 @@ def _apply_leave_type_form(form: LeaveTypeForm, lt: LeaveType) -> None:
     lt.is_paid = bool(form.is_paid.data)
     lt.min_days_request = form.min_days_request.data if form.min_days_request.data is not None else Decimal('0.5')
     lt.max_consecutive_days = form.max_consecutive_days.data
-    lt.carry_forward_max = form.carry_forward_max.data if form.carry_forward_max.data is not None else 0
+    if current_app.config.get('LEAVE_ALLOW_CARRY_FORWARD', False):
+        lt.carry_forward_max = form.carry_forward_max.data if form.carry_forward_max.data is not None else 0
+    else:
+        lt.carry_forward_max = 0
     lt.is_active = bool(form.is_active.data)
     basis = (form.days_count_basis.data or 'working').strip().lower()
     lt.days_count_basis = basis if basis in ('working', 'calendar') else 'working'
@@ -1443,6 +1446,9 @@ def balances():
         return redirect(url_for('leave.balances', employee_id=employee_id, year=year))
 
     if request.method == 'POST' and request.form.get('rollover_submit'):
+        if not current_app.config.get('LEAVE_ALLOW_CARRY_FORWARD', False):
+            flash('Year-end leave carry is disabled for this company.', 'warning')
+            return redirect(url_for('leave.balances'))
         rollover_form = LeaveYearRolloverForm(formdata=request.form)
         if rollover_form.validate_on_submit():
             fy, ty = rollover_form.from_year.data, rollover_form.to_year.data

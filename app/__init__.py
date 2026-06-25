@@ -167,6 +167,14 @@ def create_app(config_object=None):
             ensure_rbac_defaults()
         except Exception as e:
             app.logger.warning('RBAC bootstrap skipped or partial: %s', e)
+        if not app.config.get('LEAVE_ALLOW_CARRY_FORWARD', False):
+            try:
+                from app.services.company_bootstrap import sync_leave_carry_forward_policy
+                n = sync_leave_carry_forward_policy()
+                if n:
+                    app.logger.info('Leave carry-forward disabled: updated %s leave type(s).', n)
+            except Exception as e:
+                app.logger.warning('Leave carry-forward policy sync skipped: %s', e)
 
     # Register blueprints (after tables so route imports don't affect metadata)
     _register_blueprints(app)

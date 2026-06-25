@@ -16,7 +16,7 @@ def bootstrap_company_defaults(company_id: int, country_code: str = 'KE') -> Non
     cc = (country_code or 'KE').upper()[:2]
 
     leave_specs = [
-        ('ANNUAL', 'Annual Leave', Decimal('24'), True, Decimal('2'), True, 'working', 10),
+        ('ANNUAL', 'Annual Leave', Decimal('24'), True, Decimal('2'), True, 'working', 0),
         ('SICK', 'Sick Leave', Decimal('14'), False, None, True, 'working', 0),
         ('MATERNITY', 'Maternity Leave', Decimal('90'), False, None, True, 'calendar', 0),
         ('PATERNITY', 'Paternity Leave', Decimal('14'), False, None, True, 'calendar', 0),
@@ -281,4 +281,24 @@ def bootstrap_company_defaults(company_id: int, country_code: str = 'KE') -> Non
                     )
                 )
 
+    sync_leave_carry_forward_policy(company_id, commit=False)
+
     db.session.commit()
+
+
+def sync_leave_carry_forward_policy(company_id: int | None = None, *, commit: bool = True) -> int:
+    """
+    Enforce no year-end leave carry when LEAVE_ALLOW_CARRY_FORWARD is false.
+    Returns number of leave types updated.
+    """
+    from flask import current_app
+
+    if current_app.config.get('LEAVE_ALLOW_CARRY_FORWARD', False):
+        return 0
+    q = db.session.query(LeaveType).filter(LeaveType.carry_forward_max != 0)
+    if company_id is not None:
+        q = q.filter(LeaveType.company_id == company_id)
+    count = q.update({LeaveType.carry_forward_max: 0}, synchronize_session='fetch')
+    if commit and count:
+        db.session.commit()
+    return count

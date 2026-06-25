@@ -64,9 +64,15 @@
             {{ form.max_consecutive_days(class_='form-control') }}
         </div>
         <div class="col-md-4">
+            {% if leave_carry_forward_enabled %}
             <label class="form-label">{{ form.carry_forward_max.label }}</label>
             {{ form.carry_forward_max(class_='form-control') }}
-            <span class="form-text">Maximum days that can roll from one year’s closing balance into the next (use <em>Leave balances → Year rollover</em>). Use <code>0</code> for no carry.</span>
+            <span class="form-text">Maximum days that can roll from one year’s closing balance into the next. Use <code>0</code> for no carry.</span>
+            {% else %}
+            <label class="form-label">Year-end carry forward</label>
+            <input type="text" class="form-control" value="0 — not allowed" disabled readonly>
+            <span class="form-text">This company does not carry unused leave into the next calendar year.</span>
+            {% endif %}
         </div>
         <div class="col-12">
             <div class="form-check">
