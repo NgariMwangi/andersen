@@ -23,7 +23,7 @@
         <nav class="nav flex-column">
             {% set ep = request.endpoint %}
             {% set org_active = ep and (ep.startswith('departments') or (branches_enabled and ep.startswith('branches')) or ep.startswith('job_titles') or (payroll_enabled and ep.startswith('allowances')) or ep.startswith('company_assets')) %}
-            {% set leave_types_active = ep in ('leave.types_index', 'leave.type_create', 'leave.type_edit', 'leave.type_delete', 'leave.balances', 'leave.admin_request_leave', 'leave.holidays_index', 'leave.holiday_create', 'leave.holiday_edit') %}
+            {% set leave_types_active = ep in ('leave.types_index', 'leave.type_create', 'leave.type_edit', 'leave.type_delete', 'leave.balances', 'leave.bulk_entry', 'leave.admin_request_leave', 'leave.holidays_index', 'leave.holiday_create', 'leave.holiday_edit') %}
             {% set leave_main_active = ep and ep.startswith('leave') and not leave_types_active %}
             {% set leave_section_active = ep and ep.startswith('leave') %}
             {% set payroll_section_active = ep and ep.startswith('payroll') %}
@@ -122,6 +122,9 @@
                         </a>
                         <a class="nav-link {{ 'active' if ep == 'leave.balances' else '' }}" href="{{ url_for('leave.balances') }}">
                             <i class="bi bi-sliders"></i> Leave balances
+                        </a>
+                        <a class="nav-link {{ 'active' if ep == 'leave.bulk_entry' else '' }}" href="{{ url_for('leave.bulk_entry') }}">
+                            <i class="bi bi-calendar2-range"></i> Bulk leave entry
                         </a>
                         <a class="nav-link {{ 'active' if ep == 'leave.admin_request_leave' else '' }}" href="{{ url_for('leave.admin_request_leave') }}">
                             <i class="bi bi-person-plus"></i> Apply leave for employee

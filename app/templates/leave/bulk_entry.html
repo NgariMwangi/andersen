@@ -1,0 +1,254 @@
+{% extends "layouts/base.html" %}
+{% block title %}Bulk leave entry - {{ app_name }}{% endblock %}
+{% block extra_css %}
+<style>
+.le-bulk-toolbar { position: sticky; top: 0; z-index: 20; background: var(--bs-body-bg); border-bottom: 1px solid var(--bs-border-color); padding-bottom: 1rem; margin-bottom: 1rem; }
+.le-month { margin-bottom: 1.25rem; }
+.le-month-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.35rem; color: var(--bs-secondary-color); }
+.le-cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.le-cal th { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; color: var(--bs-secondary-color); padding: 0.25rem 0; text-align: center; }
+.le-day {
+    aspect-ratio: 1;
+    border: 1px solid var(--bs-border-color-translucent, #dee2e6);
+    text-align: center;
+    vertical-align: middle;
+    font-size: 0.78rem;
+    cursor: pointer;
+    user-select: none;
+    background: #fff;
+    transition: background 0.12s, color 0.12s;
+}
+.le-day.empty { background: transparent; border-color: transparent; cursor: default; }
+.le-day.weekend { background: #f8fafc; color: #94a3b8; }
+.le-day.holiday { background: #fff7ed; color: #c2410c; }
+.le-day.booked { background: #e2e8f0; color: #64748b; cursor: not-allowed; text-decoration: line-through; }
+.le-day.selected { background: #ab0e1e; color: #fff; border-color: #8d0c18; font-weight: 600; }
+.le-day.selected.weekend { color: #fff; }
+.le-legend span { display: inline-flex; align-items: center; gap: 0.35rem; margin-right: 1rem; font-size: 0.8rem; }
+.le-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 2px; border: 1px solid #cbd5e1; }
+.le-summary { font-size: 0.9rem; }
+@media (max-width: 991px) { .le-months-grid { columns: 1; } }
+@media (min-width: 992px) { .le-months-grid { columns: 2; column-gap: 1.5rem; } }
+@media (min-width: 1400px) { .le-months-grid { columns: 3; } }
+.le-months-grid .le-month { break-inside: avoid; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-2">Bulk leave entry</h1>
+<p class="text-muted small mb-4">
+    Record leave already taken this year: choose an employee and leave type, then click days on the calendar.
+    Selected days are saved as <strong>approved</strong> leave in one step (ideal for HR data entry at go-live).
+</p>
+
+<div class="le-bulk-toolbar">
+    <form method="get" id="bulk-filter-form" class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label">Employee</label>
+            <select name="employee_id" id="employee_id" class="form-select" required>
+                <option value="">— Select employee —</option>
+                {% for e in employees %}
+                <option value="{{ e.id }}" {% if employee and e.id == employee.id %}selected{% endif %}>{{ e.employee_number }} — {{ e.full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Leave type</label>
+            <select name="leave_type_id" id="leave_type_id" class="form-select" required>
+                <option value="">— Select type —</option>
+                {% for lt in leave_types %}
+                <option value="{{ lt.id }}" {% if leave_type and lt.id == leave_type.id %}selected{% endif %}>{{ lt.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Year</label>
+            <input type="number" name="year" id="year" class="form-control" value="{{ year }}" min="2000" max="2100" required>
+        </div>
+        <div class="col-md-3">
+            <button type="submit" class="btn btn-outline-primary">Load calendar</button>
+        </div>
+    </form>
+</div>
+
+{% if employee and leave_type %}
+<form method="post" id="bulk-save-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="hidden" name="employee_id" value="{{ employee.id }}"/>
+    <input type="hidden" name="leave_type_id" value="{{ leave_type.id }}"/>
+    <input type="hidden" name="year" value="{{ year }}"/>
+    <input type="hidden" name="save_bulk_leave" value="1"/>
+    <input type="hidden" name="selected_dates" id="selected_dates" value=""/>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <div class="fw-semibold">{{ employee.full_name }} · {{ leave_type.name }} · {{ year }}</div>
+                <div class="le-summary text-muted small mt-1" id="entry-summary">Loading calendar…</div>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-clear">Clear selection</button>
+                <button type="submit" class="btn btn-sm btn-primary" id="btn-save" disabled>Save approved leave</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="le-legend mb-3">
+        <span><i style="background:#ab0e1e;border-color:#8d0c18;"></i> Selected</span>
+        <span><i style="background:#e2e8f0;"></i> Already on leave</span>
+        <span><i style="background:#fff7ed;border-color:#fdba74;"></i> Public holiday</span>
+        <span><i style="background:#f8fafc;"></i> Weekend</span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Notes <span class="text-muted">(optional)</span></label>
+        <input type="text" name="notes" class="form-control" maxlength="500" placeholder="e.g. Migrated from previous records">
+    </div>
+
+    <div class="le-months-grid" id="calendar-root" aria-live="polite"></div>
+</form>
+{% else %}
+<div class="alert alert-info mb-0">Select an employee, leave type, and year, then click <strong>Load calendar</strong>.</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if employee and leave_type %}
+<script>
+(function() {
+    var YEAR = {{ year }};
+    var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var WEEKDAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+    var selected = new Set();
+    var booked = new Set();
+    var holidays = new Set();
+    var basis = 'working';
+
+    var root = document.getElementById('calendar-root');
+    var summaryEl = document.getElementById('entry-summary');
+    var hiddenInput = document.getElementById('selected_dates');
+    var saveBtn = document.getElementById('btn-save');
+
+    function pad(n) { return n < 10 ? '0' + n : String(n); }
+    function iso(y, m, d) { return y + '-' + pad(m) + '-' + pad(d); }
+
+    function updateSummary(extra) {
+        var n = selected.size;
+        hiddenInput.value = Array.from(selected).sort().join(',');
+        saveBtn.disabled = n === 0;
+        var msg = n + ' day' + (n === 1 ? '' : 's') + ' selected';
+        if (extra) msg += ' · ' + extra;
+        summaryEl.textContent = msg;
+    }
+
+    function buildMonth(monthIndex) {
+        var m = monthIndex + 1;
+        var first = new Date(YEAR, monthIndex, 1);
+        var daysInMonth = new Date(YEAR, monthIndex + 1, 0).getDate();
+        var startPad = (first.getDay() + 6) % 7;
+
+        var html = '<div class="le-month"><div class="le-month-title">' + MONTHS[monthIndex] + '</div>';
+        html += '<table class="le-cal" role="grid"><thead><tr>';
+        for (var w = 0; w < 7; w++) html += '<th>' + WEEKDAYS[w] + '</th>';
+        html += '</tr></thead><tbody>';
+
+        var day = 1;
+        for (var row = 0; row < 6; row++) {
+            html += '<tr>';
+            for (var col = 0; col < 7; col++) {
+                var cellIndex = row * 7 + col;
+                if (cellIndex < startPad || day > daysInMonth) {
+                    html += '<td class="le-day empty"></td>';
+                } else {
+                    var key = iso(YEAR, m, day);
+                    var dow = new Date(YEAR, monthIndex, day).getDay();
+                    var isWeekend = dow === 0 || dow === 6;
+                    var cls = 'le-day';
+                    if (booked.has(key)) cls += ' booked';
+                    else if (holidays.has(key)) cls += ' holiday';
+                    else if (isWeekend) cls += ' weekend';
+                    if (selected.has(key)) cls += ' selected';
+                    html += '<td class="' + cls + '" data-date="' + key + '" role="gridcell">' + day + '</td>';
+                    day++;
+                }
+            }
+            html += '</tr>';
+            if (day > daysInMonth) break;
+        }
+        html += '</tbody></table></div>';
+        return html;
+    }
+
+    function renderCalendar() {
+        var html = '';
+        for (var i = 0; i < 12; i++) html += buildMonth(i);
+        root.innerHTML = html;
+    }
+
+    function onDayClick(e) {
+        var cell = e.target.closest('.le-day[data-date]');
+        if (!cell || cell.classList.contains('booked') || cell.classList.contains('empty')) return;
+        var key = cell.getAttribute('data-date');
+        if (selected.has(key)) {
+            selected.delete(key);
+            cell.classList.remove('selected');
+        } else {
+            selected.add(key);
+            cell.classList.add('selected');
+        }
+        updateSummary();
+    }
+
+    function loadContext() {
+        var params = new URLSearchParams({
+            employee_id: '{{ employee.id }}',
+            leave_type_id: '{{ leave_type.id }}',
+            year: String(YEAR)
+        });
+        fetch('{{ url_for("leave.bulk_entry_context_api") }}?' + params.toString(), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                summaryEl.textContent = data.error;
+                return;
+            }
+            basis = data.basis || 'working';
+            booked = new Set(data.booked_dates || []);
+            holidays = new Set(data.holidays || []);
+            selected = new Set();
+            renderCalendar();
+            var extra = data.used_days + ' day(s) already recorded for this type in ' + YEAR;
+            if (data.entitlement) extra += ' · entitlement ' + data.entitlement;
+            updateSummary(extra);
+        })
+        .catch(function() {
+            summaryEl.textContent = 'Could not load calendar context.';
+            renderCalendar();
+        });
+    }
+
+    root.addEventListener('click', onDayClick);
+    document.getElementById('btn-clear').addEventListener('click', function() {
+        selected.clear();
+        renderCalendar();
+        updateSummary();
+    });
+    document.getElementById('bulk-save-form').addEventListener('submit', function(e) {
+        if (selected.size === 0) {
+            e.preventDefault();
+            return;
+        }
+        if (!confirm('Save ' + selected.size + ' day(s) as approved ' + {{ leave_type.name|tojson }} + ' for {{ employee.full_name|tojson }}?')) {
+            e.preventDefault();
+        }
+    });
+
+    loadContext();
+})();
+</script>
+{% endif %}
+{% endblock %}

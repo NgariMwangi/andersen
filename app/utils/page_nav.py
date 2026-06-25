@@ -20,6 +20,7 @@ _PAGE_NAV: dict[str, tuple[str, str]] = {
     'leave.types_index': ('Leave', 'Leave types'),
     'leave.type_create': ('Leave', 'Add leave type'),
     'leave.balances': ('Leave', 'Leave balances'),
+    'leave.bulk_entry': ('Leave', 'Bulk leave entry'),
     'leave.admin_request_leave': ('Leave', 'Apply leave for employee'),
     'leave.holidays_index': ('Leave', 'Public holidays'),
     'leave.holiday_create': ('Leave', 'Add public holiday'),

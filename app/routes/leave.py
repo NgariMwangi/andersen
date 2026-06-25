@@ -43,9 +43,9 @@ from app.services.leave_document_service import (
     resolve_leave_document_full_path,
     save_leave_request_document,
 )
-from app.services.leave_notification_service import (
-    notify_leave_responded,
-    notify_leave_submitted,
+from app.services.leave_bulk_entry_service import (
+    bulk_entry_context,
+    record_bulk_historical_leave,
 )
 from app.services.leave_approval_service import (
     EDITABLE_STATUSES,
@@ -1493,3 +1493,114 @@ def balances():
         balance_rows=balance_rows,
         rollover_form=rollover_form,
     )
+
+
+@leave_bp.route('/bulk-entry', methods=['GET', 'POST'])
+@login_required
+@permission_required('manage_leave_types')
+def bulk_entry():
+    """HR: pick many leave days on a year calendar for one employee and leave type."""
+    today = date.today()
+    cid = require_company_id()
+    employee_id = request.args.get('employee_id', type=int) or request.form.get('employee_id', type=int)
+    leave_type_id = request.args.get('leave_type_id', type=int) or request.form.get('leave_type_id', type=int)
+    year = request.args.get('year', type=int) or request.form.get('year', type=int) or today.year
+
+    employees = (
+        db.session.query(Employee)
+        .filter(Employee.company_id == cid, Employee.status == 'active')
+        .order_by(Employee.last_name, Employee.first_name)
+        .all()
+    )
+    leave_types = (
+        db.session.query(LeaveType)
+        .filter(LeaveType.company_id == cid, LeaveType.is_active.is_(True))
+        .order_by(LeaveType.name)
+        .all()
+    )
+
+    employee = db.session.get(Employee, employee_id) if employee_id else None
+    leave_type = db.session.get(LeaveType, leave_type_id) if leave_type_id else None
+    if employee and employee.company_id != cid:
+        employee = None
+    if leave_type and leave_type.company_id != cid:
+        leave_type = None
+
+    if request.method == 'POST' and request.form.get('save_bulk_leave'):
+        if not employee or not leave_type:
+            flash('Select an employee and leave type.', 'danger')
+            return redirect(url_for('leave.bulk_entry', year=year))
+
+        raw_dates = (request.form.get('selected_dates') or '').strip()
+        selected: list[date] = []
+        for part in raw_dates.split(','):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                selected.append(date.fromisoformat(part))
+            except ValueError:
+                continue
+
+        notes = (request.form.get('notes') or '').strip() or None
+        result = record_bulk_historical_leave(
+            employee_id=employee.id,
+            leave_type_id=leave_type.id,
+            year=year,
+            selected_dates=selected,
+            recorded_by_user_id=current_user.id,
+            notes=notes,
+        )
+        if result.errors:
+            for err in result.errors:
+                flash(err, 'danger')
+            return redirect(
+                url_for(
+                    'leave.bulk_entry',
+                    employee_id=employee.id,
+                    leave_type_id=leave_type.id,
+                    year=year,
+                )
+            )
+
+        db.session.commit()
+        flash(
+            f'Recorded {result.created_requests} leave period(s) '
+            f'({result.total_days} day(s)) for {employee.full_name} — {leave_type.name}.',
+            'success',
+        )
+        return redirect(
+            url_for(
+                'leave.bulk_entry',
+                employee_id=employee.id,
+                leave_type_id=leave_type.id,
+                year=year,
+            )
+        )
+
+    return render_template(
+        'leave/bulk_entry.html',
+        employees=employees,
+        leave_types=leave_types,
+        employee=employee,
+        leave_type=leave_type,
+        year=year,
+    )
+
+
+@leave_bp.route('/api/bulk-entry-context')
+@login_required
+@permission_required('manage_leave_types')
+def bulk_entry_context_api():
+    employee_id = request.args.get('employee_id', type=int)
+    leave_type_id = request.args.get('leave_type_id', type=int)
+    year = request.args.get('year', type=int)
+    if not employee_id or not leave_type_id or not year:
+        return jsonify(error='employee_id, leave_type_id, and year are required.'), 400
+    emp = db.session.get(Employee, employee_id)
+    if not emp or emp.company_id != require_company_id():
+        return jsonify(error='Employee not found.'), 404
+    ctx = bulk_entry_context(employee_id, leave_type_id, year)
+    if not ctx:
+        return jsonify(error='Invalid leave type.'), 400
+    return jsonify(ctx)
