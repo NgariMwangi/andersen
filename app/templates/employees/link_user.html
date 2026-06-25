@@ -1,5 +1,32 @@
 {% extends "layouts/base.html" %}
 {% block title %}Link login account - {{ employee.full_name }} - {{ app_name }}{% endblock %}
+{% block extra_css %}
+<style>
+.password-wrap { position: relative; }
+.password-wrap .form-control.has-toggle { padding-right: 2.75rem; }
+.password-toggle-btn {
+    position: absolute;
+    right: 0.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    color: #76848f;
+    padding: 0.4rem 0.55rem;
+    line-height: 1;
+    border-radius: 0.4rem;
+    cursor: pointer;
+}
+.password-toggle-btn:hover {
+    color: #ab0e1e;
+    background: rgba(171, 14, 30, 0.08);
+}
+.password-toggle-btn:focus {
+    outline: 2px solid rgba(171, 14, 30, 0.35);
+    outline-offset: 2px;
+}
+</style>
+{% endblock %}
 {% block content %}
 <h1 class="h4 mb-4">Link login account – {{ employee.employee_number }} {{ employee.full_name }}</h1>
 <div class="card">
@@ -13,8 +40,13 @@
                     <input type="email" name="email" class="form-control" required value="{{ employee.email or '' }}" placeholder="employee@company.com">
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Password *</label>
-                    <input type="password" name="password" class="form-control" required minlength="8" value="nexgen2026" placeholder="Min 8 characters">
+                    <label class="form-label" for="link-user-password">Password *</label>
+                    <div class="password-wrap">
+                        <input type="password" name="password" id="link-user-password" class="form-control has-toggle" required minlength="8" value="nexgen2026" placeholder="Min 8 characters" autocomplete="new-password">
+                        <button type="button" class="password-toggle-btn" aria-label="Show password" title="Show password">
+                            <i class="bi bi-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Role</label>
@@ -39,4 +71,7 @@
         </form>
     </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
 {% endblock %}
