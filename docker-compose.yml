@@ -12,7 +12,7 @@ services:
       # Required when users access the app over plain HTTP (e.g. http://IP:5002).
       # Set to true only behind HTTPS (see APP_BASE_URL=https://...).
       SESSION_COOKIE_SECURE: "false"
-      APP_BASE_URL: http://197.232.12.38:5002
+      APP_BASE_URL: https://hrms.nexusafrica.co.ke
       SALARY_BASIS: annual
       SESSION_LIFETIME_HOURS: "2"
       EMPLOYEE_UPLOADS_ROOT: /employeeuploads

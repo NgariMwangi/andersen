@@ -49,13 +49,14 @@ def send_transactional_email(
     *,
     text_content: str | None = None,
     attachments: list[tuple[str, bytes]] | None = None,
+    sender_name: str | None = None,
 ) -> bool:
     """
     Send one email through Brevo. Returns True on success, False on failure or missing config.
     """
     api_key = (current_app.config.get('BREVO_API_KEY') or '').strip()
     sender_email = normalize_hr_sender_email(current_app.config.get('BREVO_SENDER_EMAIL'))
-    sender_name = (current_app.config.get('BREVO_SENDER_NAME') or 'HR NexGen Fuelworks').strip() or 'HR NexGen Fuelworks'
+    sender_name = (sender_name or current_app.config.get('BREVO_SENDER_NAME') or 'HR NexGen Fuelworks').strip() or 'HR NexGen Fuelworks'
 
     if not api_key or not sender_email:
         logger.warning(
