@@ -1587,7 +1587,15 @@ def link_user(id):
             if role:
                 db.session.add(UserRole(user_id=user.id, role_id=role.id))
         db.session.commit()
-        flash('Login account created and linked to this employee.', 'success')
+        from app.services.employee_welcome_email_service import send_employee_welcome_email
+
+        if send_employee_welcome_email(user, emp, password, must_change_password=must_change):
+            flash('Login account created and linked. A welcome email with sign-in details was sent.', 'success')
+        else:
+            flash(
+                'Login account created and linked. Welcome email could not be sent — check Brevo configuration.',
+                'warning',
+            )
         return redirect(url_for('employees.view', id=id))
     return render_template(
         'employees/link_user.html',
@@ -1605,6 +1613,7 @@ def provision_login_accounts():
     from app.services.employee_account_service import (
         bulk_provision_employee_logins,
         preview_bulk_provision,
+        send_bulk_welcome_emails,
     )
     from app.services.audit_service import log_audit
 
@@ -1640,8 +1649,10 @@ def provision_login_accounts():
             statuses=statuses,
             must_change_password=must_change,
         )
+        emails_sent = 0
         if result.created:
             db.session.commit()
+            emails_sent = send_bulk_welcome_emails(result)
             log_audit(
                 'CREATE',
                 record_type='User',
@@ -1653,6 +1664,13 @@ def provision_login_accounts():
         else:
             db.session.rollback()
         msg = f'Created {result.created} login account(s).'
+        if result.created:
+            msg += f' Welcome emails sent to {emails_sent}.'
+            if emails_sent < result.created:
+                flash(
+                    'Some welcome emails could not be sent — verify Brevo is configured.',
+                    'warning',
+                )
         if result.skipped_has_account:
             msg += f' Skipped {result.skipped_has_account} already linked.'
         if result.errors:

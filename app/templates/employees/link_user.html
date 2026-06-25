@@ -4,7 +4,7 @@
 <h1 class="h4 mb-4">Link login account – {{ employee.employee_number }} {{ employee.full_name }}</h1>
 <div class="card">
     <div class="card-body">
-        <p class="text-muted">Create a user account so this employee can log in. Use their work email.</p>
+        <p class="text-muted">Create a user account so this employee can log in. Use their work email. A welcome email with sign-in instructions and credentials will be sent automatically.</p>
         <form method="post" action="{{ url_for('employees.link_user', id=employee.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="row g-3">

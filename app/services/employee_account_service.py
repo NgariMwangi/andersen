@@ -55,6 +55,7 @@ class ProvisionResult:
     skipped_no_email: int = 0
     errors: list[str] = field(default_factory=list)
     created_emails: list[str] = field(default_factory=list)
+    welcome_recipients: list[dict] = field(default_factory=list)
 
 
 def _employee_has_user(employee: Employee) -> bool:
@@ -157,6 +158,34 @@ def bulk_provision_employee_logins(
             )
             result.created += 1
             result.created_emails.append(user.email)
+            result.welcome_recipients.append(
+                {
+                    'user_id': user.id,
+                    'employee_id': emp.id,
+                    'password': password,
+                    'must_change_password': must_change_password,
+                }
+            )
         except ValueError as exc:
             result.errors.append(str(exc))
     return result
+
+
+def send_bulk_welcome_emails(result: ProvisionResult) -> int:
+    """Send welcome emails after accounts are committed. Returns count sent."""
+    from app.services.employee_welcome_email_service import send_employee_welcome_email
+
+    sent = 0
+    for item in result.welcome_recipients:
+        user = db.session.get(User, item.get('user_id'))
+        emp = db.session.get(Employee, item.get('employee_id'))
+        if not user or not emp:
+            continue
+        if send_employee_welcome_email(
+            user,
+            emp,
+            item.get('password') or '',
+            must_change_password=item.get('must_change_password', True),
+        ):
+            sent += 1
+    return sent
