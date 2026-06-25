@@ -162,6 +162,11 @@ def create_app(config_object=None):
         from app.models.it_ticket import TicketCategory, Ticket, TicketComment  # noqa: F401
         _create_tables_safe(app)
         _apply_schema_patches(app)
+        try:
+            from app.services.rbac_bootstrap import ensure_rbac_defaults
+            ensure_rbac_defaults()
+        except Exception as e:
+            app.logger.warning('RBAC bootstrap skipped or partial: %s', e)
 
     # Register blueprints (after tables so route imports don't affect metadata)
     _register_blueprints(app)

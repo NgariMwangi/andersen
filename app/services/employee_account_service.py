@@ -45,7 +45,9 @@ def suggest_login_email(employee: Employee) -> str:
 
 
 def _employee_role() -> Role | None:
-    return db.session.query(Role).filter_by(code='EMPLOYEE').first()
+    from app.services.rbac_bootstrap import get_role_by_code
+
+    return get_role_by_code('EMPLOYEE')
 
 
 @dataclass

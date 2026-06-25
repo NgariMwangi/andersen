@@ -1556,7 +1556,7 @@ def link_user(id):
     if emp.user:
         flash('This employee already has a linked login account.', 'info')
         return redirect(url_for('employees.view', id=id))
-    employee_role = db.session.query(Role).filter_by(code='EMPLOYEE').first()
+    employee_role = None
     if request.method == 'POST':
         email = (request.form.get('email') or '').strip().lower()
         password = request.form.get('password') or ''
@@ -1580,6 +1580,9 @@ def link_user(id):
         user.set_password(password)
         db.session.add(user)
         db.session.flush()
+        from app.services.rbac_bootstrap import get_role_by_code
+
+        employee_role = get_role_by_code('EMPLOYEE')
         if employee_role:
             db.session.add(UserRole(user_id=user.id, role_id=employee_role.id))
         db.session.commit()

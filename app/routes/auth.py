@@ -140,7 +140,9 @@ def register():
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.flush()
-            admin_role = db.session.query(Role).filter_by(code='ADMIN').first()
+            from app.services.rbac_bootstrap import get_role_by_code
+
+            admin_role = get_role_by_code('ADMIN')
             if admin_role:
                 db.session.add(UserRole(user_id=user.id, role_id=admin_role.id))
             db.session.commit()
