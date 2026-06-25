@@ -56,8 +56,8 @@
                 if (data.mode === 'ledger') {
                     var rows = [];
                     rows.push('<dl class="row small mb-0">');
-                    rows.push('<dt class="col-7 col-md-5 text-muted">Available now</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.available) + ' days</dd>');
                     rows.push('<dt class="col-7 col-md-5 text-muted">Earned this year (YTD)</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.accrued) + ' days</dd>');
+                    rows.push('<dt class="col-7 col-md-5 text-muted">Remaining</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.available) + ' days</dd>');
                     if (showOpeningCarry && parseFloat(data.opening_balance) > 0) {
                         rows.push('<dt class="col-7 col-md-5 text-muted">Opening balance</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.opening_balance) + ' days</dd>');
                     }
@@ -72,8 +72,8 @@
                     body.innerHTML = rows.join('');
                 } else if (data.mode === 'simple') {
                     body.innerHTML = '<dl class="row small mb-0">' +
-                        '<dt class="col-7 col-md-5 text-muted">Available now</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.available) + ' days</dd>' +
                         '<dt class="col-7 col-md-5 text-muted">Yearly entitlement</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.entitlement) + ' days</dd>' +
+                        '<dt class="col-7 col-md-5 text-muted">Remaining</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.available) + ' days</dd>' +
                         '<dt class="col-7 col-md-5 text-muted">Used (approved)</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.used_approved) + ' days</dd>' +
                         '</dl>';
                 } else {

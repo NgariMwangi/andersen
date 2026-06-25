@@ -1043,6 +1043,7 @@ def tracker():
             {
                 'employee': emp,
                 'visible_leave_types': visible_leave_types,
+                'stats_by_type': stat_map,
                 'carry_forward_total': carry_forward_total,
                 'used_by_type': used_by_type,
                 'remaining_by_type': remaining_by_type,

@@ -4,7 +4,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <div>
         <h1 class="h4 mb-1">Leave tracker</h1>
-        <p class="text-muted small mb-0">Year view by employee: used/remaining per leave type, and leave days on the calendar.</p>
+        <p class="text-muted small mb-0">Year view by employee: accrued, used, and remaining per leave type, plus leave days on the calendar.</p>
     </div>
     <form method="get" class="d-flex flex-wrap align-items-center gap-2">
         <input
@@ -48,7 +48,7 @@
                 {% if leave_carry_forward_enabled %}
                 <th style="min-width:110px;" class="text-end">Carry fwd</th>
                 {% endif %}
-                <th style="min-width:380px;">Used / Remaining by leave type</th>
+                <th style="min-width:420px;">Accrued / Used / Remaining by leave type</th>
                 <th style="min-width:1900px;">Calendar (months and weeks)</th>
             </tr>
         </thead>
@@ -62,9 +62,14 @@
                 <td>
                     <div class="small d-flex flex-wrap gap-1">
                         {% for lt in row.visible_leave_types %}
+                        {% set st = row.stats_by_type.get(lt.id) %}
                         <span class="badge text-bg-light border">
-                            {{ lt.code or lt.name }}: U {{ row.used_by_type[lt.id]|fmt_days }} /
-                            R {% if row.remaining_by_type[lt.id] is not none %}{{ row.remaining_by_type[lt.id]|fmt_days }}{% else %}—{% endif %}
+                            {{ lt.code or lt.name }}:
+                            {% if st and st.get('accrued') is not none %}
+                            A {{ st.accrued|fmt_days }} /
+                            {% endif %}
+                            U {{ row.used_by_type[lt.id]|fmt_days }} /
+                            R {% if row.remaining_by_type[lt.id] is not none %}<span class="fw-semibold text-primary">{{ row.remaining_by_type[lt.id]|fmt_days }}</span>{% else %}—{% endif %}
                         </span>
                         {% endfor %}
                     </div>
