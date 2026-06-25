@@ -48,14 +48,8 @@
                         </button>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Role</label>
-                    <select name="role_id" class="form-select">
-                        <option value="">-- Select role --</option>
-                        {% for r in roles %}
-                        <option value="{{ r.id }}" {% if default_role_id == r.id %}selected{% endif %}>{{ r.name }}</option>
-                        {% endfor %}
-                    </select>
+                <div class="col-12">
+                    <p class="text-muted small mb-0"><i class="bi bi-person-badge me-1"></i>Role: <strong>Employee</strong> (assigned automatically)</p>
                 </div>
                 <div class="col-12">
                     <div class="form-check">

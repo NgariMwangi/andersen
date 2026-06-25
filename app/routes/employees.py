@@ -1556,21 +1556,19 @@ def link_user(id):
     if emp.user:
         flash('This employee already has a linked login account.', 'info')
         return redirect(url_for('employees.view', id=id))
-    roles = db.session.query(Role).order_by(Role.name).all()
-    default_role_id = next((r.id for r in roles if r.code == 'EMPLOYEE'), None)
+    employee_role = db.session.query(Role).filter_by(code='EMPLOYEE').first()
     if request.method == 'POST':
         email = (request.form.get('email') or '').strip().lower()
         password = request.form.get('password') or ''
-        role_id = request.form.get('role_id', type=int)
         if not email:
             flash('Email is required.', 'danger')
-            return render_template('employees/link_user.html', employee=emp, roles=roles)
+            return render_template('employees/link_user.html', employee=emp)
         if not password or len(password) < current_app.config.get('PASSWORD_MIN_LENGTH', 8):
             flash(f'Password must be at least {current_app.config.get("PASSWORD_MIN_LENGTH", 8)} characters.', 'danger')
-            return render_template('employees/link_user.html', employee=emp, roles=roles)
+            return render_template('employees/link_user.html', employee=emp)
         if db.session.query(User).filter_by(email=email).first():
             flash('A user with this email already exists.', 'danger')
-            return render_template('employees/link_user.html', employee=emp, roles=roles)
+            return render_template('employees/link_user.html', employee=emp)
         must_change = request.form.get('must_change_password', '1') == '1'
         user = User(
             email=email,
@@ -1582,10 +1580,8 @@ def link_user(id):
         user.set_password(password)
         db.session.add(user)
         db.session.flush()
-        if role_id:
-            role = db.session.get(Role, role_id)
-            if role:
-                db.session.add(UserRole(user_id=user.id, role_id=role.id))
+        if employee_role:
+            db.session.add(UserRole(user_id=user.id, role_id=employee_role.id))
         db.session.commit()
         from app.services.employee_welcome_email_service import send_employee_welcome_email
 
@@ -1597,12 +1593,7 @@ def link_user(id):
                 'warning',
             )
         return redirect(url_for('employees.view', id=id))
-    return render_template(
-        'employees/link_user.html',
-        employee=emp,
-        roles=roles,
-        default_role_id=default_role_id,
-    )
+    return render_template('employees/link_user.html', employee=emp)
 
 
 @employees_bp.route('/provision-login-accounts', methods=['GET', 'POST'])
