@@ -102,6 +102,10 @@ def statistics_for_employee(employee_id: int, year: int | None = None) -> list[d
     rows = []
     for lt in types_q:
         used = _used_days_approved_in_year(employee_id, lt.id, year)
+        entitled_per_year = None
+        if lt.days_per_year is not None:
+            entitled_per_year = Decimal(str(lt.days_per_year)).quantize(Decimal("0.01"))
+        show_earned_this_year = bool(lt.accrues_monthly)
         if leave_type_uses_balance_ledger(lt):
             snap = compute_balance_snapshot(employee_id, lt.id, year)
             if snap:
@@ -115,6 +119,8 @@ def statistics_for_employee(employee_id: int, year: int | None = None) -> list[d
                         "code": lt.code,
                         "name": leave_type_display_name(lt),
                         "mode": "ledger",
+                        "entitled_per_year": entitled_per_year,
+                        "show_earned_this_year": show_earned_this_year,
                         "entitlement": total_book.quantize(Decimal("0.01")),
                         "opening_balance": snap["opening_balance"],
                         "accrued": snap["accrued"],
@@ -143,6 +149,8 @@ def statistics_for_employee(employee_id: int, year: int | None = None) -> list[d
             "code": lt.code,
             "name": leave_type_display_name(lt),
             "mode": mode,
+            "entitled_per_year": entitled_per_year,
+            "show_earned_this_year": show_earned_this_year,
             "entitlement": entitlement,
             "used": used,
             "remaining": remaining,

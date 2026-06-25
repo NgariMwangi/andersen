@@ -1,0 +1,35 @@
+{# Plain-language leave balance lines for employees. Expects row with entitled_per_year, accrued, used, remaining, show_earned_this_year. #}
+{% macro leave_balance_dl(row, hr_extras=false) %}
+<dl class="row small mb-0">
+    {% if row.entitled_per_year is not none %}
+    <dt class="col-6 text-muted">Entitled</dt>
+    <dd class="col-6 text-end mb-1">{{ row.entitled_per_year | fmt_days }} <span class="text-muted">per year</span></dd>
+    {% endif %}
+    {% if row.show_earned_this_year and row.get('accrued') is not none %}
+    <dt class="col-6 text-muted">Earned this year</dt>
+    <dd class="col-6 text-end mb-1">{{ row.accrued | fmt_days }}</dd>
+    {% endif %}
+    {% if hr_extras and leave_carry_forward_enabled and row.get('opening_balance') and row.opening_balance != 0 %}
+    <dt class="col-6 text-muted">Opening balance</dt>
+    <dd class="col-6 text-end mb-1">{{ row.opening_balance | fmt_days }}</dd>
+    {% endif %}
+    {% if hr_extras and row.get('adjusted') %}
+    <dt class="col-6 text-muted">Adjustment</dt>
+    <dd class="col-6 text-end mb-1">{{ row.adjusted | fmt_days }}</dd>
+    {% endif %}
+    {% if hr_extras and row.get('carry_forward_max') is defined and row.carry_forward_max > 0 %}
+    <dt class="col-6 text-muted">Max carry next yr</dt>
+    <dd class="col-6 text-end mb-1 text-muted">{{ row.carry_forward_max }} days</dd>
+    {% endif %}
+    <dt class="col-6 text-muted">Used this year</dt>
+    <dd class="col-6 text-end mb-1">{{ row.used | fmt_days }}</dd>
+    <dt class="col-6 text-muted">Remaining this year</dt>
+    <dd class="col-6 text-end mb-0 fw-semibold text-primary">
+        {% if row.remaining is not none %}
+            {{ row.remaining | fmt_days }}
+        {% else %}
+            <span class="text-muted fw-normal">—</span>
+        {% endif %}
+    </dd>
+</dl>
+{% endmacro %}

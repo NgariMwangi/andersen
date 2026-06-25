@@ -37,7 +37,7 @@
             empId = empEl && empEl.value ? String(empEl.value) : '';
             if (!empId) {
                 sub.textContent = '';
-                body.innerHTML = '<p class="mb-0 text-muted">Select an employee to see accrued and available days.</p>';
+                body.innerHTML = '<p class="mb-0 text-muted">Select an employee to see their leave balance.</p>';
                 card.style.display = 'block';
                 return;
             }
@@ -53,29 +53,29 @@
                     return;
                 }
                 sub.textContent = 'Calendar year ' + data.year + ' — ' + (data.leave_type_name || '');
-                if (data.mode === 'ledger') {
-                    var rows = [];
-                    rows.push('<dl class="row small mb-0">');
-                    rows.push('<dt class="col-7 col-md-5 text-muted">Earned this year (YTD)</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.accrued) + ' days</dd>');
-                    rows.push('<dt class="col-7 col-md-5 text-muted">Remaining</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.available) + ' days</dd>');
-                    if (showOpeningCarry && parseFloat(data.opening_balance) > 0) {
-                        rows.push('<dt class="col-7 col-md-5 text-muted">Opening balance</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.opening_balance) + ' days</dd>');
+                function balanceRows(data) {
+                    var rows = ['<dl class="row small mb-0">'];
+                    if (data.entitled_per_year) {
+                        rows.push('<dt class="col-7 col-md-5 text-muted">Entitled</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.entitled_per_year) + ' per year</dd>');
+                    }
+                    if (data.show_earned_this_year && data.accrued !== undefined) {
+                        rows.push('<dt class="col-7 col-md-5 text-muted">Earned this year</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.accrued) + '</dd>');
+                    }
+                    if (showOpeningCarry && data.opening_balance && parseFloat(data.opening_balance) > 0) {
+                        rows.push('<dt class="col-7 col-md-5 text-muted">Opening balance</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.opening_balance) + '</dd>');
                     }
                     if (data.adjusted && data.adjusted !== '0') {
-                        rows.push('<dt class="col-7 col-md-5 text-muted">Adjustment</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.adjusted) + ' days</dd>');
+                        rows.push('<dt class="col-7 col-md-5 text-muted">Adjustment</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.adjusted) + '</dd>');
                     }
-                    rows.push('<dt class="col-7 col-md-5 text-muted">Used (approved)</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.used_approved) + ' days</dd>');
-                    if (data.days_per_year_cap) {
-                        rows.push('<dt class="col-7 col-md-5 text-muted">Year cap</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.days_per_year_cap) + ' days</dd>');
-                    }
+                    rows.push('<dt class="col-7 col-md-5 text-muted">Used this year</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.used_approved) + '</dd>');
+                    rows.push('<dt class="col-7 col-md-5 text-muted">Remaining this year</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.remaining || data.available) + '</dd>');
                     rows.push('</dl>');
-                    body.innerHTML = rows.join('');
+                    return rows.join('');
+                }
+                if (data.mode === 'ledger') {
+                    body.innerHTML = balanceRows(data);
                 } else if (data.mode === 'simple') {
-                    body.innerHTML = '<dl class="row small mb-0">' +
-                        '<dt class="col-7 col-md-5 text-muted">Yearly entitlement</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.entitlement) + ' days</dd>' +
-                        '<dt class="col-7 col-md-5 text-muted">Remaining</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.available) + ' days</dd>' +
-                        '<dt class="col-7 col-md-5 text-muted">Used (approved)</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.used_approved) + ' days</dd>' +
-                        '</dl>';
+                    body.innerHTML = balanceRows(data);
                 } else {
                     body.innerHTML = '<p class="mb-0 text-muted">This leave type has no fixed yearly entitlement in the system.</p>';
                 }

@@ -55,10 +55,11 @@
                     {% if leave_carry_forward_enabled %}
                     <th class="text-end">Opening balance</th>
                     {% endif %}
-                    <th class="text-end">Earned YTD</th>
+                    <th class="text-end">Entitled / yr</th>
+                    <th class="text-end">Earned this year</th>
                     <th class="text-end">Adjustment</th>
-                    <th class="text-end">Used (approved)</th>
-                    <th class="text-end">Remaining</th>
+                    <th class="text-end">Used this year</th>
+                    <th class="text-end">Remaining this year</th>
                     {% if leave_carry_forward_enabled %}
                     <th class="text-muted small">Carry cap</th>
                     {% endif %}
@@ -80,7 +81,8 @@
                     {% else %}
                     <input type="hidden" name="opening_{{ lt.id }}" value="0"/>
                     {% endif %}
-                    <td class="text-end">{{ sn.accrued | fmt_days if sn else '—' }}</td>
+                    <td class="text-end">{{ lt.days_per_year | fmt_days if lt.days_per_year is not none else '—' }}</td>
+                    <td class="text-end">{% if lt.accrues_monthly and sn %}{{ sn.accrued | fmt_days }}{% else %}—{% endif %}</td>
                     <td class="text-end" style="max-width:7rem;">
                         <input type="text" class="form-control form-control-sm text-end" name="adjusted_{{ lt.id }}" value="{{ br.adjusted_field }}"/>
                     </td>

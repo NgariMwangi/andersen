@@ -219,13 +219,16 @@ def preview_leave_balance_for_apply(employee_id: int, leave_type_id: int, year: 
             "mode": "ledger",
             "year": year,
             "leave_type_name": lt.name,
+            "show_earned_this_year": bool(lt.accrues_monthly),
             "opening_balance": _decimal_display(snap["opening_balance"]),
             "accrued": _decimal_display(snap["accrued"]),
             "adjusted": _decimal_display(snap["adjusted"]),
             "used_approved": _decimal_display(snap["used"]),
             "available": _decimal_display(avail),
+            "remaining": _decimal_display(max(Decimal("0"), avail)),
         }
         if lt.days_per_year is not None:
+            out["entitled_per_year"] = _decimal_display(_d(lt.days_per_year))
             out["days_per_year_cap"] = _decimal_display(_d(lt.days_per_year))
         return out
 
@@ -237,9 +240,12 @@ def preview_leave_balance_for_apply(employee_id: int, leave_type_id: int, year: 
             "mode": "simple",
             "year": year,
             "leave_type_name": lt.name,
+            "show_earned_this_year": False,
+            "entitled_per_year": _decimal_display(ent),
             "entitlement": _decimal_display(ent),
             "used_approved": _decimal_display(used),
             "available": _decimal_display(avail),
+            "remaining": _decimal_display(avail),
         }
     return {
         "mode": "unlimited",
