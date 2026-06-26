@@ -13,6 +13,7 @@
     <strong>Unused leave does not carry</strong> to the next calendar year at this company.
     {% endif %}
     To record days already taken, use <a href="{{ url_for('leave.bulk_entry') }}">Bulk leave entry</a>.
+    Opening balance and adjustment apply only to leave types with <strong>monthly accrual</strong>; other types show entitlement and usage for the year.
 </p>
 
 <div class="card border-0 shadow-sm mb-4">
@@ -38,8 +39,8 @@
     </div>
 </div>
 
-{% if not ledger_types %}
-<div class="alert alert-warning">No leave types use the balance ledger yet. Enable <strong>Accrues monthly</strong> and/or set <strong>Max days carry forward</strong> on a leave type, then return here.</div>
+{% if employee and not leave_types %}
+<div class="alert alert-warning">No active leave types are configured for this company.</div>
 {% elif employee %}
 <form method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -76,18 +77,28 @@
                     </td>
                     {% if leave_carry_forward_enabled %}
                     <td class="text-end" style="max-width:7rem;">
+                        {% if br.uses_ledger %}
                         <input type="text" class="form-control form-control-sm text-end" name="opening_{{ lt.id }}" value="{{ br.opening_field }}"/>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        <input type="hidden" name="opening_{{ lt.id }}" value="0"/>
+                        {% endif %}
                     </td>
                     {% else %}
                     <input type="hidden" name="opening_{{ lt.id }}" value="0"/>
                     {% endif %}
                     <td class="text-end">{{ lt.days_per_year | fmt_days if lt.days_per_year is not none else '—' }}</td>
-                    <td class="text-end">{% if lt.accrues_monthly and sn %}{{ sn.accrued | fmt_days }}{% else %}—{% endif %}</td>
+                    <td class="text-end">{% if sn and sn.accrued is not none %}{{ sn.accrued | fmt_days }}{% elif lt.accrues_monthly %}—{% else %}—{% endif %}</td>
                     <td class="text-end" style="max-width:7rem;">
+                        {% if br.uses_ledger %}
                         <input type="text" class="form-control form-control-sm text-end" name="adjusted_{{ lt.id }}" value="{{ br.adjusted_field }}"/>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        <input type="hidden" name="adjusted_{{ lt.id }}" value="0"/>
+                        {% endif %}
                     </td>
                     <td class="text-end">{{ sn.used | fmt_days if sn else '—' }}</td>
-                    <td class="text-end fw-semibold">{{ br.closing | fmt_days }}</td>
+                    <td class="text-end fw-semibold">{% if br.closing is not none %}{{ br.closing | fmt_days }}{% else %}<span class="text-muted">Unlimited</span>{% endif %}</td>
                     {% if leave_carry_forward_enabled %}
                     <td class="text-muted small text-end">{{ lt.carry_forward_max if lt.carry_forward_max is not none else 0 }}</td>
                     {% endif %}
@@ -98,8 +109,8 @@
     </div>
     <button type="submit" class="btn btn-primary">Save balances</button>
 </form>
-{% elif ledger_types %}
-<p class="text-muted">Select an employee to edit opening balances and adjustments.</p>
+{% else %}
+<p class="text-muted">Select an employee to view and edit leave balances.</p>
 {% endif %}
 
 {% if leave_carry_forward_enabled %}

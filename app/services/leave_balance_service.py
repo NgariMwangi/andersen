@@ -123,6 +123,53 @@ def compute_balance_snapshot(
     }
 
 
+def balance_row_for_hr_page(
+    employee_id: int, lt: LeaveType, year: int, as_of: date | None = None
+) -> dict | None:
+    """One leave type row for the HR balances screen (ledger and simple entitlement types)."""
+    as_of = as_of or date.today()
+    emp = db.session.get(Employee, employee_id)
+    if not emp or not lt or lt.company_id != emp.company_id or not lt.is_active:
+        return None
+
+    if leave_type_uses_balance_ledger(lt):
+        snap = compute_balance_snapshot(employee_id, lt.id, year, as_of=as_of)
+        if snap is None:
+            return None
+        return {
+            "leave_type": lt,
+            "uses_ledger": True,
+            "snapshot": snap,
+            "opening_field": snap["opening_balance"],
+            "adjusted_field": snap["adjusted"],
+            "closing": snap["closing_balance"],
+        }
+
+    used = _used_days_approved_in_year(employee_id, lt.id, year)
+    entitled = _d(lt.days_per_year) if lt.days_per_year is not None else None
+    earned = entitled if is_fixed_annual_entitlement_leave(lt) and entitled is not None else None
+    if entitled is not None:
+        closing = max(Decimal("0"), entitled - used)
+    else:
+        closing = None
+    snap = {
+        "opening_balance": Decimal("0"),
+        "accrued": earned,
+        "adjusted": Decimal("0"),
+        "used": used,
+        "closing_balance": closing,
+        "has_persisted_row": False,
+    }
+    return {
+        "leave_type": lt,
+        "uses_ledger": False,
+        "snapshot": snap,
+        "opening_field": Decimal("0"),
+        "adjusted_field": Decimal("0"),
+        "closing": closing,
+    }
+
+
 def ensure_balance(employee_id: int, leave_type_id: int, year: int) -> LeaveBalance | None:
     """Return existing or new LeaveBalance row for accrual/carry types; None if type inactive."""
     lt = db.session.get(LeaveType, leave_type_id)

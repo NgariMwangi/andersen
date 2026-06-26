@@ -27,6 +27,7 @@ from app.forms.leave_forms import (
     PublicHolidayForm,
 )
 from app.services.leave_balance_service import (
+    balance_row_for_hr_page,
     compute_balance_snapshot,
     get_available_days,
     leave_type_uses_balance_ledger,
@@ -1459,6 +1460,20 @@ def _ledger_leave_types():
     ]
 
 
+def _leave_types_for_balance_page(employee: Employee | None = None):
+    """All active leave types for the balances UI (optionally filtered by employee gender)."""
+    cid = require_company_id()
+    types = (
+        db.session.query(LeaveType)
+        .filter(LeaveType.company_id == cid, LeaveType.is_active.is_(True))
+        .order_by(LeaveType.name)
+        .all()
+    )
+    if employee:
+        types = leave_types_visible_for_gender(types, normalize_gender(employee.gender))
+    return types
+
+
 @leave_bp.route('/balances', methods=['GET', 'POST'])
 @login_required
 @permission_required('manage_leave_types')
@@ -1532,24 +1547,19 @@ def balances():
         employee = None
 
     balance_rows = []
-    if employee and ledger_types:
-        for lt in ledger_types:
-            snap = compute_balance_snapshot(employee.id, lt.id, year)
-            balance_rows.append(
-                {
-                    'leave_type': lt,
-                    'snapshot': snap,
-                    'opening_field': snap['opening_balance'] if snap else Decimal('0'),
-                    'adjusted_field': snap['adjusted'] if snap else Decimal('0'),
-                    'closing': snap['closing_balance'] if snap else Decimal('0'),
-                }
-            )
+    leave_types = _leave_types_for_balance_page(employee) if employee else []
+    if employee:
+        for lt in leave_types:
+            row = balance_row_for_hr_page(employee.id, lt, year)
+            if row:
+                balance_rows.append(row)
 
     return render_template(
         'leave/balances.html',
         employees=employees,
         employee=employee,
         year=year,
+        leave_types=leave_types,
         ledger_types=ledger_types,
         balance_rows=balance_rows,
         rollover_form=rollover_form,
