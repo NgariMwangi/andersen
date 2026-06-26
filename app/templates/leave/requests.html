@@ -38,7 +38,7 @@
 {% macro leave_request_actions(r) %}
 {% set st = (r.status or '')|lower %}
 {% set can_act = has_permission('approve_leave') or (current_user.employee_id and current_user.employee_id == r.employee_id) %}
-{% set can_edit = st == 'pending' and can_act %}
+{% set can_edit = leave_request_is_editable(r) and can_act and st != 'rejected' %}
 {% set can_resubmit = st == 'rejected' and can_act %}
 <a href="{{ url_for('leave.view_request', id=r.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
 {% if can_edit %}

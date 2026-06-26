@@ -45,20 +45,23 @@ from app.services.leave_document_service import (
 )
 from app.services.leave_bulk_entry_service import (
     bulk_entry_context,
+    parse_bulk_selected_dates,
     record_bulk_historical_leave,
 )
 from app.services.leave_notification_service import notify_leave_responded, notify_leave_submitted
 from app.services.leave_approval_service import (
-    EDITABLE_STATUSES,
     LEAVE_STATUS_APPROVED,
+    LEAVE_STATUS_PENDING,
     LEAVE_STATUS_PENDING_HR,
     LEAVE_STATUS_REJECTED,
-    RESUBMITTABLE_STATUSES,
     approval_stage_for_user,
     initial_leave_status_for_employee,
+    leave_request_is_editable,
     leave_request_is_resubmittable,
     leave_status_label,
+    reset_leave_request_after_employee_edit,
     reset_leave_request_for_resubmission,
+    supervisor_step_summary,
     user_is_line_manager,
 )
 from app.services.employee_relations_service import employee_has_supervisor
@@ -67,19 +70,15 @@ from app.utils.tenant import require_company_id
 from app.utils.date_helpers import (
     approved_leave_remaining_days,
     end_date_for_inclusive_leave_days,
+    infer_leave_day_portion_choice,
     leave_days_between,
+    parse_leave_day_portion,
 )
 from datetime import date, datetime, timedelta
 from collections import defaultdict
 from sqlalchemy.orm import joinedload
 
 leave_bp = Blueprint('leave', __name__)
-
-
-def _leave_request_is_editable(lr: LeaveRequest) -> bool:
-    """Pending (before supervisor acts) or rejected (resubmit) requests."""
-    status = (lr.status or '').strip().lower()
-    return status in EDITABLE_STATUSES or status in RESUBMITTABLE_STATUSES
 
 
 def _leave_attachment_template_ctx(lr: LeaveRequest | None = None) -> dict:
@@ -146,14 +145,25 @@ def _leave_country_for_employee(emp: Employee | None) -> str:
 
 
 def _days_requested_for_leave(
-    lt: LeaveType, start: date, end: date, *, company_id: int, country_code: str
+    lt: LeaveType,
+    start: date,
+    end: date,
+    *,
+    company_id: int,
+    country_code: str,
+    day_portion: Decimal | None = None,
 ) -> Decimal:
     basis = (lt.days_count_basis or 'working').lower()
     if basis not in ('working', 'calendar'):
         basis = 'working'
-    # Public holidays are never counted as leave days.
     excl = public_holiday_dates_in_range(start, end, company_id, country_code)
-    return Decimal(str(leave_days_between(start, end, basis, exclude_dates=excl)))
+    full_days = leave_days_between(start, end, basis, exclude_dates=excl)
+    if full_days <= 0:
+        return Decimal('0')
+    if start == end:
+        portion = day_portion if day_portion is not None else Decimal('1')
+        return portion.quantize(Decimal('0.01'))
+    return Decimal(str(full_days))
 
 
 def _validate_days_within_leave_limits(employee_id: int, lt: LeaveType, year: int, days_requested: Decimal) -> str | None:
@@ -161,8 +171,10 @@ def _validate_days_within_leave_limits(employee_id: int, lt: LeaveType, year: in
     Validate request against leave type configured limits.
     Allows negative accrued/available balances but enforces leave type caps.
     """
-    if lt.min_days_request is not None and days_requested < Decimal(str(lt.min_days_request)):
-        return f'Minimum request for {lt.name} is {lt.min_days_request} day(s).'
+    if lt.min_days_request is not None:
+        min_req = Decimal(str(lt.min_days_request))
+        if min_req > 0 and days_requested < min_req:
+            return f'Minimum request for {lt.name} is {min_req} day(s).'
 
     if lt.max_consecutive_days is not None and days_requested > Decimal(str(lt.max_consecutive_days)):
         return f'Maximum consecutive days for {lt.name} is {lt.max_consecutive_days} day(s).'
@@ -257,7 +269,7 @@ def _apply_leave_type_form(form: LeaveTypeForm, lt: LeaveType) -> None:
     lt.requires_approval = bool(form.requires_approval.data)
     lt.requires_document = bool(form.requires_document.data)
     lt.is_paid = bool(form.is_paid.data)
-    lt.min_days_request = form.min_days_request.data if form.min_days_request.data is not None else Decimal('0.5')
+    lt.min_days_request = form.min_days_request.data if form.min_days_request.data is not None else None
     lt.max_consecutive_days = form.max_consecutive_days.data
     if current_app.config.get('LEAVE_ALLOW_CARRY_FORWARD', False):
         lt.carry_forward_max = form.carry_forward_max.data if form.carry_forward_max.data is not None else 0
@@ -384,7 +396,17 @@ def request_leave():
             form.end_date.data,
             company_id=emp_self.company_id,
             country_code=_leave_country_for_employee(emp_self),
+            day_portion=parse_leave_day_portion(form.day_portion.data),
         )
+        if days_requested <= 0:
+            flash('The selected date is not a valid leave day for this leave type (weekend or public holiday).', 'danger')
+            return render_template(
+                'leave/my_requests.html',
+                form=form,
+                balance_preview_requires_employee_id=False,
+                handover_required=handover_required,
+                **attachment_ctx,
+            )
         req_year = form.start_date.data.year
         limit_error = _validate_days_within_leave_limits(emp_id, lt, req_year, days_requested)
         if limit_error:
@@ -522,7 +544,17 @@ def admin_request_leave():
             form.end_date.data,
             company_id=emp.company_id,
             country_code=_leave_country_for_employee(emp),
+            day_portion=parse_leave_day_portion(form.day_portion.data),
         )
+        if days_requested <= 0:
+            flash('The selected date is not a valid leave day for this leave type (weekend or public holiday).', 'danger')
+            return render_template(
+                'leave/admin_request.html',
+                form=form,
+                balance_preview_requires_employee_id=True,
+                handover_required=handover_required_admin,
+                **attachment_ctx_admin,
+            )
         req_year = form.start_date.data.year
         limit_error = _validate_days_within_leave_limits(emp_id, lt, req_year, days_requested)
         if limit_error:
@@ -634,7 +666,7 @@ def view_request(id):
         supervisor_summary=sup,
         approval_stage=stage,
         remaining_days=remaining,
-        can_edit=lr.status == 'pending' and can_manage,
+        can_edit=leave_request_is_editable(lr) and can_manage and not leave_request_is_resubmittable(lr),
         can_resubmit=leave_request_is_resubmittable(lr) and can_manage,
         can_review=bool(stage),
     )
@@ -653,11 +685,12 @@ def edit_request(id):
     can_manage_all = current_user.has_permission('approve_leave')
     if not can_manage_all and (current_user.employee_id or 0) != lr.employee_id:
         abort(403)
-    if not _leave_request_is_editable(lr):
+    if not leave_request_is_editable(lr):
         flash('This leave request can no longer be changed. Contact HR.', 'warning')
         return redirect(url_for('leave.index'))
 
     is_resubmit = leave_request_is_resubmittable(lr)
+    was_pending_hr = (lr.status or '').strip().lower() == LEAVE_STATUS_PENDING_HR
     form = LeaveRequestForm(obj=lr)
     form.leave_type_id.choices = _active_leave_type_choices_for_employee(lr.employee_id)
     handover_required = _apply_handover_field(form, lr.employee_id)
@@ -669,6 +702,7 @@ def edit_request(id):
         'form_title': 'Resubmit Leave Request' if is_resubmit else 'Edit Leave Request',
         'edit_employee': emp,
         'is_resubmit': is_resubmit,
+        'edit_pending_hr': was_pending_hr and not is_resubmit,
         **_leave_attachment_template_ctx(lr),
     }
 
@@ -678,6 +712,9 @@ def edit_request(id):
         form.end_date.data = lr.end_date
         form.handover_to_id.data = lr.handover_to_id
         form.reason.data = lr.reason
+        form.day_portion.data = infer_leave_day_portion_choice(
+            lr.start_date, lr.end_date, lr.days_requested
+        )
 
     if form.validate_on_submit():
         if handover_required and form.handover_to_id.data is None:
@@ -718,7 +755,15 @@ def edit_request(id):
             form.end_date.data,
             company_id=emp.company_id,
             country_code=_leave_country_for_employee(emp),
+            day_portion=parse_leave_day_portion(form.day_portion.data),
         )
+        if days_requested <= 0:
+            flash('The selected date is not a valid leave day for this leave type (weekend or public holiday).', 'danger')
+            return render_template(
+                'leave/my_requests.html',
+                form=form,
+                **edit_ctx,
+            )
         req_year = form.start_date.data.year
         limit_error = _validate_days_within_leave_limits(lr.employee_id, lt, req_year, days_requested)
         if limit_error:
@@ -746,6 +791,8 @@ def edit_request(id):
             )
         if is_resubmit:
             reset_leave_request_for_resubmission(lr, emp)
+        else:
+            reset_leave_request_after_employee_edit(lr, emp)
         db.session.commit()
         if is_resubmit:
             try:
@@ -759,6 +806,8 @@ def edit_request(id):
                 )
             else:
                 flash('Leave request resubmitted for approval.', 'success')
+        elif was_pending_hr and (lr.status or '').strip().lower() == LEAVE_STATUS_PENDING:
+            flash('Leave request updated and sent back to your supervisor for approval.', 'success')
         elif not lr.document_path:
             flash(
                 'Leave request updated. Attaching a supporting document is strongly recommended.',
@@ -788,7 +837,7 @@ def delete_request(id):
     can_manage_all = current_user.has_permission('approve_leave')
     if not can_manage_all and (current_user.employee_id or 0) != lr.employee_id:
         abort(403)
-    if not _leave_request_is_editable(lr):
+    if not leave_request_is_editable(lr):
         flash('This leave request can no longer be deleted.', 'warning')
         return redirect(url_for('leave.index'))
     delete_leave_request_document(lr.document_path)
@@ -1544,22 +1593,24 @@ def bulk_entry():
             return redirect(url_for('leave.bulk_entry', year=year))
 
         raw_dates = (request.form.get('selected_dates') or '').strip()
-        selected: list[date] = []
-        for part in raw_dates.split(','):
-            part = part.strip()
-            if not part:
-                continue
-            try:
-                selected.append(date.fromisoformat(part))
-            except ValueError:
-                continue
+        selected = parse_bulk_selected_dates(raw_dates)
+        if not selected:
+            flash('Select at least one day on the calendar.', 'danger')
+            return redirect(
+                url_for(
+                    'leave.bulk_entry',
+                    employee_id=employee.id,
+                    leave_type_id=leave_type.id,
+                    year=year,
+                )
+            )
 
         notes = (request.form.get('notes') or '').strip() or None
         result = record_bulk_historical_leave(
             employee_id=employee.id,
             leave_type_id=leave_type.id,
             year=year,
-            selected_dates=selected,
+            selected_days=selected,
             recorded_by_user_id=current_user.id,
             notes=notes,
         )

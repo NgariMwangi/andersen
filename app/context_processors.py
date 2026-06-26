@@ -205,6 +205,7 @@ def inject_leave_approval_helpers():
     """Leave workflow labels and per-request approval stage for templates."""
     from app.services.leave_approval_service import (
         approval_stage_for_user,
+        leave_request_is_editable,
         leave_status_label,
         supervisor_step_summary,
         user_is_line_manager,
@@ -222,6 +223,7 @@ def inject_leave_approval_helpers():
 
     return {
         'leave_status_label': leave_status_label,
+        'leave_request_is_editable': leave_request_is_editable,
         'leave_approval_stage': leave_approval_stage,
         'is_line_manager': is_line_manager,
         'supervisor_step_summary': supervisor_step_summary,

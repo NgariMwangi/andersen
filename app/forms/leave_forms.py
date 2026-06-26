@@ -58,6 +58,16 @@ class LeaveRequestForm(FlaskForm):
         validators=[Optional()],
     )
     reason = TextAreaField('Reason', validators=[Optional()])
+    day_portion = SelectField(
+        'Day length',
+        choices=[
+            ('1', 'Full day (1)'),
+            ('0.5', 'Half day (0.5)'),
+            ('0.25', 'Quarter day (0.25)'),
+        ],
+        default='1',
+        validators=[DataRequired()],
+    )
     submit = SubmitField('Submit Request')
 
     def validate_end_date(self, field):

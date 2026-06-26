@@ -15,8 +15,14 @@ LEAVE_STATUS_APPROVED = 'approved'
 LEAVE_STATUS_REJECTED = 'rejected'
 LEAVE_STATUS_CANCELLED = 'cancelled'
 
-EDITABLE_STATUSES = frozenset({LEAVE_STATUS_PENDING})
+EDITABLE_STATUSES = frozenset({LEAVE_STATUS_PENDING, LEAVE_STATUS_PENDING_HR})
 RESUBMITTABLE_STATUSES = frozenset({LEAVE_STATUS_REJECTED})
+
+
+def leave_request_is_editable(leave_request: LeaveRequest) -> bool:
+    """True while the request is not yet fully approved (employee may edit or delete)."""
+    status = (leave_request.status or '').strip().lower()
+    return status in EDITABLE_STATUSES or status in RESUBMITTABLE_STATUSES
 
 
 def leave_request_is_resubmittable(leave_request: LeaveRequest) -> bool:
@@ -32,6 +38,23 @@ def reset_leave_request_for_resubmission(leave_request: LeaveRequest, employee: 
     leave_request.reviewed_by_id = None
     leave_request.reviewed_at = None
     leave_request.review_notes = None
+
+
+def reset_leave_request_after_employee_edit(leave_request: LeaveRequest, employee: Employee) -> None:
+    """
+    After an employee changes a request that had advanced in approval, rewind as needed.
+
+    Pending (supervisor not yet acted): no change.
+    Pending HR after supervisor approval: clear supervisor step and return to pending.
+    Pending HR with no supervisor on file: remain with HR.
+    """
+    status = (leave_request.status or '').strip().lower()
+    if status != LEAVE_STATUS_PENDING_HR or not leave_request.supervisor_reviewed_at:
+        return
+    leave_request.supervisor_reviewed_by_id = None
+    leave_request.supervisor_reviewed_at = None
+    leave_request.supervisor_notes = None
+    leave_request.status = LEAVE_STATUS_PENDING
 
 
 def initial_leave_status_for_employee(employee: Employee | None) -> str:

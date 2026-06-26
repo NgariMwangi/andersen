@@ -167,6 +167,13 @@ def create_app(config_object=None):
             ensure_rbac_defaults()
         except Exception as e:
             app.logger.warning('RBAC bootstrap skipped or partial: %s', e)
+        try:
+            from app.services.company_bootstrap import sync_leave_min_request_policy
+            n_min = sync_leave_min_request_policy()
+            if n_min:
+                app.logger.info('Cleared legacy leave minimum (0.5 day) on %s leave type(s).', n_min)
+        except Exception as e:
+            app.logger.warning('Leave minimum policy sync skipped: %s', e)
         if not app.config.get('LEAVE_ALLOW_CARRY_FORWARD', False):
             try:
                 from app.services.company_bootstrap import sync_leave_carry_forward_policy

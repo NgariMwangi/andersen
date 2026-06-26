@@ -42,7 +42,7 @@ def bootstrap_company_defaults(company_id: int, country_code: str = 'KE') -> Non
                 requires_document=False,
                 days_count_basis=basis,
                 is_paid=is_paid,
-                min_days_request=Decimal('0.5'),
+                min_days_request=None,
                 carry_forward_max=carry_max,
                 is_active=True,
             )
@@ -282,8 +282,20 @@ def bootstrap_company_defaults(company_id: int, country_code: str = 'KE') -> Non
                 )
 
     sync_leave_carry_forward_policy(company_id, commit=False)
+    sync_leave_min_request_policy(company_id, commit=False)
 
     db.session.commit()
+
+
+def sync_leave_min_request_policy(company_id: int | None = None, *, commit: bool = True) -> int:
+    """Clear legacy default minimum (0.5 day) so quarter-day requests are allowed."""
+    q = db.session.query(LeaveType).filter(LeaveType.min_days_request == Decimal('0.5'))
+    if company_id is not None:
+        q = q.filter(LeaveType.company_id == company_id)
+    count = q.update({LeaveType.min_days_request: None}, synchronize_session='fetch')
+    if commit and count:
+        db.session.commit()
+    return count
 
 
 def sync_leave_carry_forward_policy(company_id: int | None = None, *, commit: bool = True) -> int:

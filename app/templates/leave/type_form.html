@@ -57,7 +57,8 @@
         </div>
         <div class="col-md-4">
             <label class="form-label">{{ form.min_days_request.label }}</label>
-            {{ form.min_days_request(class_='form-control') }}
+            {{ form.min_days_request(class_='form-control', placeholder='No minimum') }}
+            <span class="form-text">Leave blank for no minimum (allows quarter-day requests).</span>
         </div>
         <div class="col-md-4">
             <label class="form-label">{{ form.max_consecutive_days.label }}</label>

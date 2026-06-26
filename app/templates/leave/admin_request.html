@@ -37,6 +37,7 @@
             {{ form.end_date.label(class='form-label') }}
             {{ form.end_date(class_='form-control', id='end_date') }}
         </div>
+        {% include 'leave/_day_portion_field.html' %}
         <div class="col-md-8">
             {{ form.handover_to_id.label(class='form-label') }}
             {{ form.handover_to_id(class_='form-select', id='handover_to_id') }}

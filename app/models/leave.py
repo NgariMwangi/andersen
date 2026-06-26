@@ -24,7 +24,7 @@ class LeaveType(BaseModel):
     # How start/end dates are counted for days_requested: 'working' (Mon–Fri) vs 'calendar' (e.g. 90-day maternity)
     days_count_basis = db.Column(db.String(20), nullable=False, default='working')
     is_paid = db.Column(db.Boolean, default=True, nullable=False)
-    min_days_request = db.Column(db.Numeric(4, 2), default=Decimal('0.5'), nullable=True)  # half-day
+    min_days_request = db.Column(db.Numeric(4, 2), nullable=True)  # blank = no minimum
     max_consecutive_days = db.Column(db.Integer, nullable=True)
     carry_forward_max = db.Column(db.Integer, default=0, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)

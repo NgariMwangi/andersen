@@ -13,6 +13,7 @@ from app.models.employee import Employee
 from app.models.leave import LeaveRequest, LeaveType
 from app.services.leave_balance_service import refresh_leave_balance_after_request_change
 from app.services.public_holiday_service import public_holiday_dates_in_range
+from app.utils.date_helpers import parse_leave_day_portion
 
 
 @dataclass
@@ -89,6 +90,49 @@ def merge_consecutive_dates(dates: list[date]) -> list[list[date]]:
     return groups
 
 
+def parse_bulk_selected_dates(raw: str) -> list[tuple[date, Decimal]]:
+    """Parse '2026-01-15:1,2026-01-16:0.5' or legacy '2026-01-15'."""
+    out: list[tuple[date, Decimal]] = []
+    for part in (raw or '').split(','):
+        part = part.strip()
+        if not part:
+            continue
+        if ':' in part:
+            date_s, portion_s = part.split(':', 1)
+            try:
+                out.append((date.fromisoformat(date_s.strip()), parse_leave_day_portion(portion_s.strip())))
+            except ValueError:
+                continue
+        else:
+            try:
+                out.append((date.fromisoformat(part), Decimal('1')))
+            except ValueError:
+                continue
+    return out
+
+
+def merge_consecutive_day_portions(
+    items: list[tuple[date, Decimal]],
+) -> list[tuple[list[date], Decimal]]:
+    """Group consecutive calendar days; total days = sum of portions in each group."""
+    if not items:
+        return []
+    sorted_items = sorted(items, key=lambda item: item[0])
+    groups: list[list[tuple[date, Decimal]]] = [[sorted_items[0]]]
+    for current in sorted_items[1:]:
+        prev_date = groups[-1][-1][0]
+        if (current[0] - prev_date).days == 1:
+            groups[-1].append(current)
+        else:
+            groups.append([current])
+    merged: list[tuple[list[date], Decimal]] = []
+    for group in groups:
+        dates = [item[0] for item in group]
+        total = sum((item[1] for item in group), Decimal('0')).quantize(Decimal('0.01'))
+        merged.append((dates, total))
+    return merged
+
+
 def bulk_entry_context(
     employee_id: int,
     leave_type_id: int,
@@ -135,7 +179,7 @@ def record_bulk_historical_leave(
     employee_id: int,
     leave_type_id: int,
     year: int,
-    selected_dates: list[date],
+    selected_days: list[tuple[date, Decimal]],
     recorded_by_user_id: int,
     notes: str | None = None,
 ) -> BulkLeaveEntryResult:
@@ -148,10 +192,13 @@ def record_bulk_historical_leave(
 
     y0 = date(year, 1, 1)
     y1 = date(year, 12, 31)
-    in_year = sorted({d for d in selected_dates if y0 <= d <= y1})
+    in_year = sorted({d for d, _ in selected_days if y0 <= d <= y1}, key=lambda d: d)
     if not in_year:
         result.errors.append('Select at least one day in the chosen year.')
         return result
+
+    in_year_set = set(in_year)
+    selected_in_year = [(d, p) for d, p in selected_days if d in in_year_set]
 
     booked = approved_leave_dates_for_employee(employee_id, year)
     conflicts = [d for d in in_year if d in booked]
@@ -168,13 +215,12 @@ def record_bulk_historical_leave(
         review_notes = f'{review_notes} {note_text}'
 
     years_touched: set[int] = set()
-    for group in merge_consecutive_dates(in_year):
-        days = Decimal(len(group))
+    for dates, days in merge_consecutive_day_portions(selected_in_year):
         lr = LeaveRequest(
             employee_id=employee_id,
             leave_type_id=leave_type_id,
-            start_date=group[0],
-            end_date=group[-1],
+            start_date=dates[0],
+            end_date=dates[-1],
             days_requested=days,
             reason=note_text or 'Leave taken (recorded during HR data entry).',
             status='approved',
@@ -185,9 +231,9 @@ def record_bulk_historical_leave(
         db.session.add(lr)
         result.created_requests += 1
         result.total_days += days
-        years_touched.add(group[0].year)
-        if group[-1].year != group[0].year:
-            years_touched.add(group[-1].year)
+        years_touched.add(dates[0].year)
+        if dates[-1].year != dates[0].year:
+            years_touched.add(dates[-1].year)
 
     for y in years_touched:
         refresh_leave_balance_after_request_change(employee_id, leave_type_id, y)

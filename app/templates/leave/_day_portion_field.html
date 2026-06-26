@@ -1,0 +1,36 @@
+{# Expects form with day_portion field #}
+<div class="col-md-4" id="day-portion-wrap">
+    {{ form.day_portion.label(class='form-label') }}
+    {{ form.day_portion(class_='form-select', id='day_portion') }}
+    <span class="form-text" id="day-portion-hint">For a single day only: full, half, or quarter day.</span>
+    {% for e in form.day_portion.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+</div>
+<script>
+(function() {
+    var startEl = document.getElementById('start_date');
+    var endEl = document.getElementById('end_date');
+    var portionEl = document.getElementById('day_portion');
+    var wrap = document.getElementById('day-portion-wrap');
+    var hint = document.getElementById('day-portion-hint');
+    if (!startEl || !endEl || !portionEl || !wrap) return;
+
+    function syncDayPortion() {
+        var single = startEl.value && endEl.value && startEl.value === endEl.value;
+        portionEl.disabled = !single;
+        wrap.style.opacity = single ? '1' : '0.55';
+        if (!single) {
+            portionEl.value = '1';
+            if (hint) hint.textContent = 'Multi-day requests use full days for each day in the range.';
+        } else if (hint) {
+            hint.textContent = 'Single day: choose full (1), half (0.5), or quarter (0.25) day.';
+        }
+    }
+
+    startEl.addEventListener('change', syncDayPortion);
+    endEl.addEventListener('change', syncDayPortion);
+    startEl.addEventListener('blur', syncDayPortion);
+    endEl.addEventListener('blur', syncDayPortion);
+    document.addEventListener('DOMContentLoaded', syncDayPortion);
+    syncDayPortion();
+})();
+</script>

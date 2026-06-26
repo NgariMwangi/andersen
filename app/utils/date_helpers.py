@@ -1,6 +1,41 @@
 """Date helpers for payroll and leave."""
 from datetime import date, timedelta
 from calendar import monthrange
+from decimal import Decimal
+
+# Leave day units for single-day requests and bulk entry.
+LEAVE_DAY_PORTION_VALUES: tuple[Decimal, ...] = (
+    Decimal('1'),
+    Decimal('0.5'),
+    Decimal('0.25'),
+)
+
+
+def parse_leave_day_portion(raw) -> Decimal:
+    """Return 1, 0.5, or 0.25; default full day."""
+    try:
+        value = Decimal(str(raw or '1')).quantize(Decimal('0.01'))
+    except Exception:
+        return Decimal('1')
+    if value not in LEAVE_DAY_PORTION_VALUES:
+        return Decimal('1')
+    return value
+
+
+def infer_leave_day_portion_choice(start: date, end: date, days_requested) -> str:
+    """Form select value when editing a single-day request."""
+    if start != end:
+        return '1'
+    try:
+        d = Decimal(str(days_requested)).quantize(Decimal('0.01'))
+    except Exception:
+        return '1'
+    if d == Decimal('0.25'):
+        return '0.25'
+    if d == Decimal('0.5'):
+        return '0.5'
+    return '1'
+
 
 
 def last_day_of_month(year: int, month: int) -> date:
