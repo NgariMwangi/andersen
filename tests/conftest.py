@@ -7,7 +7,7 @@ from config import TestingConfig
 
 @pytest.fixture
 def app():
-    """Create application for testing."""
+    """Create application for testing. jdkdl"""
     app = create_app(TestingConfig)
     return app
 
