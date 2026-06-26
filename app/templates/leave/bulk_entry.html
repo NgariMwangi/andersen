@@ -158,13 +158,18 @@
         return Math.round(total * 100) / 100;
     }
 
+    function syncHiddenInput() {
+        hiddenInput.value = JSON.stringify(
+            Array.from(selected.entries())
+                .sort(function(a, b) { return a[0].localeCompare(b[0]); })
+                .map(function(entry) { return { date: entry[0], portion: String(entry[1]) }; })
+        );
+    }
+
     function updateSummary(extra) {
         var n = selected.size;
         var days = totalSelectedDays();
-        hiddenInput.value = Array.from(selected.entries())
-            .sort(function(a, b) { return a[0].localeCompare(b[0]); })
-            .map(function(entry) { return entry[0] + ':' + entry[1]; })
-            .join(',');
+        syncHiddenInput();
         saveBtn.disabled = n === 0;
         var msg = n + ' day' + (n === 1 ? '' : 's') + ' selected (' + days + ' leave day' + (days === 1 ? '' : 's') + ')';
         if (extra) msg += ' · ' + extra;
@@ -221,18 +226,26 @@
         var cell = e.target.closest('.le-day[data-date]');
         if (!cell || cell.classList.contains('booked') || cell.classList.contains('empty')) return;
         var key = cell.getAttribute('data-date');
+        var portion = portionSelect ? portionSelect.value : '1';
         if (selected.has(key)) {
-            selected.delete(key);
-            cell.classList.remove('selected');
-            var mark = cell.querySelector('.le-portion');
-            if (mark) mark.remove();
+            if (selected.get(key) === portion) {
+                selected.delete(key);
+                cell.classList.remove('selected');
+                var mark = cell.querySelector('.le-portion');
+                if (mark) mark.remove();
+            } else {
+                selected.set(key, portion);
+                var existing = cell.querySelector('.le-portion');
+                if (existing) {
+                    existing.textContent = portionLabel(portion);
+                }
+            }
         } else {
-            var portion = portionSelect ? portionSelect.value : '1';
             selected.set(key, portion);
             cell.classList.add('selected');
-            var existing = cell.querySelector('.le-portion');
-            if (existing) {
-                existing.textContent = portionLabel(portion);
+            var existingNew = cell.querySelector('.le-portion');
+            if (existingNew) {
+                existingNew.textContent = portionLabel(portion);
             } else {
                 var div = document.createElement('div');
                 div.className = 'le-portion';
@@ -281,6 +294,7 @@
         updateSummary();
     });
     document.getElementById('bulk-save-form').addEventListener('submit', function(e) {
+        syncHiddenInput();
         if (selected.size === 0) {
             e.preventDefault();
             return;

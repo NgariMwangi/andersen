@@ -1,6 +1,7 @@
 """Bulk historical leave entry — select many calendar days at once for data migration."""
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -91,9 +92,38 @@ def merge_consecutive_dates(dates: list[date]) -> list[list[date]]:
 
 
 def parse_bulk_selected_dates(raw: str) -> list[tuple[date, Decimal]]:
-    """Parse '2026-01-15:1,2026-01-16:0.5' or legacy '2026-01-15'."""
-    out: list[tuple[date, Decimal]] = []
-    for part in (raw or '').split(','):
+    """Parse JSON [{date, portion}] or '2026-01-15:0.5,2026-01-16:0.5' or legacy '2026-01-15'."""
+    text = (raw or '').strip()
+    if not text:
+        return []
+
+    if text.startswith('['):
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, list):
+            out: list[tuple[date, Decimal]] = []
+            for item in payload:
+                if not isinstance(item, dict):
+                    continue
+                date_s = item.get('date')
+                if not date_s:
+                    continue
+                try:
+                    out.append(
+                        (
+                            date.fromisoformat(str(date_s).strip()),
+                            parse_leave_day_portion(item.get('portion', '1')),
+                        )
+                    )
+                except ValueError:
+                    continue
+            if out:
+                return out
+
+    out = []
+    for part in text.split(','):
         part = part.strip()
         if not part:
             continue
@@ -114,17 +144,30 @@ def parse_bulk_selected_dates(raw: str) -> list[tuple[date, Decimal]]:
 def merge_consecutive_day_portions(
     items: list[tuple[date, Decimal]],
 ) -> list[tuple[list[date], Decimal]]:
-    """Group consecutive calendar days; total days = sum of portions in each group."""
+    """
+    Group consecutive full-day (1.0) selections into one request.
+
+    Partial days (0.5, 0.25) always become separate single-day records so each
+    calendar day keeps its chosen length.
+    """
     if not items:
         return []
     sorted_items = sorted(items, key=lambda item: item[0])
-    groups: list[list[tuple[date, Decimal]]] = [[sorted_items[0]]]
-    for current in sorted_items[1:]:
-        prev_date = groups[-1][-1][0]
-        if (current[0] - prev_date).days == 1:
-            groups[-1].append(current)
+    groups: list[list[tuple[date, Decimal]]] = []
+
+    for d, portion in sorted_items:
+        if portion != Decimal('1'):
+            groups.append([(d, portion)])
+            continue
+        if (
+            groups
+            and all(p == Decimal('1') for _, p in groups[-1])
+            and (d - groups[-1][-1][0]).days == 1
+        ):
+            groups[-1].append((d, portion))
         else:
-            groups.append([current])
+            groups.append([(d, portion)])
+
     merged: list[tuple[list[date], Decimal]] = []
     for group in groups:
         dates = [item[0] for item in group]
