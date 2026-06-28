@@ -8,7 +8,7 @@ services:
     environment:
       FLASK_ENV: production
       SECRET_KEY: jtyjxdnjncdkm
-      DATABASE_URL: postgresql://postgres:deno0707@172.17.0.1:5432/billing_system
+      DATABASE_URL: postgresql://postgres:deno0707@172.17.0.1:5432/andersen
       # Required when users access the app over plain HTTP (e.g. http://IP:5002).
       # Set to true only behind HTTPS (see APP_BASE_URL=https://...).
       SESSION_COOKIE_SECURE: "false"
