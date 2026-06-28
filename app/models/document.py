@@ -35,9 +35,30 @@ class EmployeeDocument(BaseModel):
     file_size = db.Column(db.Integer, nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    # Employee self-service uploads require HR approval; HR uploads default to approved.
+    approval_status = db.Column(db.String(20), nullable=False, default='approved', server_default='approved')
+    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    review_notes = db.Column(db.Text, nullable=True)
 
     employee = db.relationship('Employee', backref='documents')
     category = db.relationship('DocumentCategory', backref='documents')
+    uploaded_by = db.relationship('User', foreign_keys=[uploaded_by_user_id])
+    reviewed_by = db.relationship('User', foreign_keys=[reviewed_by_user_id])
+
+    @property
+    def is_pending_approval(self) -> bool:
+        return self.approval_status == 'pending'
+
+    @property
+    def approval_status_label(self) -> str:
+        labels = {
+            'approved': 'Approved',
+            'pending': 'Pending HR approval',
+            'rejected': 'Rejected',
+        }
+        return labels.get(self.approval_status or 'approved', (self.approval_status or 'approved').title())
 
     @property
     def file_extension(self) -> str:

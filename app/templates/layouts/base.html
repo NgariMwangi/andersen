@@ -341,6 +341,11 @@
                             Overtime {{ pending_approvals.overtime }}
                         </a>
                         {% endif %}
+                        {% if pending_approvals.documents > 0 and has_permission('edit_employees') %}
+                        <a href="{{ url_for('employees.pending_uploads') }}" class="btn btn-sm btn-outline-secondary">
+                            Documents {{ pending_approvals.documents }}
+                        </a>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>

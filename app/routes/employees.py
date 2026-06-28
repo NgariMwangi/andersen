@@ -36,12 +36,15 @@ from app.services.employee_relations_service import (
     sync_employee_supervisors,
 )
 from app.services.employee_document_service import (
+    EMPLOYEE_UPLOADS_CATEGORY_CODE,
     delete_employee_document,
     document_download_filename,
     documents_grouped_by_category,
     ensure_standard_document_categories,
     get_category_by_code,
+    list_pending_employee_uploads,
     resolve_document_full_path,
+    review_employee_document,
     save_employee_document,
 )
 
@@ -246,6 +249,18 @@ def list():
         departments=departments,
         branches=branches,
         director_title_ids=director_title_ids,
+    )
+
+
+@employees_bp.route('/pending-uploads')
+@login_required
+@permission_required('edit_employees')
+def pending_uploads():
+    cid = require_company_id()
+    pending_docs = list_pending_employee_uploads(cid)
+    return render_template(
+        'employees/pending_uploads.html',
+        pending_docs=pending_docs,
     )
 
 
@@ -1865,6 +1880,47 @@ def _can_access_employee_documents(employee_id: int) -> bool:
     return bool(current_user.employee_id and int(current_user.employee_id) == int(employee_id))
 
 
+def _is_own_employee_documents(employee_id: int) -> bool:
+    return bool(current_user.employee_id and int(current_user.employee_id) == int(employee_id))
+
+
+def _can_upload_to_document_category(employee_id: int, category_code: str) -> bool:
+    """HR uploads to any category; employees only to Employee Uploads on their own profile."""
+    if current_user.has_permission('edit_employees'):
+        return True
+    if not _is_own_employee_documents(employee_id):
+        return False
+    return (category_code or '').strip().upper() == EMPLOYEE_UPLOADS_CATEGORY_CODE
+
+
+def _can_delete_employee_document(doc: EmployeeDocument, employee_id: int) -> bool:
+    if current_user.has_permission('edit_employees'):
+        return True
+    if not _is_own_employee_documents(employee_id):
+        return False
+    category_code = doc.category.code if doc.category else ''
+    return (
+        category_code == EMPLOYEE_UPLOADS_CATEGORY_CODE
+        and doc.approval_status in ('pending', 'rejected')
+    )
+
+
+def _document_json(doc: EmployeeDocument, employee_id: int) -> dict:
+    return {
+        'id': doc.id,
+        'name': doc.display_filename,
+        'original_filename': doc.original_filename or doc.display_filename,
+        'extension': doc.file_extension,
+        'file_size': doc.file_size,
+        'created_at': doc.created_at.strftime('%d %b %Y') if doc.created_at else '',
+        'approval_status': doc.approval_status,
+        'approval_status_label': doc.approval_status_label,
+        'review_notes': doc.review_notes,
+        'open_url': url_for('employees.document_open', id=employee_id, doc_id=doc.id),
+        'download_url': url_for('employees.document_open', id=employee_id, doc_id=doc.id, download=1),
+    }
+
+
 def _cloudinary_enabled() -> bool:
     return bool(
         cloudinary
@@ -1919,12 +1975,15 @@ def documents(id):
     categories = ensure_standard_document_categories(emp.company_id)
     grouped = documents_grouped_by_category(id, categories)
     max_mb = max(1, int(current_app.config.get('EMPLOYEE_DOCUMENT_MAX_BYTES', 25 * 1024 * 1024)) // (1024 * 1024))
+    is_self_service = _is_own_employee_documents(id) and not current_user.has_permission('edit_employees')
     return render_template(
         'employees/documents.html',
         employee=emp,
         categories=categories,
         grouped_documents=grouped,
         max_upload_mb=max_mb,
+        is_self_service=is_self_service,
+        employee_uploads_category_code=EMPLOYEE_UPLOADS_CATEGORY_CODE,
     )
 
 
@@ -1934,10 +1993,11 @@ def document_upload(id):
     emp = db.session.get(Employee, id)
     if not emp or emp.company_id != require_company_id():
         return jsonify(status='error', message='Employee not found.'), 404
-    if not current_user.has_permission('edit_employees'):
-        return jsonify(status='error', message='Permission denied.'), 403
 
     category_code = (request.form.get('category_code') or '').strip().upper()
+    if not _can_upload_to_document_category(id, category_code):
+        return jsonify(status='error', message='Permission denied.'), 403
+
     category = get_category_by_code(emp.company_id, category_code)
     if not category:
         return jsonify(status='error', message='Invalid document category.'), 400
@@ -1946,9 +2006,18 @@ def document_upload(id):
     notes = (request.form.get('notes') or '').strip() or None
     name = (request.form.get('name') or '').strip() or None
     original_name = f.filename if f and f.filename else 'file'
+    is_employee_upload = category_code == EMPLOYEE_UPLOADS_CATEGORY_CODE and not current_user.has_permission('edit_employees')
 
     try:
-        doc = save_employee_document(emp, category, f, name=name, notes=notes)
+        doc = save_employee_document(
+            emp,
+            category,
+            f,
+            name=name,
+            notes=notes,
+            approval_status='pending' if is_employee_upload else 'approved',
+            uploaded_by_user_id=current_user.id if is_employee_upload else None,
+        )
         log_create(
             'EmployeeDocument',
             doc.id,
@@ -1956,19 +2025,15 @@ def document_upload(id):
             user_id=current_user.id,
             description=f'Document uploaded for employee {emp.id}',
         )
+        message = (
+            'Uploaded — pending HR approval.'
+            if is_employee_upload
+            else 'Uploaded.'
+        )
         return jsonify(
             status='ok',
-            message='Uploaded.',
-            document={
-                'id': doc.id,
-                'name': doc.display_filename,
-                'original_filename': doc.original_filename or doc.display_filename,
-                'extension': doc.file_extension,
-                'file_size': doc.file_size,
-                'created_at': doc.created_at.strftime('%d %b %Y') if doc.created_at else '',
-                'open_url': url_for('employees.document_open', id=id, doc_id=doc.id),
-                'download_url': url_for('employees.document_open', id=id, doc_id=doc.id, download=1),
-            },
+            message=message,
+            document=_document_json(doc, id),
         )
     except ValueError as e:
         return jsonify(status='error', message=str(e), filename=original_name), 400
@@ -1987,7 +2052,6 @@ def document_upload(id):
 
 @employees_bp.route('/<int:id>/documents/<int:doc_id>/delete', methods=['POST'])
 @login_required
-@permission_required('edit_employees')
 def document_delete(id, doc_id):
     emp = db.session.get(Employee, id)
     if not emp or emp.company_id != require_company_id():
@@ -1995,6 +2059,10 @@ def document_delete(id, doc_id):
     doc = db.session.get(EmployeeDocument, doc_id)
     if not doc or doc.employee_id != id:
         abort(404)
+    if not _can_delete_employee_document(doc, id):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify(status='error', message='Permission denied.'), 403
+        abort(403)
     old = model_to_audit_dict(doc)
     delete_employee_document(doc)
     log_delete(
@@ -2008,6 +2076,67 @@ def document_delete(id, doc_id):
         return jsonify(status='ok', message='Document deleted.')
     flash('Document deleted.', 'success')
     return redirect(url_for('employees.documents', id=id))
+
+
+@employees_bp.route('/<int:id>/documents/<int:doc_id>/approve', methods=['POST'])
+@login_required
+@permission_required('edit_employees')
+def document_approve(id, doc_id):
+    emp = db.session.get(Employee, id)
+    if not emp or emp.company_id != require_company_id():
+        return jsonify(status='error', message='Employee not found.'), 404
+    doc = db.session.get(EmployeeDocument, doc_id)
+    if not doc or doc.employee_id != id:
+        return jsonify(status='error', message='Document not found.'), 404
+    old = model_to_audit_dict(doc)
+    try:
+        review_employee_document(doc, status='approved', reviewer_user_id=current_user.id)
+    except ValueError as e:
+        return jsonify(status='error', message=str(e)), 400
+    log_update(
+        'EmployeeDocument',
+        doc_id,
+        old,
+        model_to_audit_dict(doc),
+        user_id=current_user.id,
+        description=f'Employee document approved for employee {id}',
+    )
+    return jsonify(status='ok', message='Document approved.', document=_document_json(doc, id))
+
+
+@employees_bp.route('/<int:id>/documents/<int:doc_id>/reject', methods=['POST'])
+@login_required
+@permission_required('edit_employees')
+def document_reject(id, doc_id):
+    emp = db.session.get(Employee, id)
+    if not emp or emp.company_id != require_company_id():
+        return jsonify(status='error', message='Employee not found.'), 404
+    doc = db.session.get(EmployeeDocument, doc_id)
+    if not doc or doc.employee_id != id:
+        return jsonify(status='error', message='Document not found.'), 404
+    review_notes = (request.form.get('review_notes') or '').strip() or None
+    if not review_notes and request.is_json:
+        payload = request.get_json(silent=True) or {}
+        review_notes = (payload.get('review_notes') or '').strip() or None
+    old = model_to_audit_dict(doc)
+    try:
+        review_employee_document(
+            doc,
+            status='rejected',
+            reviewer_user_id=current_user.id,
+            review_notes=review_notes,
+        )
+    except ValueError as e:
+        return jsonify(status='error', message=str(e)), 400
+    log_update(
+        'EmployeeDocument',
+        doc_id,
+        old,
+        model_to_audit_dict(doc),
+        user_id=current_user.id,
+        description=f'Employee document rejected for employee {id}',
+    )
+    return jsonify(status='ok', message='Document rejected.', document=_document_json(doc, id))
 
 
 @employees_bp.route('/<int:id>/documents/<int:doc_id>/open')

@@ -53,6 +53,7 @@ def bootstrap_company_defaults(company_id: int, country_code: str = 'KE') -> Non
         ('WORK', 'Work Related Documents', True),
         ('PERFORMANCE', 'Performance Management', False),
         ('EDUCATION', 'Education Documents', False),
+        ('EMPLOYEE_UPLOADS', 'Employee Uploads', False),
         ('OTHER', 'Others', False),
     ]:
         if (

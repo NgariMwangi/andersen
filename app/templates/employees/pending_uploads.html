@@ -1,0 +1,235 @@
+{% extends "layouts/base.html" %}
+{% block title %}Pending document uploads - {{ app_name }}{% endblock %}
+{% block page_nav_title %}Pending document uploads{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-2">Pending document uploads</h1>
+        <p class="text-muted small mb-0">
+            Employee uploads awaiting HR review. Approve or reject each file, or open the employee’s documents page for full context.
+        </p>
+    </div>
+    <a href="{{ url_for('employees.list') }}" class="btn btn-outline-secondary shrink-0">
+        <i class="bi bi-arrow-left me-1"></i>All employees
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="pendingUploadsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Document</th>
+                        <th>Uploaded</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in pending_docs %}
+                    {% set emp = doc.employee %}
+                    <tr data-doc-id="{{ doc.id }}" data-employee-id="{{ emp.id }}">
+                        <td>
+                            <a href="{{ url_for('employees.view', id=emp.id) }}" class="fw-medium text-decoration-none">
+                                {{ emp.full_name }}
+                            </a>
+                            <div class="text-muted small">
+                                {% if emp.employee_number %}{{ emp.employee_number }}{% endif %}
+                                {% if emp.department %} · {{ emp.department.name }}{% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <span>{{ doc.display_filename }}</span>
+                            <div class="text-muted small">
+                                {% if doc.file_extension %}
+                                <span class="badge text-bg-secondary text-uppercase">{{ doc.file_extension }}</span>
+                                {% endif %}
+                                {% if doc.file_size %}{{ (doc.file_size / 1024)|round(1) }} KB{% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            {{ doc.created_at.strftime('%d %b %Y %H:%M') if doc.created_at else '—' }}
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-primary doc-preview-btn"
+                                    title="View"
+                                    data-preview-url="{{ url_for('employees.document_open', id=emp.id, doc_id=doc.id) }}"
+                                    data-download-url="{{ url_for('employees.document_open', id=emp.id, doc_id=doc.id, download=1) }}"
+                                    data-filename="{{ doc.display_filename|e }}"
+                                    data-extension="{{ doc.file_extension|e }}">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <a href="{{ url_for('employees.documents', id=emp.id) }}" class="btn btn-sm btn-outline-secondary" title="All documents">
+                                <i class="bi bi-folder2-open"></i>
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-success pending-approve-btn" data-doc-id="{{ doc.id }}" data-employee-id="{{ emp.id }}" title="Approve">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning pending-reject-btn" data-doc-id="{{ doc.id }}" data-employee-id="{{ emp.id }}" title="Reject">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr id="pendingUploadsEmptyRow">
+                        <td colspan="4" class="text-muted text-center py-5">No employee uploads are waiting for review.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="documentPreviewModal" tabindex="-1" aria-labelledby="documentPreviewTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-lg-down">
+        <div class="modal-content">
+            <div class="modal-header flex-wrap gap-2">
+                <h5 class="modal-title text-truncate me-auto" id="documentPreviewTitle">Document</h5>
+                <a id="documentPreviewDownload" class="btn btn-sm btn-outline-primary shrink-0" href="#">
+                    <i class="bi bi-download me-1"></i>Download
+                </a>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0 bg-body-secondary">
+                <iframe id="documentPreviewFrame" class="w-100 border-0 d-none doc-preview-pane" style="height: 78vh; min-height: 400px;" title="Document preview"></iframe>
+                <div id="documentPreviewImageWrap" class="d-none text-center p-2 doc-preview-pane">
+                    <img id="documentPreviewImage" class="img-fluid" style="max-height: 78vh; object-fit: contain;" alt="">
+                </div>
+                <div id="documentPreviewFallback" class="d-none doc-preview-pane p-5 text-center">
+                    <i class="bi bi-file-earmark-text display-4 text-muted d-block mb-3"></i>
+                    <p class="text-muted mb-3">This file type cannot be previewed in the browser. Download it to open locally.</p>
+                    <a class="btn btn-primary" id="documentPreviewFallbackDownload" href="#">
+                        <i class="bi bi-download me-1"></i>Download file
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var csrfToken = {{ csrf_token()|tojson }};
+    var approveUrlTemplate = {{ url_for('employees.document_approve', id=0, doc_id=0)|tojson }};
+    var rejectUrlTemplate = {{ url_for('employees.document_reject', id=0, doc_id=0)|tojson }};
+
+    function actionUrl(template, employeeId, docId) {
+        return template.replace('/0/documents/0/', '/' + employeeId + '/documents/' + docId + '/');
+    }
+
+    function ensureEmptyRow() {
+        var tbody = document.querySelector('#pendingUploadsTable tbody');
+        if (!tbody) return;
+        if (tbody.querySelector('tr[data-doc-id]')) return;
+        if (document.getElementById('pendingUploadsEmptyRow')) return;
+        var row = document.createElement('tr');
+        row.id = 'pendingUploadsEmptyRow';
+        row.innerHTML = '<td colspan="4" class="text-muted text-center py-5">No employee uploads are waiting for review.</td>';
+        tbody.appendChild(row);
+    }
+
+    function postReview(btn, action, reviewNotes) {
+        var employeeId = btn.getAttribute('data-employee-id');
+        var docId = btn.getAttribute('data-doc-id');
+        var fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        if (reviewNotes) fd.append('review_notes', reviewNotes);
+        var url = action === 'approve'
+            ? actionUrl(approveUrlTemplate, employeeId, docId)
+            : actionUrl(rejectUrlTemplate, employeeId, docId);
+        fetch(url, {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrfToken },
+        }).then(function(res) { return res.json(); }).then(function(data) {
+            if (data.status === 'ok') {
+                var row = btn.closest('tr[data-doc-id]');
+                if (row) row.remove();
+                ensureEmptyRow();
+            } else {
+                alert(data.message || 'Action failed.');
+            }
+        }).catch(function() { alert('Action failed.'); });
+    }
+
+    document.addEventListener('click', function(e) {
+        var approveBtn = e.target.closest('.pending-approve-btn');
+        if (approveBtn) {
+            e.preventDefault();
+            if (!confirm('Approve this document?')) return;
+            postReview(approveBtn, 'approve');
+            return;
+        }
+        var rejectBtn = e.target.closest('.pending-reject-btn');
+        if (rejectBtn) {
+            e.preventDefault();
+            var reason = prompt('Optional reason for rejection:');
+            if (reason === null) return;
+            postReview(rejectBtn, 'reject', reason);
+        }
+    });
+
+    (function initPreview() {
+        try {
+            var modalEl = document.getElementById('documentPreviewModal');
+            if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
+
+            var frame = document.getElementById('documentPreviewFrame');
+            var imageWrap = document.getElementById('documentPreviewImageWrap');
+            var image = document.getElementById('documentPreviewImage');
+            var fallback = document.getElementById('documentPreviewFallback');
+            var titleEl = document.getElementById('documentPreviewTitle');
+            var downloadBtn = document.getElementById('documentPreviewDownload');
+            var fallbackDownload = document.getElementById('documentPreviewFallbackDownload');
+            var previewModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+            function hidePreviewPanes() {
+                frame.classList.add('d-none');
+                imageWrap.classList.add('d-none');
+                fallback.classList.add('d-none');
+                frame.src = 'about:blank';
+                image.removeAttribute('src');
+            }
+
+            modalEl.addEventListener('hidden.bs.modal', hidePreviewPanes);
+
+            document.addEventListener('click', function(e) {
+                var btn = e.target.closest('.doc-preview-btn');
+                if (!btn) return;
+                e.preventDefault();
+
+                var url = btn.getAttribute('data-preview-url');
+                var downloadUrl = btn.getAttribute('data-download-url');
+                var filename = btn.getAttribute('data-filename') || 'Document';
+                var ext = (btn.getAttribute('data-extension') || '').toLowerCase();
+
+                hidePreviewPanes();
+                titleEl.textContent = filename;
+                downloadBtn.href = downloadUrl;
+                fallbackDownload.href = downloadUrl;
+
+                if (['jpg', 'jpeg', 'png'].indexOf(ext) !== -1) {
+                    image.src = url;
+                    image.alt = filename;
+                    imageWrap.classList.remove('d-none');
+                } else if (ext === 'pdf') {
+                    frame.src = url;
+                    frame.classList.remove('d-none');
+                } else {
+                    fallback.classList.remove('d-none');
+                }
+                previewModal.show();
+            });
+        } catch (err) {
+            console.warn('Document preview unavailable:', err);
+        }
+    })();
+})();
+</script>
+{% endblock %}

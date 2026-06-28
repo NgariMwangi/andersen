@@ -20,10 +20,13 @@ STANDARD_DOCUMENT_CATEGORIES: tuple[tuple[str, str, bool], ...] = (
     ('WORK', 'Work Related Documents', True),
     ('PERFORMANCE', 'Performance Management', False),
     ('EDUCATION', 'Education Documents', False),
+    ('EMPLOYEE_UPLOADS', 'Employee Uploads', False),
     ('OTHER', 'Others', False),
 )
 
 STANDARD_CATEGORY_CODES = {code for code, _name, _track in STANDARD_DOCUMENT_CATEGORIES}
+EMPLOYEE_UPLOADS_CATEGORY_CODE = 'EMPLOYEE_UPLOADS'
+DOCUMENT_APPROVAL_STATUSES = frozenset({'approved', 'pending', 'rejected'})
 
 
 def allowed_document_filename(filename: str) -> bool:
@@ -137,6 +140,8 @@ def save_employee_document(
     *,
     name: str | None = None,
     notes: str | None = None,
+    approval_status: str = 'approved',
+    uploaded_by_user_id: int | None = None,
 ) -> EmployeeDocument:
     if not file_storage or not file_storage.filename:
         raise ValueError('No file selected.')
@@ -150,6 +155,9 @@ def save_employee_document(
     if size_bytes > max_bytes:
         mb = max(1, max_bytes // (1024 * 1024))
         raise ValueError(f'File is too large. Maximum size is {mb} MB.')
+
+    if approval_status not in DOCUMENT_APPROVAL_STATUSES:
+        raise ValueError('Invalid document approval status.')
 
     upload_dir = ensure_employee_category_dir(employee, category)
     disk_name = _unique_disk_filename(file_storage.filename)
@@ -171,6 +179,8 @@ def save_employee_document(
         file_path=rel_path.replace('\\', '/'),
         file_size=size_bytes,
         notes=(notes or '').strip() or None,
+        approval_status=approval_status,
+        uploaded_by_user_id=uploaded_by_user_id,
     )
     db.session.add(doc)
     db.session.commit()
@@ -225,3 +235,64 @@ def documents_grouped_by_category(
         elif other_id is not None:
             grouped[other_id].append(doc)
     return grouped
+
+
+def count_pending_employee_uploads(company_id: int) -> int:
+    """Documents uploaded by employees awaiting HR approval."""
+    return (
+        db.session.query(EmployeeDocument)
+        .join(Employee, EmployeeDocument.employee_id == Employee.id)
+        .join(DocumentCategory, EmployeeDocument.category_id == DocumentCategory.id)
+        .filter(
+            Employee.company_id == company_id,
+            DocumentCategory.code == EMPLOYEE_UPLOADS_CATEGORY_CODE,
+            EmployeeDocument.approval_status == 'pending',
+        )
+        .count()
+    )
+
+
+def list_pending_employee_uploads(company_id: int) -> list[EmployeeDocument]:
+    """Pending employee self-service uploads, oldest first."""
+    from sqlalchemy.orm import joinedload
+
+    return (
+        db.session.query(EmployeeDocument)
+        .options(
+            joinedload(EmployeeDocument.employee).joinedload(Employee.department),
+            joinedload(EmployeeDocument.uploaded_by),
+        )
+        .join(Employee, EmployeeDocument.employee_id == Employee.id)
+        .join(DocumentCategory, EmployeeDocument.category_id == DocumentCategory.id)
+        .filter(
+            Employee.company_id == company_id,
+            DocumentCategory.code == EMPLOYEE_UPLOADS_CATEGORY_CODE,
+            EmployeeDocument.approval_status == 'pending',
+        )
+        .order_by(EmployeeDocument.created_at.asc())
+        .all()
+    )
+
+
+def review_employee_document(
+    doc: EmployeeDocument,
+    *,
+    status: str,
+    reviewer_user_id: int,
+    review_notes: str | None = None,
+) -> EmployeeDocument:
+    if status not in {'approved', 'rejected'}:
+        raise ValueError('Invalid review status.')
+    if doc.approval_status != 'pending':
+        raise ValueError('This document is not pending approval.')
+    if not doc.category or doc.category.code != EMPLOYEE_UPLOADS_CATEGORY_CODE:
+        raise ValueError('Only employee uploads can be reviewed.')
+
+    from datetime import datetime
+
+    doc.approval_status = status
+    doc.reviewed_by_user_id = reviewer_user_id
+    doc.reviewed_at = datetime.utcnow()
+    doc.review_notes = (review_notes or '').strip() or None
+    db.session.commit()
+    return doc

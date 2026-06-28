@@ -236,6 +236,7 @@ def inject_pending_approvals():
         'pending_approvals': {
             'leave': 0,
             'overtime': 0,
+            'documents': 0,
             'total': 0,
         }
     }
@@ -251,6 +252,7 @@ def inject_pending_approvals():
     cid = current_user.company_id
     leave_pending = 0
     overtime_pending = 0
+    documents_pending = 0
 
     from app.services.leave_approval_service import count_pending_leave_for_user
 
@@ -279,11 +281,17 @@ def inject_pending_approvals():
                     .count()
                 )
 
+    if current_user.has_permission('edit_employees'):
+        from app.services.employee_document_service import count_pending_employee_uploads
+
+        documents_pending = count_pending_employee_uploads(cid)
+
     return {
         'pending_approvals': {
             'leave': leave_pending,
             'overtime': overtime_pending,
-            'total': leave_pending + overtime_pending,
+            'documents': documents_pending,
+            'total': leave_pending + overtime_pending + documents_pending,
         }
     }
 

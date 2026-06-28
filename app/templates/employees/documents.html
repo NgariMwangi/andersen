@@ -4,35 +4,50 @@
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
     <div>
-        <h1 class="h4 mb-2">Documents – {{ employee.employee_number }} {{ employee.full_name }}</h1>
+        <h1 class="h4 mb-2">
+            {% if is_self_service %}My documents{% else %}Documents – {{ employee.employee_number }} {{ employee.full_name }}{% endif %}
+        </h1>
         <p class="text-muted small mb-0">
+            {% if is_self_service %}
+            View HR-shared files and upload documents for HR review under <strong>My Uploads</strong>.
+            {% else %}
             Files are stored under <strong>{{ employee.id }}_{{ employee.full_name }}</strong> in {{ categories|length }} categories.
+            {% endif %}
             Any file type — max {{ max_upload_mb }} MB each.
         </p>
     </div>
+    {% if is_self_service %}
+    <a href="{{ url_for('employees.profile') }}" class="btn btn-outline-secondary shrink-0">
+        <i class="bi bi-arrow-left me-1"></i>Back to my profile
+    </a>
+    {% else %}
     <a href="{{ url_for('employees.view', id=employee.id) }}" class="btn btn-outline-secondary shrink-0">
         <i class="bi bi-arrow-left me-1"></i>Back to employee
     </a>
+    {% endif %}
 </div>
 
-{% set can_upload = has_permission('edit_employees') %}
+{% set can_manage_documents = has_permission('edit_employees') %}
 
 {% for category in categories %}
 {% set docs = grouped_documents.get(category.id, []) %}
-<div class="card mb-4 doc-category-panel" data-category-code="{{ category.code }}">
+{% set can_upload_category = can_manage_documents or (is_self_service and category.code == employee_uploads_category_code) %}
+{% set show_approval_status = category.code == employee_uploads_category_code %}
+<div class="card mb-4 doc-category-panel" data-category-code="{{ category.code }}" data-can-upload="{{ '1' if can_upload_category else '0' }}" data-show-approval="{{ '1' if show_approval_status else '0' }}">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
         <span>
             {% if category.code == 'PERSONAL' %}<i class="bi bi-person-vcard me-1"></i>
             {% elif category.code == 'WORK' %}<i class="bi bi-briefcase me-1"></i>
             {% elif category.code == 'PERFORMANCE' %}<i class="bi bi-clipboard-data me-1"></i>
             {% elif category.code == 'EDUCATION' %}<i class="bi bi-mortarboard me-1"></i>
+            {% elif category.code == 'EMPLOYEE_UPLOADS' %}<i class="bi bi-cloud-upload me-1"></i>
             {% else %}<i class="bi bi-folder me-1"></i>{% endif %}
-            {{ category.name }}
+            {% if is_self_service and category.code == employee_uploads_category_code %}My Uploads{% else %}{{ category.name }}{% endif %}
         </span>
         <span class="badge text-bg-light border doc-count-badge">{{ docs|length }} file{{ 's' if docs|length != 1 else '' }}</span>
     </div>
     <div class="card-body">
-        {% if can_upload %}
+        {% if can_upload_category %}
         <div class="mb-3 p-3 border border-dashed rounded bg-light-subtle upload-dropzone"
              data-category="{{ category.code }}">
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
@@ -40,7 +55,13 @@
                     <i class="bi bi-upload me-1"></i>Choose files
                     <input type="file" class="d-none doc-file-input" multiple>
                 </label>
-                <span class="text-muted small">or drag and drop here — multiple files supported</span>
+                <span class="text-muted small">
+                    {% if is_self_service and category.code == employee_uploads_category_code %}
+                    or drag and drop here — uploads await HR approval
+                    {% else %}
+                    or drag and drop here — multiple files supported
+                    {% endif %}
+                </span>
             </div>
             <div class="upload-queue list-group list-group-flush d-none" aria-live="polite"></div>
         </div>
@@ -52,6 +73,7 @@
                     <tr>
                         <th>Name</th>
                         <th>Type</th>
+                        {% if show_approval_status %}<th>Status</th>{% endif %}
                         <th>Size</th>
                         <th>Uploaded</th>
                         <th class="text-end">Actions</th>
@@ -59,7 +81,7 @@
                 </thead>
                 <tbody class="doc-list-body" data-category-id="{{ category.id }}">
                     {% for d in docs %}
-                    <tr data-doc-id="{{ d.id }}">
+                    <tr data-doc-id="{{ d.id }}" data-approval-status="{{ d.approval_status }}">
                         <td>
                             <button type="button" class="btn btn-link p-0 text-start text-decoration-none doc-preview-btn"
                                     data-preview-url="{{ url_for('employees.document_open', id=employee.id, doc_id=d.id) }}"
@@ -74,6 +96,20 @@
                             <span class="badge text-bg-secondary text-uppercase">{{ d.file_extension }}</span>
                             {% else %}—{% endif %}
                         </td>
+                        {% if show_approval_status %}
+                        <td class="doc-status-cell">
+                            {% if d.approval_status == 'pending' %}
+                            <span class="badge text-bg-warning text-dark">Pending HR approval</span>
+                            {% elif d.approval_status == 'rejected' %}
+                            <span class="badge text-bg-danger">Rejected</span>
+                            {% if d.review_notes %}
+                            <div class="small text-muted mt-1">{{ d.review_notes }}</div>
+                            {% endif %}
+                            {% else %}
+                            <span class="badge text-bg-success">Approved</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
                         <td>{% if d.file_size %}{{ (d.file_size / 1024)|round(1) }} KB{% else %}—{% endif %}</td>
                         <td>{{ d.created_at.strftime('%d %b %Y') if d.created_at else '—' }}</td>
                         <td class="text-end text-nowrap">
@@ -90,7 +126,17 @@
                                title="Download">
                                 <i class="bi bi-download"></i>
                             </a>
-                            {% if can_upload %}
+                            {% if can_manage_documents and d.approval_status == 'pending' and category.code == employee_uploads_category_code %}
+                            <button type="button" class="btn btn-sm btn-outline-success doc-approve-btn"
+                                    data-doc-id="{{ d.id }}" title="Approve">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning doc-reject-btn"
+                                    data-doc-id="{{ d.id }}" title="Reject">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                            {% endif %}
+                            {% if can_manage_documents or (is_self_service and d.approval_status in ['pending', 'rejected'] and category.code == employee_uploads_category_code) %}
                             <button type="button" class="btn btn-sm btn-outline-danger doc-delete-btn"
                                     data-doc-id="{{ d.id }}" title="Delete">
                                 <i class="bi bi-trash"></i>
@@ -100,7 +146,7 @@
                     </tr>
                     {% else %}
                     <tr class="doc-empty-row">
-                        <td colspan="5" class="text-muted small py-3">No documents in this category yet.</td>
+                        <td colspan="{{ 6 if show_approval_status else 5 }}" class="text-muted small py-3">No documents in this category yet.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -142,9 +188,13 @@
 {% block extra_js %}
 <script>
 (function() {
-    var canUpload = {{ has_permission('edit_employees')|tojson }};
+    var canManageDocuments = {{ has_permission('edit_employees')|tojson }};
+    var isSelfService = {{ is_self_service|tojson }};
+    var employeeUploadsCategoryCode = {{ employee_uploads_category_code|tojson }};
     var uploadUrl = {{ url_for('employees.document_upload', id=employee.id)|tojson }};
     var deleteUrlTemplate = {{ url_for('employees.document_delete', id=employee.id, doc_id=0)|tojson }};
+    var approveUrlTemplate = {{ url_for('employees.document_approve', id=employee.id, doc_id=0)|tojson }};
+    var rejectUrlTemplate = {{ url_for('employees.document_reject', id=employee.id, doc_id=0)|tojson }};
     var csrfToken = {{ csrf_token()|tojson }};
     var maxUploadMb = {{ max_upload_mb }};
 
@@ -169,6 +219,42 @@
     function formatExtension(ext) {
         if (!ext) return '—';
         return '<span class="badge text-bg-secondary text-uppercase">' + escapeHtml(ext) + '</span>';
+    }
+
+    function formatApprovalStatus(status, reviewNotes) {
+        if (status === 'pending') {
+            return '<span class="badge text-bg-warning text-dark">Pending HR approval</span>';
+        }
+        if (status === 'rejected') {
+            var html = '<span class="badge text-bg-danger">Rejected</span>';
+            if (reviewNotes) {
+                html += '<div class="small text-muted mt-1">' + escapeHtml(reviewNotes) + '</div>';
+            }
+            return html;
+        }
+        return '<span class="badge text-bg-success">Approved</span>';
+    }
+
+    function panelShowsApproval(panel) {
+        return panel.getAttribute('data-show-approval') === '1';
+    }
+
+    function panelCanUpload(panel) {
+        return panel.getAttribute('data-can-upload') === '1';
+    }
+
+    function canDeleteDocument(panel, doc) {
+        if (canManageDocuments) return true;
+        if (!isSelfService) return false;
+        var categoryCode = panel.getAttribute('data-category-code');
+        return categoryCode === employeeUploadsCategoryCode
+            && (doc.approval_status === 'pending' || doc.approval_status === 'rejected');
+    }
+
+    function canReviewDocument(panel, doc) {
+        return canManageDocuments
+            && panel.getAttribute('data-category-code') === employeeUploadsCategoryCode
+            && doc.approval_status === 'pending';
     }
 
     function queueItemHtml(filename, status, message) {
@@ -229,7 +315,9 @@
         if (!empty && count === 0) {
             empty = document.createElement('tr');
             empty.className = 'doc-empty-row';
-            empty.innerHTML = '<td colspan="5" class="text-muted small py-3">No documents in this category yet.</td>';
+            var panel = tbody.closest('.doc-category-panel');
+            var colspan = panel && panelShowsApproval(panel) ? 6 : 5;
+            empty.innerHTML = '<td colspan="' + colspan + '" class="text-muted small py-3">No documents in this category yet.</td>';
             tbody.appendChild(empty);
         }
         if (empty) {
@@ -257,6 +345,7 @@
 
         var tr = document.createElement('tr');
         tr.setAttribute('data-doc-id', doc.id);
+        tr.setAttribute('data-approval-status', doc.approval_status || 'approved');
 
         var nameTd = document.createElement('td');
         nameTd.appendChild(makePreviewButton(
@@ -267,6 +356,18 @@
 
         var typeTd = document.createElement('td');
         typeTd.innerHTML = formatExtension(doc.extension);
+
+        if (panelShowsApproval(panel)) {
+            var statusTd = document.createElement('td');
+            statusTd.className = 'doc-status-cell';
+            statusTd.innerHTML = formatApprovalStatus(doc.approval_status, doc.review_notes);
+            tr.appendChild(nameTd);
+            tr.appendChild(typeTd);
+            tr.appendChild(statusTd);
+        } else {
+            tr.appendChild(nameTd);
+            tr.appendChild(typeTd);
+        }
 
         var sizeTd = document.createElement('td');
         sizeTd.textContent = formatSize(doc.file_size);
@@ -287,7 +388,27 @@
         actionsTd.appendChild(document.createTextNode(' '));
         actionsTd.appendChild(downloadA);
 
-        if (canUpload) {
+        if (canReviewDocument(panel, doc)) {
+            var approveBtn = document.createElement('button');
+            approveBtn.type = 'button';
+            approveBtn.className = 'btn btn-sm btn-outline-success doc-approve-btn';
+            approveBtn.setAttribute('data-doc-id', doc.id);
+            approveBtn.title = 'Approve';
+            approveBtn.innerHTML = '<i class="bi bi-check-lg"></i>';
+            actionsTd.appendChild(document.createTextNode(' '));
+            actionsTd.appendChild(approveBtn);
+
+            var rejectBtn = document.createElement('button');
+            rejectBtn.type = 'button';
+            rejectBtn.className = 'btn btn-sm btn-outline-warning doc-reject-btn';
+            rejectBtn.setAttribute('data-doc-id', doc.id);
+            rejectBtn.title = 'Reject';
+            rejectBtn.innerHTML = '<i class="bi bi-x-lg"></i>';
+            actionsTd.appendChild(document.createTextNode(' '));
+            actionsTd.appendChild(rejectBtn);
+        }
+
+        if (canDeleteDocument(panel, doc)) {
             var delBtn = document.createElement('button');
             delBtn.type = 'button';
             delBtn.className = 'btn btn-sm btn-outline-danger doc-delete-btn';
@@ -298,13 +419,53 @@
             actionsTd.appendChild(delBtn);
         }
 
-        tr.appendChild(nameTd);
-        tr.appendChild(typeTd);
         tr.appendChild(sizeTd);
         tr.appendChild(dateTd);
         tr.appendChild(actionsTd);
         tbody.insertBefore(tr, tbody.firstChild);
         updateCountBadge(panel);
+    }
+
+    function updateDocumentRow(panel, row, doc) {
+        row.setAttribute('data-approval-status', doc.approval_status || 'approved');
+        var statusCell = row.querySelector('.doc-status-cell');
+        if (statusCell) {
+            statusCell.innerHTML = formatApprovalStatus(doc.approval_status, doc.review_notes);
+        }
+        var actionsTd = row.querySelector('td.text-end');
+        if (!actionsTd) return;
+        actionsTd.querySelectorAll('.doc-approve-btn, .doc-reject-btn, .doc-delete-btn').forEach(function(el) {
+            el.remove();
+        });
+        if (canReviewDocument(panel, doc)) {
+            var approveBtn = document.createElement('button');
+            approveBtn.type = 'button';
+            approveBtn.className = 'btn btn-sm btn-outline-success doc-approve-btn';
+            approveBtn.setAttribute('data-doc-id', doc.id);
+            approveBtn.title = 'Approve';
+            approveBtn.innerHTML = '<i class="bi bi-check-lg"></i>';
+            actionsTd.appendChild(document.createTextNode(' '));
+            actionsTd.appendChild(approveBtn);
+
+            var rejectBtn = document.createElement('button');
+            rejectBtn.type = 'button';
+            rejectBtn.className = 'btn btn-sm btn-outline-warning doc-reject-btn';
+            rejectBtn.setAttribute('data-doc-id', doc.id);
+            rejectBtn.title = 'Reject';
+            rejectBtn.innerHTML = '<i class="bi bi-x-lg"></i>';
+            actionsTd.appendChild(document.createTextNode(' '));
+            actionsTd.appendChild(rejectBtn);
+        }
+        if (canDeleteDocument(panel, doc)) {
+            var delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'btn btn-sm btn-outline-danger doc-delete-btn';
+            delBtn.setAttribute('data-doc-id', doc.id);
+            delBtn.title = 'Delete';
+            delBtn.innerHTML = '<i class="bi bi-trash"></i>';
+            actionsTd.appendChild(document.createTextNode(' '));
+            actionsTd.appendChild(delBtn);
+        }
     }
 
     async function uploadOneFile(panel, categoryCode, file, queueEl, queueRow) {
@@ -326,7 +487,7 @@
             });
             var data = await parseUploadResponse(res);
             if (res.ok && data.status === 'ok' && data.document) {
-                queueRow.innerHTML = queueItemHtml(file.name, 'done', 'Uploaded');
+                queueRow.innerHTML = queueItemHtml(file.name, 'done', data.message || 'Uploaded');
                 appendDocumentRow(panel, data.document);
             } else {
                 queueRow.innerHTML = queueItemHtml(file.name, 'failed', data.message || 'Upload failed');
@@ -355,8 +516,8 @@
     }
 
     function initUpload() {
-        if (!canUpload) return;
         document.querySelectorAll('.doc-category-panel').forEach(function(panel) {
+            if (!panelCanUpload(panel)) return;
             var categoryCode = panel.getAttribute('data-category-code');
             var dropzone = panel.querySelector('.upload-dropzone');
             if (!dropzone) return;
@@ -432,6 +593,57 @@
                     alert(data.message || 'Could not delete document.');
                 }
             }).catch(function() { alert('Could not delete document.'); });
+        });
+
+        document.addEventListener('click', function(e) {
+            var approveBtn = e.target.closest('.doc-approve-btn');
+            if (approveBtn) {
+                e.preventDefault();
+                if (!confirm('Approve this document?')) return;
+                var docId = approveBtn.getAttribute('data-doc-id');
+                var panel = approveBtn.closest('.doc-category-panel');
+                var fd = new FormData();
+                fd.append('csrf_token', csrfToken);
+                fetch(approveUrlTemplate.replace('/0/approve', '/' + docId + '/approve'), {
+                    method: 'POST',
+                    body: fd,
+                    credentials: 'same-origin',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrfToken },
+                }).then(function(res) { return res.json(); }).then(function(data) {
+                    if (data.status === 'ok' && data.document) {
+                        var row = approveBtn.closest('tr[data-doc-id]');
+                        if (row && panel) updateDocumentRow(panel, row, data.document);
+                    } else {
+                        alert(data.message || 'Could not approve document.');
+                    }
+                }).catch(function() { alert('Could not approve document.'); });
+                return;
+            }
+
+            var rejectBtn = e.target.closest('.doc-reject-btn');
+            if (rejectBtn) {
+                e.preventDefault();
+                var reason = prompt('Optional reason for rejection:');
+                if (reason === null) return;
+                var docId = rejectBtn.getAttribute('data-doc-id');
+                var panel = rejectBtn.closest('.doc-category-panel');
+                var fd = new FormData();
+                fd.append('csrf_token', csrfToken);
+                fd.append('review_notes', reason);
+                fetch(rejectUrlTemplate.replace('/0/reject', '/' + docId + '/reject'), {
+                    method: 'POST',
+                    body: fd,
+                    credentials: 'same-origin',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrfToken },
+                }).then(function(res) { return res.json(); }).then(function(data) {
+                    if (data.status === 'ok' && data.document) {
+                        var row = rejectBtn.closest('tr[data-doc-id]');
+                        if (row && panel) updateDocumentRow(panel, row, data.document);
+                    } else {
+                        alert(data.message || 'Could not reject document.');
+                    }
+                }).catch(function() { alert('Could not reject document.'); });
+            }
         });
     }
 

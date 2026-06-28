@@ -176,7 +176,7 @@
                 {{ profile_action(url_for('reports.p9_report'), 'file-earmark-text', 'My P9', 'Annual tax certificate') }}
                 {% endif %}
                 {{ profile_action(url_for('employees.history', id=employee.id), 'graph-up-arrow', 'Career history', 'Role{% if payroll_enabled %} and salary{% endif %} timeline') }}
-                {{ profile_action(url_for('employees.documents', id=employee.id), 'folder2-open', 'My documents', 'Contracts and IDs') }}
+                {{ profile_action(url_for('employees.documents', id=employee.id), 'folder2-open', 'My documents', 'View files and upload for HR review') }}
                 {{ profile_action(url_for('auth.change_password'), 'key', 'Change password', 'Update your sign-in password') }}
             </div>
         </div>

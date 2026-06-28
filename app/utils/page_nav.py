@@ -15,6 +15,7 @@ _PAGE_NAV: dict[str, tuple[str, str]] = {
     'employees.deductions_index': ('Employees', 'Deductions'),
     'employees.history': ('Employees', 'Career history'),
     'employees.documents': ('Employees', 'Documents'),
+    'employees.pending_uploads': ('Employees', 'Pending document uploads'),
     'employees.link_user': ('Employees', 'Link login account'),
     'leave.index': ('Leave', 'Calendar & requests'),
     'leave.types_index': ('Leave', 'Leave types'),
