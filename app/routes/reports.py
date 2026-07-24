@@ -204,6 +204,379 @@ def payroll_summary():
     return render_template('reports/payroll_summary.html')
 
 
+def _leave_utilization_filters():
+    """Parse shared leave utilization query filters."""
+    year = request.args.get('year', type=int) or date.today().year
+    return {
+        'year': year,
+        'department_id': request.args.get('department_id', type=int),
+        'leave_type_id': request.args.get('leave_type_id', type=int),
+        'branch_id': request.args.get('branch_id', type=int),
+    }
+
+
+def _leave_utilization_payload(company_id: int):
+    from app.services.leave_utilization_report_service import build_leave_utilization_report
+
+    filters = _leave_utilization_filters()
+    return build_leave_utilization_report(company_id, **filters), filters
+
+
+@reports_bp.route('/leave-utilization')
+@login_required
+@permission_required('view_reports')
+def leave_utilization():
+    cid = require_company_id()
+    report, filters = _leave_utilization_payload(cid)
+    departments = (
+        db.session.query(Department)
+        .filter(Department.company_id == cid)
+        .order_by(Department.name)
+        .all()
+    )
+    from app.models.leave import LeaveType
+    from app.models.company import Branch
+
+    leave_types = (
+        db.session.query(LeaveType)
+        .filter(LeaveType.company_id == cid, LeaveType.is_active.is_(True))
+        .order_by(LeaveType.name)
+        .all()
+    )
+    branches = (
+        db.session.query(Branch)
+        .filter(Branch.company_id == cid)
+        .order_by(Branch.name)
+        .all()
+    )
+    year = filters['year']
+    return render_template(
+        'reports/leave_utilization.html',
+        report=report,
+        departments=departments,
+        leave_types=leave_types,
+        branches=branches,
+        year=year,
+        year_choices=[year - 1, year, year + 1],
+        filters=filters,
+    )
+
+
+@reports_bp.route('/leave-utilization/csv')
+@login_required
+@permission_required('view_reports')
+def leave_utilization_csv():
+    cid = require_company_id()
+    report, filters = _leave_utilization_payload(cid)
+    si = StringIO()
+    w = csv.writer(si)
+    w.writerow(['section', 'metric', 'value'])
+    s = report['summary']
+    w.writerow(['summary', 'year', report['year']])
+    w.writerow(['summary', 'generated_at', report['generated_at'].isoformat(timespec='seconds')])
+    w.writerow(['summary', 'active_employees', s['active_employees']])
+    w.writerow(['summary', 'employees_with_usage', s['employees_with_usage']])
+    w.writerow(['summary', 'total_entitlement', str(s['total_entitlement'])])
+    w.writerow(['summary', 'total_used', str(s['total_used'])])
+    w.writerow(['summary', 'total_remaining', str(s['total_remaining'])])
+    w.writerow(['summary', 'utilization_pct', str(s['utilization_pct'] or '')])
+    w.writerow(['summary', 'pending_approvals', s['pending_count']])
+    w.writerow(['summary', 'pending_days', str(s['pending_days'])])
+    w.writerow(['summary', 'pending_supervisor', s['pending_supervisor']])
+    w.writerow(['summary', 'pending_hr', s['pending_hr']])
+
+    w.writerow([])
+    w.writerow(
+        [
+            'by_leave_type',
+            'code',
+            'name',
+            'entitlement',
+            'used',
+            'remaining',
+            'utilization_pct',
+            'employees_with_usage',
+        ]
+    )
+    for row in report['by_leave_type']:
+        w.writerow(
+            [
+                'by_leave_type',
+                row['code'],
+                row['name'],
+                str(row['entitlement']),
+                str(row['used']),
+                str(row['remaining']),
+                str(row['utilization_pct'] or ''),
+                row['employees_with_usage'],
+            ]
+        )
+
+    w.writerow([])
+    w.writerow(
+        [
+            'by_department',
+            'department',
+            'entitlement',
+            'used',
+            'remaining',
+            'utilization_pct',
+            'employees_with_usage',
+        ]
+    )
+    for row in report['by_department']:
+        w.writerow(
+            [
+                'by_department',
+                row['department'],
+                str(row['entitlement']),
+                str(row['used']),
+                str(row['remaining']),
+                str(row['utilization_pct'] or ''),
+                row['employees_with_usage'],
+            ]
+        )
+
+    w.writerow([])
+    w.writerow(
+        [
+            'employee',
+            'employee_number',
+            'employee_name',
+            'department',
+            'branch',
+            'leave_code',
+            'leave_type',
+            'entitlement',
+            'used',
+            'remaining',
+        ]
+    )
+    for row in report['employee_rows']:
+        w.writerow(
+            [
+                'employee',
+                row['employee_number'],
+                row['employee_name'],
+                row['department'],
+                row['branch'],
+                row['leave_code'],
+                row['leave_type'],
+                '' if row['entitlement'] is None else str(row['entitlement']),
+                str(row['used']),
+                '' if row['remaining'] is None else str(row['remaining']),
+            ]
+        )
+
+    w.writerow([])
+    w.writerow(
+        [
+            'backlog',
+            'employee_number',
+            'employee_name',
+            'department',
+            'leave_type',
+            'start_date',
+            'end_date',
+            'days_requested',
+            'status',
+            'submitted_at',
+            'age_days',
+        ]
+    )
+    for row in report['backlog']:
+        w.writerow(
+            [
+                'backlog',
+                row['employee_number'],
+                row['employee_name'],
+                row['department'],
+                row['leave_type'],
+                row['start_date'].isoformat() if row['start_date'] else '',
+                row['end_date'].isoformat() if row['end_date'] else '',
+                str(row['days_requested']),
+                row['status_label'],
+                row['submitted_at'].isoformat(timespec='seconds') if row['submitted_at'] else '',
+                row['age_days'],
+            ]
+        )
+
+    out = BytesIO()
+    out.write(si.getvalue().encode('utf-8-sig'))
+    out.seek(0)
+    return send_file(
+        out,
+        as_attachment=True,
+        download_name=f"leave-utilization-{filters['year']}.csv",
+        mimetype='text/csv; charset=utf-8',
+    )
+
+
+@reports_bp.route('/leave-utilization/xlsx')
+@login_required
+@permission_required('view_reports')
+def leave_utilization_xlsx():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+
+    cid = require_company_id()
+    report, filters = _leave_utilization_payload(cid)
+    wb = Workbook()
+
+    def _style_header(ws):
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+
+    def _autosize(ws):
+        for col in ws.columns:
+            max_len = 0
+            col_letter = col[0].column_letter
+            for cell in col:
+                if cell.value is not None:
+                    max_len = max(max_len, len(str(cell.value)))
+            ws.column_dimensions[col_letter].width = min(max_len + 2, 36)
+
+    # Summary
+    ws = wb.active
+    ws.title = 'Summary'
+    ws.append(['Metric', 'Value'])
+    s = report['summary']
+    for label, value in [
+        ('Year', report['year']),
+        ('Generated at', report['generated_at'].strftime('%Y-%m-%d %H:%M')),
+        ('Active employees', s['active_employees']),
+        ('Employees with usage', s['employees_with_usage']),
+        ('Total entitlement (days)', float(s['total_entitlement'])),
+        ('Total used (days)', float(s['total_used'])),
+        ('Total remaining (days)', float(s['total_remaining'])),
+        ('Utilization %', float(s['utilization_pct']) if s['utilization_pct'] is not None else ''),
+        ('Pending approvals', s['pending_count']),
+        ('Pending days', float(s['pending_days'])),
+        ('Pending supervisor', s['pending_supervisor']),
+        ('Pending HR', s['pending_hr']),
+    ]:
+        ws.append([label, value])
+    _style_header(ws)
+    _autosize(ws)
+
+    # By leave type
+    ws = wb.create_sheet('By Leave Type')
+    ws.append(
+        ['Code', 'Leave type', 'Entitlement', 'Used', 'Remaining', 'Utilization %', 'Employees with usage']
+    )
+    for row in report['by_leave_type']:
+        ws.append(
+            [
+                row['code'],
+                row['name'],
+                float(row['entitlement']),
+                float(row['used']),
+                float(row['remaining']),
+                float(row['utilization_pct']) if row['utilization_pct'] is not None else '',
+                row['employees_with_usage'],
+            ]
+        )
+    _style_header(ws)
+    _autosize(ws)
+
+    # By department
+    ws = wb.create_sheet('By Department')
+    ws.append(
+        ['Department', 'Entitlement', 'Used', 'Remaining', 'Utilization %', 'Employees with usage']
+    )
+    for row in report['by_department']:
+        ws.append(
+            [
+                row['department'],
+                float(row['entitlement']),
+                float(row['used']),
+                float(row['remaining']),
+                float(row['utilization_pct']) if row['utilization_pct'] is not None else '',
+                row['employees_with_usage'],
+            ]
+        )
+    _style_header(ws)
+    _autosize(ws)
+
+    # Employee detail
+    ws = wb.create_sheet('Employee Balances')
+    ws.append(
+        [
+            'Employee No.',
+            'Name',
+            'Department',
+            'Branch',
+            'Leave code',
+            'Leave type',
+            'Entitlement',
+            'Used',
+            'Remaining',
+        ]
+    )
+    for row in report['employee_rows']:
+        ws.append(
+            [
+                row['employee_number'],
+                row['employee_name'],
+                row['department'],
+                row['branch'],
+                row['leave_code'],
+                row['leave_type'],
+                float(row['entitlement']) if row['entitlement'] is not None else '',
+                float(row['used']),
+                float(row['remaining']) if row['remaining'] is not None else '',
+            ]
+        )
+    _style_header(ws)
+    _autosize(ws)
+
+    # Backlog
+    ws = wb.create_sheet('Approval Backlog')
+    ws.append(
+        [
+            'Employee No.',
+            'Name',
+            'Department',
+            'Leave type',
+            'Start',
+            'End',
+            'Days',
+            'Status',
+            'Submitted',
+            'Age (days)',
+        ]
+    )
+    for row in report['backlog']:
+        ws.append(
+            [
+                row['employee_number'],
+                row['employee_name'],
+                row['department'],
+                row['leave_type'],
+                row['start_date'].isoformat() if row['start_date'] else '',
+                row['end_date'].isoformat() if row['end_date'] else '',
+                float(row['days_requested']),
+                row['status_label'],
+                row['submitted_at'].strftime('%Y-%m-%d %H:%M') if row['submitted_at'] else '',
+                row['age_days'],
+            ]
+        )
+    _style_header(ws)
+    _autosize(ws)
+
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return send_file(
+        out,
+        as_attachment=True,
+        download_name=f"leave-utilization-{filters['year']}.xlsx",
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+
 def _executive_summary_payload(company_id: int):
     """Aggregate executive metrics for exportable summary documents."""
     from app.models.company import Branch

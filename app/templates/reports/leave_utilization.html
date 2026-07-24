@@ -1,0 +1,310 @@
+{% extends "layouts/base.html" %}
+{% block title %}Leave Utilization - {{ app_name }}{% endblock %}
+{% block page_nav_section %}Reports{% endblock %}
+{% block page_nav_title %}Leave utilization{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Leave Utilization</h1>
+        <p class="text-muted mb-0">Balances, days used/remaining, and approval backlog by leave type and department.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('reports.leave_utilization_csv', **request.args) }}">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i>CSV
+        </a>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('reports.leave_utilization_xlsx', **request.args) }}">
+            <i class="bi bi-file-earmark-excel me-1"></i>Excel
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-2 col-lg-1">
+                <label class="form-label small text-muted mb-1">Year</label>
+                <select name="year" class="form-select form-select-sm">
+                    {% for y in year_choices %}
+                    <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if branches_enabled %}
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small text-muted mb-1">Branch</label>
+                <select name="branch_id" class="form-select form-select-sm">
+                    <option value="">All branches</option>
+                    {% for b in branches %}
+                    <option value="{{ b.id }}" {% if filters.branch_id == b.id %}selected{% endif %}>{{ b.name }}{% if b.country_code %} ({{ b.country_code }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small text-muted mb-1">Department</label>
+                <select name="department_id" class="form-select form-select-sm">
+                    <option value="">All departments</option>
+                    {% for d in departments %}
+                    <option value="{{ d.id }}" {% if filters.department_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small text-muted mb-1">Leave type</label>
+                <select name="leave_type_id" class="form-select form-select-sm">
+                    <option value="">All leave types</option>
+                    {% for lt in leave_types %}
+                    <option value="{{ lt.id }}" {% if filters.leave_type_id == lt.id %}selected{% endif %}>{{ lt.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>Apply</button>
+            </div>
+            <div class="col-auto">
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('reports.leave_utilization') }}">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% set s = report.summary %}
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1 text-primary">{{ s.total_used | fmt_days }}</div>
+                <div class="small text-muted">Days used ({{ year }})</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1 text-success">{{ s.total_remaining | fmt_days }}</div>
+                <div class="small text-muted">Days remaining</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1">{% if s.utilization_pct is not none %}{{ s.utilization_pct }}%{% else %}—{% endif %}</div>
+                <div class="small text-muted">Utilization of entitlement</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="h2 mb-1 text-warning">{{ s.pending_count }}</div>
+                <div class="small text-muted">Pending approvals ({{ s.pending_days | fmt_days }} days)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center py-3">
+                <div class="h4 mb-0">{{ s.active_employees }}</div>
+                <div class="small text-muted">Active employees in scope</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center py-3">
+                <div class="h4 mb-0">{{ s.employees_with_usage }}</div>
+                <div class="small text-muted">Employees who took leave</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center py-3">
+                <div class="h4 mb-0 text-warning">{{ s.pending_supervisor }}</div>
+                <div class="small text-muted">Awaiting supervisor</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center py-3">
+                <div class="h4 mb-0 text-warning">{{ s.pending_hr }}</div>
+                <div class="small text-muted">Awaiting HR</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0">By leave type</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Leave type</th>
+                            <th class="text-end">Entitled</th>
+                            <th class="text-end">Used</th>
+                            <th class="text-end">Remaining</th>
+                            <th class="text-end pe-3">Util. %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in report.by_leave_type %}
+                        <tr>
+                            <td class="ps-3">
+                                <div class="fw-semibold">{{ row.name }}</div>
+                                <div class="small text-muted">{{ row.code }} · {{ row.employees_with_usage }} with usage</div>
+                            </td>
+                            <td class="text-end">{{ row.entitlement | fmt_days }}</td>
+                            <td class="text-end">{{ row.used | fmt_days }}</td>
+                            <td class="text-end">{{ row.remaining | fmt_days }}</td>
+                            <td class="text-end pe-3">{% if row.utilization_pct is not none %}{{ row.utilization_pct }}%{% else %}—{% endif %}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-muted text-center py-4">No leave types configured.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h2 class="h6 mb-0">By department</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Department</th>
+                            <th class="text-end">Entitled</th>
+                            <th class="text-end">Used</th>
+                            <th class="text-end">Remaining</th>
+                            <th class="text-end pe-3">Util. %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in report.by_department %}
+                        <tr>
+                            <td class="ps-3">
+                                <div class="fw-semibold">{{ row.department }}</div>
+                                <div class="small text-muted">{{ row.employees_with_usage }} with usage</div>
+                            </td>
+                            <td class="text-end">{{ row.entitlement | fmt_days }}</td>
+                            <td class="text-end">{{ row.used | fmt_days }}</td>
+                            <td class="text-end">{{ row.remaining | fmt_days }}</td>
+                            <td class="text-end pe-3">{% if row.utilization_pct is not none %}{{ row.utilization_pct }}%{% else %}—{% endif %}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-muted text-center py-4">No department activity for this filter.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h2 class="h6 mb-0">Approval backlog</h2>
+        <span class="small text-muted">{{ report.backlog|length }} open request{{ 's' if report.backlog|length != 1 else '' }}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Employee</th>
+                    <th>Department</th>
+                    <th>Leave type</th>
+                    <th>Dates</th>
+                    <th class="text-end">Days</th>
+                    <th>Status</th>
+                    <th class="text-end pe-3">Age</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in report.backlog %}
+                <tr>
+                    <td class="ps-3">
+                        <div class="fw-semibold">{{ row.employee_name }}</div>
+                        <div class="small text-muted">{{ row.employee_number or '—' }}</div>
+                    </td>
+                    <td>{{ row.department }}</td>
+                    <td>{{ row.leave_type }}</td>
+                    <td class="small">
+                        {% if row.start_date and row.end_date %}
+                        {{ row.start_date.strftime('%d %b %Y') }} – {{ row.end_date.strftime('%d %b %Y') }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="text-end">{{ row.days_requested | fmt_days }}</td>
+                    <td>
+                        <span class="badge bg-warning text-dark">{{ row.status_label }}</span>
+                    </td>
+                    <td class="text-end pe-3">{{ row.age_days }}d</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-muted text-center py-4">No pending leave approvals.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h2 class="h6 mb-0">Employee balances</h2>
+        <span class="small text-muted">{{ report.employee_rows|length }} row{{ 's' if report.employee_rows|length != 1 else '' }}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Employee</th>
+                    <th>Department</th>
+                    {% if branches_enabled %}<th>Branch</th>{% endif %}
+                    <th>Leave type</th>
+                    <th class="text-end">Entitled</th>
+                    <th class="text-end">Used</th>
+                    <th class="text-end pe-3">Remaining</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in report.employee_rows %}
+                <tr>
+                    <td class="ps-3">
+                        <div class="fw-semibold">{{ row.employee_name }}</div>
+                        <div class="small text-muted">{{ row.employee_number or '—' }}</div>
+                    </td>
+                    <td>{{ row.department }}</td>
+                    {% if branches_enabled %}<td>{{ row.branch or '—' }}</td>{% endif %}
+                    <td>
+                        <span class="fw-semibold">{{ row.leave_type }}</span>
+                        <span class="small text-muted">{{ row.leave_code }}</span>
+                    </td>
+                    <td class="text-end">{% if row.entitlement is not none %}{{ row.entitlement | fmt_days }}{% else %}—{% endif %}</td>
+                    <td class="text-end">{{ row.used | fmt_days }}</td>
+                    <td class="text-end pe-3 fw-semibold">{% if row.remaining is not none %}{{ row.remaining | fmt_days }}{% else %}—{% endif %}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="{% if branches_enabled %}7{% else %}6{% endif %}" class="text-muted text-center py-4">No employee leave balances for this filter.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<p class="small text-muted mb-0">
+    Generated {{ report.generated_at.strftime('%d %b %Y at %H:%M') }} UTC.
+    Used days are approved leave overlapping the calendar year. Remaining uses the same entitlement rules as leave balances/tracker.
+</p>
+{% endblock %}
