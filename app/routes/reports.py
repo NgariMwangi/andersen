@@ -467,12 +467,31 @@ def leave_utilization_employee_balances_csv():
 
 def _add_employee_balances_sheet(workbook, report):
     """Add the formatted, pivoted employee balance worksheet."""
-    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
     ws = workbook.create_sheet('Employee Balances')
-    leave_types = report['by_leave_type']
+    leave_types = list(report['by_leave_type'])
     employees = report['employee_balance_rows']
+
+    # HR requested Compassionate Leave and Sick Leave to exchange positions.
+    sick_index = next(
+        (i for i, leave_type in enumerate(leave_types) if leave_type['code'] == 'SICK'),
+        None,
+    )
+    compassionate_index = next(
+        (
+            i
+            for i, leave_type in enumerate(leave_types)
+            if leave_type['code'] == 'COMPASSIONATE'
+        ),
+        None,
+    )
+    if sick_index is not None and compassionate_index is not None:
+        leave_types[sick_index], leave_types[compassionate_index] = (
+            leave_types[compassionate_index],
+            leave_types[sick_index],
+        )
 
     ws.append(
         ['Employee No.', 'Employee Name']
@@ -521,6 +540,14 @@ def _add_employee_balances_sheet(workbook, report):
     primary_fill = PatternFill('solid', fgColor='7F1D1D')
     secondary_fill = PatternFill('solid', fgColor='FDECEC')
     alternate_fill = PatternFill('solid', fgColor='F8FAFC')
+    thin_side = Side(style='thin', color='CBD5E1')
+    group_side = Side(style='medium', color='94A3B8')
+    thin_border = Border(
+        left=thin_side,
+        right=thin_side,
+        top=thin_side,
+        bottom=thin_side,
+    )
     for cell in ws[1]:
         cell.font = Font(bold=True, color='FFFFFF')
         cell.fill = primary_fill
@@ -551,9 +578,41 @@ def _add_employee_balances_sheet(workbook, report):
     for row_number, row in enumerate(ws.iter_rows(min_row=3), start=3):
         row[0].alignment = Alignment(vertical='center')
         row[1].alignment = Alignment(vertical='center')
+        row[1].font = Font(bold=True)
         if row_number % 2 == 0:
             for cell in row:
                 cell.fill = alternate_fill
+        for col_number, cell in enumerate(row, start=1):
+            if col_number >= 3:
+                metric_position = (col_number - 3) % 3
+                if metric_position == 1:
+                    cell.font = Font(color='B45309')
+                elif metric_position == 2:
+                    cell.font = Font(bold=True, color='15803D')
+        ws.row_dimensions[row_number].height = 24
+
+    # Grid lines and stronger separators make each leave-type group easy to scan.
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
+        for cell in row:
+            cell.border = thin_border
+    for index, _leave_type in enumerate(leave_types):
+        start_col = 3 + (index * 3)
+        end_col = start_col + 2
+        for row_number in range(1, ws.max_row + 1):
+            start_cell = ws.cell(row=row_number, column=start_col)
+            start_cell.border = Border(
+                left=group_side,
+                right=start_cell.border.right,
+                top=start_cell.border.top,
+                bottom=start_cell.border.bottom,
+            )
+            end_cell = ws.cell(row=row_number, column=end_col)
+            end_cell.border = Border(
+                left=end_cell.border.left,
+                right=group_side,
+                top=end_cell.border.top,
+                bottom=end_cell.border.bottom,
+            )
 
     ws.row_dimensions[1].height = 30
     ws.row_dimensions[2].height = 24
