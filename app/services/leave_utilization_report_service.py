@@ -82,6 +82,7 @@ def build_leave_utilization_report(
     by_type: dict[int, dict] = defaultdict(_empty_bucket)
     by_dept: dict[str, dict] = defaultdict(_empty_bucket)
     employee_rows: list[dict] = []
+    employee_balance_rows: list[dict] = []
 
     total_entitlement = Decimal('0.00')
     total_used = Decimal('0.00')
@@ -102,6 +103,7 @@ def build_leave_utilization_report(
 
         emp_used = Decimal('0.00')
         emp_had_row = False
+        balances_by_type = {}
         for lt in visible:
             st = stat_map.get(lt.id)
             if not st:
@@ -148,9 +150,25 @@ def build_leave_utilization_report(
                     'remaining': remaining_d,
                 }
             )
+            balances_by_type[lt.id] = {
+                'entitlement': entitlement_d,
+                'used': used,
+                'remaining': remaining_d,
+            }
 
         if emp_had_row and emp_used > 0:
             employees_with_usage += 1
+        if emp_had_row:
+            employee_balance_rows.append(
+                {
+                    'employee_id': emp.id,
+                    'employee_number': emp.employee_number or '',
+                    'employee_name': emp.full_name,
+                    'department': dept_name,
+                    'branch': emp.branch.name if emp.branch else '',
+                    'balances_by_type': balances_by_type,
+                }
+            )
 
     # Approval backlog (open requests; optional filters)
     backlog_requests = []
@@ -260,6 +278,9 @@ def build_leave_utilization_report(
     employee_rows.sort(
         key=lambda r: (r['department'], r['employee_name'].lower(), r['leave_type'])
     )
+    employee_balance_rows.sort(
+        key=lambda r: (r['department'], r['employee_name'].lower())
+    )
 
     return {
         'generated_at': generated_at,
@@ -284,6 +305,7 @@ def build_leave_utilization_report(
         'by_leave_type': by_leave_type,
         'by_department': by_department,
         'employee_rows': employee_rows,
+        'employee_balance_rows': employee_balance_rows,
         'backlog': backlog,
     }
 

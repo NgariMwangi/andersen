@@ -128,6 +128,15 @@ def test_leave_utilization_aggregates_used_remaining_and_backlog(leave_report_se
     assert report['backlog'][0]['employee_name'] == 'Bob Otieno'
     assert report['backlog'][0]['status'] == 'pending_hr'
 
+    # The UI balance table has one row per employee, with leave types pivoted to columns.
+    assert len(report['employee_balance_rows']) == 2
+    alice = next(
+        row for row in report['employee_balance_rows']
+        if row['employee_id'] == seed['alice_id']
+    )
+    assert alice['balances_by_type'][seed['annual_id']]['used'] == Decimal('5.00')
+    assert alice['balances_by_type'][seed['annual_id']]['remaining'] == Decimal('16.00')
+
 
 def test_leave_utilization_filters_by_department_and_type(leave_report_seed):
     seed = leave_report_seed
@@ -143,3 +152,5 @@ def test_leave_utilization_filters_by_department_and_type(leave_report_seed):
     assert report['summary']['pending_count'] == 0
     assert all(r['leave_type_id'] == seed['annual_id'] for r in report['employee_rows'])
     assert all(r['department'] == 'Engineering' for r in report['employee_rows'])
+    assert len(report['employee_balance_rows']) == 1
+    assert set(report['employee_balance_rows'][0]['balances_by_type']) == {seed['annual_id']}

@@ -263,7 +263,7 @@
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
         <h2 class="h6 mb-0">Employee balances</h2>
-        <span class="small text-muted">{{ report.employee_rows|length }} row{{ 's' if report.employee_rows|length != 1 else '' }}</span>
+        <span class="small text-muted">{{ report.employee_balance_rows|length }} employee{{ 's' if report.employee_balance_rows|length != 1 else '' }}</span>
     </div>
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle mb-0">
@@ -272,14 +272,13 @@
                     <th class="ps-3">Employee</th>
                     <th>Department</th>
                     {% if branches_enabled %}<th>Branch</th>{% endif %}
-                    <th>Leave type</th>
-                    <th class="text-end">Entitled</th>
-                    <th class="text-end">Used</th>
-                    <th class="text-end pe-3">Remaining</th>
+                    {% for lt in report.by_leave_type %}
+                    <th style="min-width: 150px;">{{ lt.name }}</th>
+                    {% endfor %}
                 </tr>
             </thead>
             <tbody>
-                {% for row in report.employee_rows %}
+                {% for row in report.employee_balance_rows %}
                 <tr>
                     <td class="ps-3">
                         <div class="fw-semibold">{{ row.employee_name }}</div>
@@ -287,16 +286,21 @@
                     </td>
                     <td>{{ row.department }}</td>
                     {% if branches_enabled %}<td>{{ row.branch or '—' }}</td>{% endif %}
+                    {% for lt in report.by_leave_type %}
+                    {% set balance = row.balances_by_type.get(lt.leave_type_id) %}
                     <td>
-                        <span class="fw-semibold">{{ row.leave_type }}</span>
-                        <span class="small text-muted">{{ row.leave_code }}</span>
+                        {% if balance %}
+                        <div class="small text-nowrap">Entitled: <strong>{% if balance.entitlement is not none %}{{ balance.entitlement | fmt_days }}{% else %}—{% endif %}</strong></div>
+                        <div class="small text-nowrap">Used: <strong>{{ balance.used | fmt_days }}</strong></div>
+                        <div class="small text-nowrap">Balance: <strong>{% if balance.remaining is not none %}{{ balance.remaining | fmt_days }}{% else %}—{% endif %}</strong></div>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
                     </td>
-                    <td class="text-end">{% if row.entitlement is not none %}{{ row.entitlement | fmt_days }}{% else %}—{% endif %}</td>
-                    <td class="text-end">{{ row.used | fmt_days }}</td>
-                    <td class="text-end pe-3 fw-semibold">{% if row.remaining is not none %}{{ row.remaining | fmt_days }}{% else %}—{% endif %}</td>
+                    {% endfor %}
                 </tr>
                 {% else %}
-                <tr><td colspan="{% if branches_enabled %}7{% else %}6{% endif %}" class="text-muted text-center py-4">No employee leave balances for this filter.</td></tr>
+                <tr><td colspan="{{ 2 + (1 if branches_enabled else 0) + report.by_leave_type|length }}" class="text-muted text-center py-4">No employee leave balances for this filter.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
