@@ -102,7 +102,9 @@
 {% set show_employee_column = has_permission('approve_leave') or is_line_manager() %}
 {% set show_supervisor_column = has_permission('approve_leave') %}
 {% set leave_table_cols = 8 + (1 if show_employee_column else 0) + (1 if show_supervisor_column else 0) %}
+{% if current_user.employee_id %}
 <a href="{{ url_for('leave.request_leave') }}" class="btn btn-primary mb-3">New Request</a>
+{% endif %}
 <div class="d-none d-md-block table-responsive leave-requests-table-wrap">
     <table class="table leave-requests-table mb-0">
         <thead>
