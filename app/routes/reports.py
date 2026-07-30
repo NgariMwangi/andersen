@@ -465,13 +465,134 @@ def leave_utilization_employee_balances_csv():
     )
 
 
+def _add_employee_balances_sheet(workbook, report):
+    """Add the formatted, pivoted employee balance worksheet."""
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    ws = workbook.create_sheet('Employee Balances')
+    leave_types = report['by_leave_type']
+    employees = report['employee_balance_rows']
+
+    ws.append(
+        ['Employee No.', 'Employee Name']
+        + [
+            value
+            for leave_type in leave_types
+            for value in [leave_type['name'], '', '']
+        ]
+    )
+    ws.append(
+        ['', '']
+        + [
+            value
+            for _leave_type in leave_types
+            for value in ['Entitled', 'Used', 'Balance']
+        ]
+    )
+
+    for index, _leave_type in enumerate(leave_types):
+        start_col = 3 + (index * 3)
+        ws.merge_cells(
+            start_row=1,
+            start_column=start_col,
+            end_row=1,
+            end_column=start_col + 2,
+        )
+    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
+    ws.merge_cells(start_row=1, start_column=2, end_row=2, end_column=2)
+
+    for employee in employees:
+        row = [employee['employee_number'], employee['employee_name']]
+        for leave_type in leave_types:
+            balance = employee['balances_by_type'].get(leave_type['leave_type_id'])
+            if not balance:
+                row.extend(['', '', ''])
+                continue
+            row.extend(
+                [
+                    float(balance['entitlement']) if balance['entitlement'] is not None else '',
+                    float(balance['used']),
+                    float(balance['remaining']) if balance['remaining'] is not None else '',
+                ]
+            )
+        ws.append(row)
+
+    primary_fill = PatternFill('solid', fgColor='7F1D1D')
+    secondary_fill = PatternFill('solid', fgColor='FDECEC')
+    alternate_fill = PatternFill('solid', fgColor='F8FAFC')
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = primary_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    for cell in ws[2]:
+        if cell.column > 2:
+            cell.font = Font(bold=True, color='7F1D1D')
+            cell.fill = secondary_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    employee_number_width = max(
+        [len('Employee No.')] + [len(str(row['employee_number'] or '')) for row in employees]
+    )
+    employee_name_width = max(
+        [len('Employee Name')] + [len(str(row['employee_name'] or '')) for row in employees]
+    )
+    ws.column_dimensions['A'].width = min(max(employee_number_width + 3, 16), 26)
+    ws.column_dimensions['B'].width = min(max(employee_name_width + 3, 24), 45)
+
+    for col in range(3, ws.max_column + 1):
+        letter = get_column_letter(col)
+        ws.column_dimensions[letter].width = 14
+        for cell in ws[letter][2:]:
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            if isinstance(cell.value, (int, float)):
+                cell.number_format = '0.00'
+
+    for row_number, row in enumerate(ws.iter_rows(min_row=3), start=3):
+        row[0].alignment = Alignment(vertical='center')
+        row[1].alignment = Alignment(vertical='center')
+        if row_number % 2 == 0:
+            for cell in row:
+                cell.fill = alternate_fill
+
+    ws.row_dimensions[1].height = 30
+    ws.row_dimensions[2].height = 24
+    ws.freeze_panes = 'C3'
+    ws.sheet_view.showGridLines = False
+    ws.print_title_rows = '1:2'
+    return ws
+
+
+@reports_bp.route('/leave-utilization/employee-balances.xlsx')
+@login_required
+@permission_required('view_reports')
+def leave_utilization_employee_balances_xlsx():
+    """Export only the formatted employee balance table."""
+    from openpyxl import Workbook
+
+    cid = require_company_id()
+    report, filters = _leave_utilization_payload(cid)
+    wb = Workbook()
+    wb.remove(wb.active)
+    _add_employee_balances_sheet(wb, report)
+
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return send_file(
+        out,
+        as_attachment=True,
+        download_name=f"employee-leave-balances-{filters['year']}.xlsx",
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
 @reports_bp.route('/leave-utilization/xlsx')
 @login_required
 @permission_required('view_reports')
 def leave_utilization_xlsx():
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import Font, Alignment
 
     cid = require_company_id()
     report, filters = _leave_utilization_payload(cid)
@@ -553,79 +674,7 @@ def leave_utilization_xlsx():
     _style_header(ws)
     _autosize(ws)
 
-    # Employee balances: one employee per row, with each leave type grouped.
-    ws = wb.create_sheet('Employee Balances')
-    leave_types = report['by_leave_type']
-    ws.append(
-        ['Employee No.', 'Employee Name']
-        + [
-            value
-            for leave_type in leave_types
-            for value in [leave_type['name'], '', '']
-        ]
-    )
-    ws.append(
-        ['', '']
-        + [
-            value
-            for _leave_type in leave_types
-            for value in ['Entitled', 'Used', 'Balance']
-        ]
-    )
-
-    for index, leave_type in enumerate(leave_types):
-        start_col = 3 + (index * 3)
-        ws.merge_cells(
-            start_row=1,
-            start_column=start_col,
-            end_row=1,
-            end_column=start_col + 2,
-        )
-
-    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
-    ws.merge_cells(start_row=1, start_column=2, end_row=2, end_column=2)
-
-    for employee in report['employee_balance_rows']:
-        row = [employee['employee_number'], employee['employee_name']]
-        for leave_type in leave_types:
-            balance = employee['balances_by_type'].get(leave_type['leave_type_id'])
-            if not balance:
-                row.extend(['', '', ''])
-                continue
-            row.extend(
-                [
-                    float(balance['entitlement']) if balance['entitlement'] is not None else '',
-                    float(balance['used']),
-                    float(balance['remaining']) if balance['remaining'] is not None else '',
-                ]
-            )
-        ws.append(row)
-
-    primary_fill = PatternFill('solid', fgColor='7F1D1D')
-    secondary_fill = PatternFill('solid', fgColor='FDECEC')
-    for cell in ws[1]:
-        cell.font = Font(bold=True, color='FFFFFF')
-        cell.fill = primary_fill
-        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    for cell in ws[2]:
-        if cell.column > 2:
-            cell.font = Font(bold=True, color='7F1D1D')
-            cell.fill = secondary_fill
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-
-    ws.column_dimensions['A'].width = 18
-    ws.column_dimensions['B'].width = 30
-    for col in range(3, ws.max_column + 1):
-        ws.column_dimensions[get_column_letter(col)].width = 13
-        for cell in ws[get_column_letter(col)][2:]:
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-            if isinstance(cell.value, (int, float)):
-                cell.number_format = '0.00'
-    for row in ws.iter_rows(min_row=3):
-        row[1].alignment = Alignment(vertical='center', wrap_text=True)
-    ws.row_dimensions[1].height = 28
-    ws.row_dimensions[2].height = 22
-    ws.freeze_panes = 'C3'
+    _add_employee_balances_sheet(wb, report)
 
     # Backlog
     ws = wb.create_sheet('Approval Backlog')
