@@ -16,6 +16,55 @@
     </span>
 </div>
 
+{% if leave_balance %}
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <h2 class="h6 mb-0 text-uppercase text-muted">Leave balance</h2>
+            <span class="small text-muted">{{ leave_balance.name }} · {{ stats_year }}</span>
+        </div>
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <div class="border rounded p-3 h-100 bg-light bg-opacity-50 text-center">
+                    <div class="small text-muted mb-1">Entitled</div>
+                    <div class="fs-5 fw-semibold">
+                        {% if leave_balance.entitled_per_year is not none %}{{ leave_balance.entitled_per_year | fmt_days }}{% else %}—{% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="border rounded p-3 h-100 bg-light bg-opacity-50 text-center">
+                    <div class="small text-muted mb-1">Earned</div>
+                    <div class="fs-5 fw-semibold">
+                        {% if leave_balance.show_earned_this_year and leave_balance.get('accrued') is not none %}
+                        {{ leave_balance.accrued | fmt_days }}
+                        {% elif leave_balance.entitlement is not none %}
+                        {{ leave_balance.entitlement | fmt_days }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="border rounded p-3 h-100 bg-light bg-opacity-50 text-center">
+                    <div class="small text-muted mb-1">Used</div>
+                    <div class="fs-5 fw-semibold text-warning">{{ leave_balance.used | fmt_days }}</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="border rounded p-3 h-100 bg-light bg-opacity-50 text-center">
+                    <div class="small text-muted mb-1">Remaining</div>
+                    <div class="fs-5 fw-semibold text-success">
+                        {% if leave_balance.remaining is not none %}{{ leave_balance.remaining | fmt_days }}{% else %}—{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="card mb-4 border-0 shadow-sm">
     <div class="card-body">
         <dl class="row mb-0">
@@ -33,7 +82,7 @@
             <dd class="col-sm-9">{{ request.days_requested | fmt_days }}</dd>
 
             {% if remaining_days is not none %}
-            <dt class="col-sm-3 text-muted">Days remaining</dt>
+            <dt class="col-sm-3 text-muted">Days left in this leave</dt>
             <dd class="col-sm-9">{{ remaining_days | fmt_days }}</dd>
             {% endif %}
 

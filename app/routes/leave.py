@@ -653,6 +653,14 @@ def view_request(id):
             lr.start_date, lr.end_date, basis, today=date.today(), exclude_dates=excl
         )
 
+    stats_year = lr.start_date.year if lr.start_date else date.today().year
+    leave_balance = None
+    if lr.employee_id and lr.leave_type_id:
+        for row in statistics_for_employee(lr.employee_id, stats_year):
+            if row.get('leave_type_id') == lr.leave_type_id:
+                leave_balance = row
+                break
+
     sup = supervisor_step_summary(lr)
     stage = approval_stage_for_user(current_user, lr)
     if stage == 'hr' and sup.get('state') == 'awaiting':
@@ -667,6 +675,8 @@ def view_request(id):
         supervisor_summary=sup,
         approval_stage=stage,
         remaining_days=remaining,
+        leave_balance=leave_balance,
+        stats_year=stats_year,
         can_edit=leave_request_is_editable(lr) and can_manage and not leave_request_is_resubmittable(lr),
         can_resubmit=leave_request_is_resubmittable(lr) and can_manage,
         can_review=bool(stage),
