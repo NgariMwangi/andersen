@@ -66,6 +66,44 @@ def _employee_has_user(employee: Employee) -> bool:
     return db.session.query(User.id).filter_by(employee_id=employee.id).first() is not None
 
 
+def linked_user_for_employee(employee: Employee) -> User | None:
+    """Return the login account linked to this employee, if any."""
+    user = getattr(employee, 'user', None)
+    if user is not None:
+        return user
+    return db.session.query(User).filter_by(employee_id=employee.id).first()
+
+
+def set_employee_login_active(employee: Employee, *, active: bool) -> User | None:
+    """Enable or disable the employee's login account. Returns the user if one exists."""
+    user = linked_user_for_employee(employee)
+    if not user:
+        return None
+    user.is_active = bool(active)
+    return user
+
+
+# Employment statuses that must not be able to sign in.
+LOGIN_BLOCKED_EMPLOYEE_STATUSES = frozenset({
+    'suspended',
+    'terminated',
+    'resigned',
+    'retired',
+})
+
+
+def sync_employee_login_access(employee: Employee) -> User | None:
+    """
+    Align login access with employment status.
+    Suspended/terminated/resigned/retired → login off; otherwise → login on.
+    """
+    status = (employee.status or '').strip().lower()
+    return set_employee_login_active(
+        employee,
+        active=status not in LOGIN_BLOCKED_EMPLOYEE_STATUSES,
+    )
+
+
 def provision_employee_login(
     employee: Employee,
     password: str,

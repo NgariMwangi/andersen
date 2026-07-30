@@ -76,6 +76,21 @@ def login():
         if user.is_locked:
             flash('Account temporarily locked. Try again later.', 'warning')
             return render_template('auth/login.html', form=form)
+        if not user.is_active:
+            emp = getattr(user, 'employee', None)
+            if emp is not None and (emp.status or '').strip().lower() == 'suspended':
+                flash('Your account is disabled because your employment is suspended. Contact HR.', 'warning')
+            else:
+                flash('This account is disabled. Contact an administrator.', 'warning')
+            log_audit(
+                'LOGIN_FAILED',
+                record_type='User',
+                record_id=user.id,
+                new_values={'email': form.email.data, 'reason': 'inactive'},
+                user_id=user.id,
+                description='Login failed - account inactive',
+            )
+            return render_template('auth/login.html', form=form)
         if not user.check_password(form.password.data):
             user.failed_login_count = (user.failed_login_count or 0) + 1
             from flask import current_app

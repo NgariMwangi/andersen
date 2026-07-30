@@ -838,6 +838,9 @@ def suspend_employee(id):
         emp.suspension_to_date = suspension_to
         emp.termination_date = None
         emp.termination_reason = None
+        from app.services.employee_account_service import set_employee_login_active
+
+        login_user = set_employee_login_active(emp, active=False)
         db.session.commit()
         log_update(
             'Employee',
@@ -847,7 +850,10 @@ def suspend_employee(id):
             user_id=current_user.id,
             description='Employee suspended',
         )
-        flash('Employee suspended.', 'success')
+        if login_user:
+            flash('Employee suspended. Their login has been disabled.', 'success')
+        else:
+            flash('Employee suspended.', 'success')
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
@@ -871,6 +877,9 @@ def terminate_employee(id):
         emp.termination_reason = termination_reason
         emp.suspension_from_date = None
         emp.suspension_to_date = None
+        from app.services.employee_account_service import set_employee_login_active
+
+        login_user = set_employee_login_active(emp, active=False)
         db.session.commit()
         log_update(
             'Employee',
@@ -880,7 +889,10 @@ def terminate_employee(id):
             user_id=current_user.id,
             description='Employee terminated',
         )
-        flash('Employee terminated.', 'success')
+        if login_user:
+            flash('Employee terminated. Their login has been disabled.', 'success')
+        else:
+            flash('Employee terminated.', 'success')
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
@@ -905,6 +917,9 @@ def reactivate_employee(id):
         emp.suspension_to_date = None
         emp.termination_date = None
         emp.termination_reason = None
+        from app.services.employee_account_service import set_employee_login_active
+
+        login_user = set_employee_login_active(emp, active=True)
         db.session.commit()
         log_update(
             'Employee',
@@ -914,7 +929,10 @@ def reactivate_employee(id):
             user_id=current_user.id,
             description='Employee reactivated',
         )
-        flash('Employee set back to active.', 'success')
+        if login_user:
+            flash('Employee set back to active. Their login has been re-enabled.', 'success')
+        else:
+            flash('Employee set back to active.', 'success')
     except Exception as exc:
         db.session.rollback()
         flash(f'Could not reactivate employee: {exc}', 'danger')
@@ -1012,6 +1030,9 @@ def edit(id):
             sync_employee_supervisors(emp, form.supervisor_ids.data, cid)
             sync_employee_next_of_kin(emp, request, branch.country_code)
             emp.status = form.status.data
+            from app.services.employee_account_service import sync_employee_login_access
+
+            sync_employee_login_access(emp)
             emp.employment_type = form.employment_type.data or None
             emp.hire_date = form.hire_date.data
             if form.employment_type.data == 'probation':

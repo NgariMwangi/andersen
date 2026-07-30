@@ -271,7 +271,7 @@
                         <label class="form-label">Suspension to <span class="text-muted">(optional)</span></label>
                         <input type="date" name="suspension_to" class="form-control"
                                value="{{ employee.suspension_to_date.isoformat() if employee.suspension_to_date else '' }}">
-                        <div class="form-text">Leave blank for an open-ended suspension.</div>
+                        <div class="form-text">Leave blank for an open-ended suspension. The employee’s login will be disabled until they are reactivated.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
