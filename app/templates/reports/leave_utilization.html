@@ -312,7 +312,10 @@
         <div class="d-flex align-items-center gap-2">
             <span class="small text-muted">{{ report.employee_balance_rows|length }} employee{{ 's' if report.employee_balance_rows|length != 1 else '' }}</span>
             <a class="btn btn-sm btn-outline-success" href="{{ url_for('reports.leave_utilization_employee_balances_csv', **request.args) }}">
-                <i class="bi bi-filetype-csv me-1"></i>Export table
+                <i class="bi bi-filetype-csv me-1"></i>CSV
+            </a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('reports.leave_utilization_xlsx', **request.args) }}">
+                <i class="bi bi-file-earmark-excel me-1"></i>Excel
             </a>
         </div>
     </div>

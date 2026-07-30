@@ -423,7 +423,7 @@ def leave_utilization_employee_balances_csv():
 
     si = StringIO()
     w = csv.writer(si)
-    header = ['Employee Number', 'Employee Name', 'Department', 'Branch']
+    header = ['Employee Number', 'Employee Name']
     for leave_type in leave_types:
         name = leave_type['name']
         header.extend(
@@ -439,8 +439,6 @@ def leave_utilization_employee_balances_csv():
         row = [
             employee['employee_number'],
             employee['employee_name'],
-            employee['department'],
-            employee['branch'],
         ]
         for leave_type in leave_types:
             balance = employee['balances_by_type'].get(leave_type['leave_type_id'])
@@ -472,7 +470,8 @@ def leave_utilization_employee_balances_csv():
 @permission_required('view_reports')
 def leave_utilization_xlsx():
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils import get_column_letter
 
     cid = require_company_id()
     report, filters = _leave_utilization_payload(cid)
@@ -554,37 +553,79 @@ def leave_utilization_xlsx():
     _style_header(ws)
     _autosize(ws)
 
-    # Employee detail
+    # Employee balances: one employee per row, with each leave type grouped.
     ws = wb.create_sheet('Employee Balances')
+    leave_types = report['by_leave_type']
     ws.append(
-        [
-            'Employee No.',
-            'Name',
-            'Department',
-            'Branch',
-            'Leave code',
-            'Leave type',
-            'Entitlement',
-            'Used',
-            'Remaining',
+        ['Employee No.', 'Employee Name']
+        + [
+            value
+            for leave_type in leave_types
+            for value in [leave_type['name'], '', '']
         ]
     )
-    for row in report['employee_rows']:
-        ws.append(
-            [
-                row['employee_number'],
-                row['employee_name'],
-                row['department'],
-                row['branch'],
-                row['leave_code'],
-                row['leave_type'],
-                float(row['entitlement']) if row['entitlement'] is not None else '',
-                float(row['used']),
-                float(row['remaining']) if row['remaining'] is not None else '',
-            ]
+    ws.append(
+        ['', '']
+        + [
+            value
+            for _leave_type in leave_types
+            for value in ['Entitled', 'Used', 'Balance']
+        ]
+    )
+
+    for index, leave_type in enumerate(leave_types):
+        start_col = 3 + (index * 3)
+        ws.merge_cells(
+            start_row=1,
+            start_column=start_col,
+            end_row=1,
+            end_column=start_col + 2,
         )
-    _style_header(ws)
-    _autosize(ws)
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
+    ws.merge_cells(start_row=1, start_column=2, end_row=2, end_column=2)
+
+    for employee in report['employee_balance_rows']:
+        row = [employee['employee_number'], employee['employee_name']]
+        for leave_type in leave_types:
+            balance = employee['balances_by_type'].get(leave_type['leave_type_id'])
+            if not balance:
+                row.extend(['', '', ''])
+                continue
+            row.extend(
+                [
+                    float(balance['entitlement']) if balance['entitlement'] is not None else '',
+                    float(balance['used']),
+                    float(balance['remaining']) if balance['remaining'] is not None else '',
+                ]
+            )
+        ws.append(row)
+
+    primary_fill = PatternFill('solid', fgColor='7F1D1D')
+    secondary_fill = PatternFill('solid', fgColor='FDECEC')
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = primary_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    for cell in ws[2]:
+        if cell.column > 2:
+            cell.font = Font(bold=True, color='7F1D1D')
+            cell.fill = secondary_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    ws.column_dimensions['A'].width = 18
+    ws.column_dimensions['B'].width = 30
+    for col in range(3, ws.max_column + 1):
+        ws.column_dimensions[get_column_letter(col)].width = 13
+        for cell in ws[get_column_letter(col)][2:]:
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            if isinstance(cell.value, (int, float)):
+                cell.number_format = '0.00'
+    for row in ws.iter_rows(min_row=3):
+        row[1].alignment = Alignment(vertical='center', wrap_text=True)
+    ws.row_dimensions[1].height = 28
+    ws.row_dimensions[2].height = 22
+    ws.freeze_panes = 'C3'
 
     # Backlog
     ws = wb.create_sheet('Approval Backlog')
