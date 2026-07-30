@@ -470,28 +470,9 @@ def _add_employee_balances_sheet(workbook, report):
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
-    ws = workbook.create_sheet('Employee Balances')
+    ws = workbook.create_sheet('Employee Utilization')
     leave_types = list(report['by_leave_type'])
     employees = report['employee_balance_rows']
-
-    # HR requested Compassionate Leave and Sick Leave to exchange positions.
-    sick_index = next(
-        (i for i, leave_type in enumerate(leave_types) if leave_type['code'] == 'SICK'),
-        None,
-    )
-    compassionate_index = next(
-        (
-            i
-            for i, leave_type in enumerate(leave_types)
-            if leave_type['code'] == 'COMPASSIONATE'
-        ),
-        None,
-    )
-    if sick_index is not None and compassionate_index is not None:
-        leave_types[sick_index], leave_types[compassionate_index] = (
-            leave_types[compassionate_index],
-            leave_types[sick_index],
-        )
 
     ws.append(
         ['Employee No.', 'Employee Name']
@@ -641,7 +622,7 @@ def leave_utilization_employee_balances_xlsx():
     return send_file(
         out,
         as_attachment=True,
-        download_name=f"employee-leave-balances-{filters['year']}.xlsx",
+        download_name=f"employee-utilization-{filters['year']}.xlsx",
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
 
@@ -650,134 +631,8 @@ def leave_utilization_employee_balances_xlsx():
 @login_required
 @permission_required('view_reports')
 def leave_utilization_xlsx():
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment
-
-    cid = require_company_id()
-    report, filters = _leave_utilization_payload(cid)
-    wb = Workbook()
-
-    def _style_header(ws):
-        for cell in ws[1]:
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
-
-    def _autosize(ws):
-        for col in ws.columns:
-            max_len = 0
-            col_letter = col[0].column_letter
-            for cell in col:
-                if cell.value is not None:
-                    max_len = max(max_len, len(str(cell.value)))
-            ws.column_dimensions[col_letter].width = min(max_len + 2, 36)
-
-    # Summary
-    ws = wb.active
-    ws.title = 'Summary'
-    ws.append(['Metric', 'Value'])
-    s = report['summary']
-    for label, value in [
-        ('Year', report['year']),
-        ('Generated at', report['generated_at'].strftime('%Y-%m-%d %H:%M')),
-        ('Active employees', s['active_employees']),
-        ('Employees with usage', s['employees_with_usage']),
-        ('Total entitlement (days)', float(s['total_entitlement'])),
-        ('Total used (days)', float(s['total_used'])),
-        ('Total remaining (days)', float(s['total_remaining'])),
-        ('Utilization %', float(s['utilization_pct']) if s['utilization_pct'] is not None else ''),
-        ('Pending approvals', s['pending_count']),
-        ('Pending days', float(s['pending_days'])),
-        ('Pending supervisor', s['pending_supervisor']),
-        ('Pending HR', s['pending_hr']),
-    ]:
-        ws.append([label, value])
-    _style_header(ws)
-    _autosize(ws)
-
-    # By leave type
-    ws = wb.create_sheet('By Leave Type')
-    ws.append(
-        ['Code', 'Leave type', 'Entitlement', 'Used', 'Remaining', 'Utilization %', 'Employees with usage']
-    )
-    for row in report['by_leave_type']:
-        ws.append(
-            [
-                row['code'],
-                row['name'],
-                float(row['entitlement']),
-                float(row['used']),
-                float(row['remaining']),
-                float(row['utilization_pct']) if row['utilization_pct'] is not None else '',
-                row['employees_with_usage'],
-            ]
-        )
-    _style_header(ws)
-    _autosize(ws)
-
-    # By department
-    ws = wb.create_sheet('By Department')
-    ws.append(
-        ['Department', 'Entitlement', 'Used', 'Remaining', 'Utilization %', 'Employees with usage']
-    )
-    for row in report['by_department']:
-        ws.append(
-            [
-                row['department'],
-                float(row['entitlement']),
-                float(row['used']),
-                float(row['remaining']),
-                float(row['utilization_pct']) if row['utilization_pct'] is not None else '',
-                row['employees_with_usage'],
-            ]
-        )
-    _style_header(ws)
-    _autosize(ws)
-
-    _add_employee_balances_sheet(wb, report)
-
-    # Backlog
-    ws = wb.create_sheet('Approval Backlog')
-    ws.append(
-        [
-            'Employee No.',
-            'Name',
-            'Department',
-            'Leave type',
-            'Start',
-            'End',
-            'Days',
-            'Status',
-            'Submitted',
-            'Age (days)',
-        ]
-    )
-    for row in report['backlog']:
-        ws.append(
-            [
-                row['employee_number'],
-                row['employee_name'],
-                row['department'],
-                row['leave_type'],
-                row['start_date'].isoformat() if row['start_date'] else '',
-                row['end_date'].isoformat() if row['end_date'] else '',
-                float(row['days_requested']),
-                row['status_label'],
-                row['submitted_at'].strftime('%Y-%m-%d %H:%M') if row['submitted_at'] else '',
-                row['age_days'],
-            ]
-        )
-    _style_header(ws)
-    _autosize(ws)
-
-    out = BytesIO()
-    wb.save(out)
-    out.seek(0)
-    return send_file(
-        out,
-        as_attachment=True,
-        download_name=f"leave-utilization-{filters['year']}.xlsx",
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    )
+    """Alias for the employee utilization Excel export."""
+    return leave_utilization_employee_balances_xlsx()
 
 
 

@@ -244,6 +244,7 @@ def build_leave_utilization_report(
                 'utilization_pct': _utilization_pct(b['used'], b['entitlement']),
             }
         )
+    by_leave_type = _swap_sick_and_compassionate(by_leave_type)
 
     departments = (
         db.session.query(Department)
@@ -315,3 +316,16 @@ def _utilization_pct(used: Decimal, entitlement: Decimal) -> Decimal | None:
     if entitlement is None or entitlement <= 0:
         return None
     return (used * Decimal('100') / entitlement).quantize(Decimal('0.1'))
+
+
+def _swap_sick_and_compassionate(leave_type_rows: list[dict]) -> list[dict]:
+    """Put Compassionate Leave where Sick Leave would alphabetically fall, and vice versa."""
+    rows = list(leave_type_rows)
+    sick_index = next((i for i, row in enumerate(rows) if row.get('code') == 'SICK'), None)
+    compassionate_index = next(
+        (i for i, row in enumerate(rows) if row.get('code') == 'COMPASSIONATE'),
+        None,
+    )
+    if sick_index is not None and compassionate_index is not None:
+        rows[sick_index], rows[compassionate_index] = rows[compassionate_index], rows[sick_index]
+    return rows
