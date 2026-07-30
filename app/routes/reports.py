@@ -470,7 +470,7 @@ def _add_employee_balances_sheet(workbook, report):
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
-    ws = workbook.create_sheet('Employee Utilization')
+    ws = workbook.create_sheet('Employee Leave Utilization')
     leave_types = list(report['by_leave_type'])
     employees = report['employee_balance_rows']
 
@@ -622,7 +622,7 @@ def leave_utilization_employee_balances_xlsx():
     return send_file(
         out,
         as_attachment=True,
-        download_name=f"employee-utilization-{filters['year']}.xlsx",
+        download_name=f"employee-leave-utilization-{filters['year']}.xlsx",
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
 
@@ -631,7 +631,7 @@ def leave_utilization_employee_balances_xlsx():
 @login_required
 @permission_required('view_reports')
 def leave_utilization_xlsx():
-    """Alias for the employee utilization Excel export."""
+    """Alias for the employee leave utilization Excel export."""
     return leave_utilization_employee_balances_xlsx()
 
 

@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
-{% block title %}Employee Utilization - {{ app_name }}{% endblock %}
+{% block title %}Employee Leave Utilization - {{ app_name }}{% endblock %}
 {% block page_nav_section %}Reports{% endblock %}
-{% block page_nav_title %}Employee utilization{% endblock %}
+{% block page_nav_title %}Employee leave utilization{% endblock %}
 {% block extra_css %}
 <style>
     .employee-balance-table {
@@ -53,7 +53,7 @@
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
     <div>
-        <h1 class="h3 mb-1">Employee Utilization</h1>
+        <h1 class="h3 mb-1">Employee Leave Utilization</h1>
         <p class="text-muted mb-0">Entitled, used, and remaining leave days by employee and leave type.</p>
     </div>
     <a class="btn btn-outline-primary btn-sm" href="{{ url_for('reports.leave_utilization_employee_balances_xlsx', **request.args) }}">
@@ -113,7 +113,7 @@
 
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-        <h2 class="h6 mb-0">Employee Utilization</h2>
+        <h2 class="h6 mb-0">Employee Leave Utilization</h2>
         <span class="small text-muted">{{ report.employee_balance_rows|length }} employee{{ 's' if report.employee_balance_rows|length != 1 else '' }}</span>
     </div>
     <div class="table-responsive">
@@ -152,7 +152,7 @@
                     {% endfor %}
                 </tr>
                 {% else %}
-                <tr><td colspan="{{ 1 + report.by_leave_type|length }}" class="text-muted text-center py-4">No employee utilization data for this filter.</td></tr>
+                <tr><td colspan="{{ 1 + report.by_leave_type|length }}" class="text-muted text-center py-4">No employee leave utilization data for this filter.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
