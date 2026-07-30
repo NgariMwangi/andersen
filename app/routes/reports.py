@@ -412,6 +412,61 @@ def leave_utilization_csv():
     )
 
 
+@reports_bp.route('/leave-utilization/employee-balances.csv')
+@login_required
+@permission_required('view_reports')
+def leave_utilization_employee_balances_csv():
+    """Export the pivoted employee balance table shown on the report page."""
+    cid = require_company_id()
+    report, filters = _leave_utilization_payload(cid)
+    leave_types = report['by_leave_type']
+
+    si = StringIO()
+    w = csv.writer(si)
+    header = ['Employee Number', 'Employee Name', 'Department', 'Branch']
+    for leave_type in leave_types:
+        name = leave_type['name']
+        header.extend(
+            [
+                f'{name} - Entitled',
+                f'{name} - Used',
+                f'{name} - Balance',
+            ]
+        )
+    w.writerow(header)
+
+    for employee in report['employee_balance_rows']:
+        row = [
+            employee['employee_number'],
+            employee['employee_name'],
+            employee['department'],
+            employee['branch'],
+        ]
+        for leave_type in leave_types:
+            balance = employee['balances_by_type'].get(leave_type['leave_type_id'])
+            if not balance:
+                row.extend(['', '', ''])
+                continue
+            row.extend(
+                [
+                    '' if balance['entitlement'] is None else str(balance['entitlement']),
+                    str(balance['used']),
+                    '' if balance['remaining'] is None else str(balance['remaining']),
+                ]
+            )
+        w.writerow(row)
+
+    out = BytesIO()
+    out.write(si.getvalue().encode('utf-8-sig'))
+    out.seek(0)
+    return send_file(
+        out,
+        as_attachment=True,
+        download_name=f"employee-leave-balances-{filters['year']}.csv",
+        mimetype='text/csv; charset=utf-8',
+    )
+
+
 @reports_bp.route('/leave-utilization/xlsx')
 @login_required
 @permission_required('view_reports')

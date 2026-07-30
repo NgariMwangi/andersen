@@ -260,27 +260,78 @@
     </div>
 </div>
 
+<style>
+    .employee-balance-table {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .employee-balance-table th {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+    .employee-balance-table .employee-col {
+        position: sticky;
+        left: 0;
+        min-width: 210px;
+        z-index: 2;
+        background: #fff;
+        border-right: 2px solid #e2e8f0;
+    }
+    .employee-balance-table thead .employee-col {
+        z-index: 3;
+        background: #f8f9fa;
+    }
+    .employee-balance-table tbody tr:hover .employee-col {
+        background: #f8fafc;
+    }
+    .employee-balance-table .leave-heading {
+        min-width: 165px;
+        text-align: center;
+        color: #7f1d1d;
+        background: #fff7f7;
+    }
+    .balance-metrics {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.2rem 0.75rem;
+        min-width: 145px;
+        padding: 0.45rem 0.55rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        background: #f8fafc;
+        font-size: 0.8rem;
+    }
+    .balance-metrics .metric-label { color: #64748b; }
+    .balance-metrics .metric-value { text-align: right; font-weight: 600; }
+    .balance-metrics .used-value { color: #b45309; }
+    .balance-metrics .balance-value { color: #15803d; }
+</style>
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
         <h2 class="h6 mb-0">Employee balances</h2>
-        <span class="small text-muted">{{ report.employee_balance_rows|length }} employee{{ 's' if report.employee_balance_rows|length != 1 else '' }}</span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="small text-muted">{{ report.employee_balance_rows|length }} employee{{ 's' if report.employee_balance_rows|length != 1 else '' }}</span>
+            <a class="btn btn-sm btn-outline-success" href="{{ url_for('reports.leave_utilization_employee_balances_csv', **request.args) }}">
+                <i class="bi bi-filetype-csv me-1"></i>Export table
+            </a>
+        </div>
     </div>
     <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0 employee-balance-table">
             <thead class="table-light">
                 <tr>
-                    <th class="ps-3">Employee</th>
+                    <th class="ps-3 employee-col">Employee</th>
                     <th>Department</th>
                     {% if branches_enabled %}<th>Branch</th>{% endif %}
                     {% for lt in report.by_leave_type %}
-                    <th style="min-width: 150px;">{{ lt.name }}</th>
+                    <th class="leave-heading">{{ lt.name }}</th>
                     {% endfor %}
                 </tr>
             </thead>
             <tbody>
                 {% for row in report.employee_balance_rows %}
                 <tr>
-                    <td class="ps-3">
+                    <td class="ps-3 employee-col">
                         <div class="fw-semibold">{{ row.employee_name }}</div>
                         <div class="small text-muted">{{ row.employee_number or '—' }}</div>
                     </td>
@@ -290,9 +341,14 @@
                     {% set balance = row.balances_by_type.get(lt.leave_type_id) %}
                     <td>
                         {% if balance %}
-                        <div class="small text-nowrap">Entitled: <strong>{% if balance.entitlement is not none %}{{ balance.entitlement | fmt_days }}{% else %}—{% endif %}</strong></div>
-                        <div class="small text-nowrap">Used: <strong>{{ balance.used | fmt_days }}</strong></div>
-                        <div class="small text-nowrap">Balance: <strong>{% if balance.remaining is not none %}{{ balance.remaining | fmt_days }}{% else %}—{% endif %}</strong></div>
+                        <div class="balance-metrics">
+                            <span class="metric-label">Entitled</span>
+                            <span class="metric-value">{% if balance.entitlement is not none %}{{ balance.entitlement | fmt_days }}{% else %}—{% endif %}</span>
+                            <span class="metric-label">Used</span>
+                            <span class="metric-value used-value">{{ balance.used | fmt_days }}</span>
+                            <span class="metric-label">Balance</span>
+                            <span class="metric-value balance-value">{% if balance.remaining is not none %}{{ balance.remaining | fmt_days }}{% else %}—{% endif %}</span>
+                        </div>
                         {% else %}
                         <span class="text-muted">—</span>
                         {% endif %}
