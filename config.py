@@ -83,8 +83,8 @@ class Config:
 
     # Brevo transactional email (password reset, leave notifications)
     BREVO_API_KEY = os.environ.get('BREVO_API_KEY') or ''
-    BREVO_SENDER_EMAIL = os.environ.get('BREVO_SENDER_EMAIL') or 'hr@nexgenfuelworks.com'
-    BREVO_SENDER_NAME = os.environ.get('BREVO_SENDER_NAME') or 'HR NexGen Fuelworks'
+    BREVO_SENDER_EMAIL = os.environ.get('BREVO_SENDER_EMAIL') or 'hrms@nexusafrica.co.ke'
+    BREVO_SENDER_NAME = os.environ.get('BREVO_SENDER_NAME') or 'Andersen'
     LEAVE_HR_NOTIFY_EMAIL = os.environ.get('LEAVE_HR_NOTIFY_EMAIL', '')  # optional extra recipients (comma-separated)
     APP_BASE_URL = os.environ.get('APP_BASE_URL') or ''  # e.g. https://hrms.example.com
     APP_NAME = os.environ.get('APP_NAME') or 'Andersen'

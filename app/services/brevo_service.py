@@ -10,14 +10,18 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
-DEFAULT_HR_SENDER_EMAIL = 'hr@nexgenfuelworks.com'
-LEGACY_SENDER_EMAIL = 'info@nexgenfuelworks.com'
+DEFAULT_HR_SENDER_EMAIL = 'hrms@nexusafrica.co.ke'
+LEGACY_SENDER_EMAILS = frozenset({
+    'info@nexgenfuelworks.com',
+    'hr@nexgenfuelworks.com',
+    'admin@abzhardware.co.ke',
+})
 
 
 def normalize_hr_sender_email(value: str | None) -> str:
-    """Use hr@ for all outbound mail; migrate away from legacy info@."""
+    """Prefer the Andersen HRMS sender; remap known legacy/wrong senders."""
     email = (value or '').strip().lower()
-    if not email or email == LEGACY_SENDER_EMAIL:
+    if not email or email in LEGACY_SENDER_EMAILS:
         return DEFAULT_HR_SENDER_EMAIL
     return email
 
@@ -56,7 +60,7 @@ def send_transactional_email(
     """
     api_key = (current_app.config.get('BREVO_API_KEY') or '').strip()
     sender_email = normalize_hr_sender_email(current_app.config.get('BREVO_SENDER_EMAIL'))
-    sender_name = (sender_name or current_app.config.get('BREVO_SENDER_NAME') or 'HR NexGen Fuelworks').strip() or 'HR NexGen Fuelworks'
+    sender_name = (sender_name or current_app.config.get('BREVO_SENDER_NAME') or 'Andersen').strip() or 'Andersen'
 
     if not api_key or not sender_email:
         logger.error(
