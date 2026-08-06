@@ -227,6 +227,10 @@ def forgot_password():
         return redirect_to_user_home()
     form = ForgotPasswordForm()
     if form.validate_on_submit():
+        current_app.logger.info(
+            'Forgot-password form accepted for %s',
+            (form.email.data or '').strip().lower(),
+        )
         initiate_password_reset(form.email.data.strip().lower())
         flash(
             'If an account exists for that email, we sent a password reset link. '
@@ -234,6 +238,12 @@ def forgot_password():
             'info',
         )
         return redirect(url_for('auth.login'))
+    if request.method == 'POST':
+        current_app.logger.warning(
+            'Forgot-password form rejected: %s',
+            form.errors or 'unknown validation error',
+        )
+        _flash_form_errors(form, prefix='Could not send reset link.')
     return render_template('auth/forgot_password.html', form=form)
 
 

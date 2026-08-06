@@ -410,8 +410,24 @@ def _register_error_handlers(app):
         Handle expired/invalid CSRF tokens gracefully.
         Common when a user leaves a form open and session expires.
         """
+        app.logger.warning(
+            'CSRF failed on %s %s: %s',
+            request.method,
+            request.path,
+            getattr(e, 'description', e),
+        )
         if request.path.endswith('/documents/upload') or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify(status='error', message='Your session expired. Refresh the page and try again.'), 400
+        endpoint = request.endpoint or ''
+        if endpoint in ('auth.forgot_password', 'auth.reset_password'):
+            flash('Your session expired. Please try again.', 'warning')
+            return redirect(url_for('auth.forgot_password'))
+        if endpoint == 'auth.register':
+            flash('Your session expired. Please try again.', 'warning')
+            return redirect(url_for('auth.register'))
+        if endpoint == 'auth.login':
+            flash('Your session expired. Please try again.', 'warning')
+            return redirect(url_for('auth.login'))
         flash('Your session expired. Please log in again and retry.', 'warning')
         return redirect(url_for('auth.login', next=request.path))
 
@@ -497,8 +513,10 @@ def _configure_logging(app):
     console.setLevel(log_level)
     for logger_name in (
         'app.services.brevo_service',
+        'app.services.password_reset_service',
         'app.services.message_notification_service',
         'app.routes.messages',
+        'app.routes.auth',
     ):
         email_logger = logging.getLogger(logger_name)
         email_logger.setLevel(log_level)

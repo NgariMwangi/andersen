@@ -1,4 +1,5 @@
 """Password reset tokens and Brevo reset emails."""
+import logging
 from datetime import datetime, timedelta
 
 from flask import current_app, url_for
@@ -7,6 +8,8 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from app.extensions import db
 from app.models.user import User
 from app.services.brevo_service import brevo_configured, send_transactional_email
+
+logger = logging.getLogger(__name__)
 
 
 def _serializer():
@@ -66,14 +69,19 @@ def send_password_reset_email(user: User) -> bool:
         'If you did not request this, ignore this email.'
     )
 
+    logger.info('Sending password reset email to %s', user.email)
     sent = send_transactional_email(
         user.email,
         f'{app_name} — Reset your password',
         html,
         text_content=text,
     )
-    if not sent and current_app.debug:
-        current_app.logger.info('Password reset link (dev, email not sent): %s', reset_url)
+    if sent:
+        logger.info('Password reset email accepted for %s', user.email)
+    else:
+        logger.error('Password reset email failed for %s', user.email)
+        if current_app.debug:
+            logger.info('Password reset link (dev, email not sent): %s', reset_url)
     return sent
 
 
@@ -82,15 +90,21 @@ def initiate_password_reset(email: str) -> None:
     Look up user by email and send reset link if active.
     Always succeeds from caller's perspective (no email enumeration).
     """
+    cleaned = (email or '').strip().lower()
+    logger.info('Password reset requested for %s', cleaned or '(empty)')
     user = (
         db.session.query(User)
-        .filter(db.func.lower(User.email) == email.strip().lower())
+        .filter(db.func.lower(User.email) == cleaned)
         .first()
     )
-    if not user or not user.is_active:
+    if not user:
+        logger.info('Password reset skipped — no user for %s', cleaned)
+        return
+    if not user.is_active:
+        logger.info('Password reset skipped — inactive user id=%s email=%s', user.id, user.email)
         return
     if not brevo_configured() and not current_app.debug:
-        current_app.logger.warning('Password reset requested but Brevo is not configured')
+        logger.warning('Password reset skipped — Brevo is not configured (user=%s)', user.email)
         return
     send_password_reset_email(user)
 
