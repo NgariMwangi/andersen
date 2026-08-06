@@ -1,6 +1,7 @@
 """Book company mandatory annual leave for all active employees."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -23,7 +24,14 @@ from app.services.leave_bulk_entry_service import (
 from app.services.public_holiday_service import public_holiday_dates_in_range
 
 DEFAULT_MANDATORY_REASON = 'Company mandatory annual leave'
-MANDATORY_REVIEW_NOTES = 'Booked as company mandatory annual leave.'
+MANDATORY_REVIEW_NOTES_PREFIX = 'Booked as company mandatory annual leave.'
+# Legacy exact value (still matched via startswith / equality).
+MANDATORY_REVIEW_NOTES = MANDATORY_REVIEW_NOTES_PREFIX
+
+_PERIOD_IN_NOTES_RE = re.compile(
+    r'Period\s+(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})',
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -35,6 +43,35 @@ class MandatoryLeaveResult:
     total_days: Decimal = Decimal('0')
     errors: list[str] = field(default_factory=list)
     skipped_names: list[str] = field(default_factory=list)
+
+    def merge(self, other: 'MandatoryLeaveResult') -> None:
+        self.employees_processed = max(self.employees_processed, other.employees_processed)
+        self.employees_booked += other.employees_booked
+        self.employees_skipped_covered += other.employees_skipped_covered
+        self.created_requests += other.created_requests
+        self.total_days += other.total_days
+        self.errors.extend(other.errors)
+        self.skipped_names.extend(other.skipped_names)
+
+
+def review_notes_for_period(start: date, end: date) -> str:
+    """Stamp the intended company window so late joiners can be synced to the full period."""
+    return (
+        f'{MANDATORY_REVIEW_NOTES_PREFIX} '
+        f'Period {start.isoformat()} to {end.isoformat()}.'
+    )
+
+
+def parse_period_from_review_notes(notes: str | None) -> tuple[date, date] | None:
+    if not notes:
+        return None
+    m = _PERIOD_IN_NOTES_RE.search(notes)
+    if not m:
+        return None
+    try:
+        return date.fromisoformat(m.group(1)), date.fromisoformat(m.group(2))
+    except ValueError:
+        return None
 
 
 def _country_for_employee(emp: Employee) -> str:
@@ -52,13 +89,13 @@ def _mandatory_leave_query(company_id: int):
             Employee.company_id == company_id,
             db.or_(
                 LeaveRequest.status == LEAVE_STATUS_BOOKED,
-                LeaveRequest.review_notes == MANDATORY_REVIEW_NOTES,
+                LeaveRequest.review_notes.startswith(MANDATORY_REVIEW_NOTES_PREFIX),
             ),
         )
     )
 
 
-def migrate_mandatory_leave_status_to_booked(company_id: int) -> int:
+def migrate_mandatory_leave_status_to_booked(company_id: int, *, commit: bool = True) -> int:
     """
     Flip legacy mandatory leave rows from approved → booked
     (identified by review notes written at booking time).
@@ -69,7 +106,7 @@ def migrate_mandatory_leave_status_to_booked(company_id: int) -> int:
         .filter(
             Employee.company_id == company_id,
             LeaveRequest.status == LEAVE_STATUS_APPROVED,
-            LeaveRequest.review_notes == MANDATORY_REVIEW_NOTES,
+            LeaveRequest.review_notes.startswith(MANDATORY_REVIEW_NOTES_PREFIX),
         )
         .all()
     )
@@ -77,8 +114,39 @@ def migrate_mandatory_leave_status_to_booked(company_id: int) -> int:
         return 0
     for lr in rows:
         lr.status = LEAVE_STATUS_BOOKED
-    db.session.commit()
+    if commit:
+        db.session.commit()
     return len(rows)
+
+
+def known_mandatory_period_windows(company_id: int) -> list[dict]:
+    """
+    Distinct company mandatory windows {start_date, end_date, reason}.
+    Prefers the intended period stamped in review notes (not clipped per-employee dates).
+    """
+    rows = _mandatory_leave_query(company_id).all()
+    seen: dict[tuple, dict] = {}
+    for lr in rows:
+        parsed = parse_period_from_review_notes(lr.review_notes)
+        if parsed:
+            start, end = parsed
+        else:
+            start, end = lr.start_date, lr.end_date
+        if not start or not end:
+            continue
+        reason = (lr.reason or '').strip() or DEFAULT_MANDATORY_REASON
+        key = (start, end, reason)
+        if key not in seen:
+            seen[key] = {
+                'start_date': start,
+                'end_date': end,
+                'reason': reason,
+            }
+    return sorted(
+        seen.values(),
+        key=lambda p: (p['start_date'] or date.min, p['end_date'] or date.min),
+        reverse=True,
+    )
 
 
 def list_mandatory_leave_periods(company_id: int) -> list[dict]:
@@ -94,12 +162,18 @@ def list_mandatory_leave_periods(company_id: int) -> list[dict]:
     )
     groups: dict[tuple, dict] = {}
     for lr in rows:
-        key = (lr.start_date, lr.end_date, (lr.reason or '').strip())
+        parsed = parse_period_from_review_notes(lr.review_notes)
+        if parsed:
+            period_start, period_end = parsed
+        else:
+            period_start, period_end = lr.start_date, lr.end_date
+        reason = (lr.reason or '').strip() or DEFAULT_MANDATORY_REASON
+        key = (period_start, period_end, reason)
         if key not in groups:
             groups[key] = {
-                'start_date': lr.start_date,
-                'end_date': lr.end_date,
-                'reason': (lr.reason or '').strip() or DEFAULT_MANDATORY_REASON,
+                'start_date': period_start,
+                'end_date': period_end,
+                'reason': reason,
                 'employee_count': 0,
                 'request_count': 0,
                 'total_days': Decimal('0'),
@@ -198,6 +272,28 @@ def approved_leave_dates_in_range(
     return covered
 
 
+def _effective_period_for_employee(
+    emp: Employee,
+    start_date: date,
+    end_date: date,
+    *,
+    clip_to_hire_date: bool,
+) -> tuple[date, date] | None:
+    """
+    Return the leave window for this employee, clipped to hire_date when requested.
+    None if the employee joined after the period ended (nothing to book).
+    """
+    effective_start = start_date
+    if clip_to_hire_date and emp.hire_date:
+        if emp.hire_date > end_date:
+            return None
+        if emp.hire_date > start_date:
+            effective_start = emp.hire_date
+    if effective_start > end_date:
+        return None
+    return effective_start, end_date
+
+
 def book_mandatory_annual_leave(
     company_id: int,
     start_date: date,
@@ -205,12 +301,15 @@ def book_mandatory_annual_leave(
     *,
     reason: str | None = None,
     reviewed_by_user_id: int,
+    employee_ids: list[int] | None = None,
+    clip_to_hire_date: bool = True,
 ) -> MandatoryLeaveResult:
     """
-    Create booked ANNUAL leave for all active employees for the date range.
+    Create booked ANNUAL leave for active employees for the date range.
 
     Days already covered by approved or booked leave are not charged again.
     Remaining days are stored as contiguous booked leave segments.
+    When clip_to_hire_date is True, days before the employee's hire_date are skipped.
     """
     result = MandatoryLeaveResult()
     if not start_date or not end_date:
@@ -237,23 +336,35 @@ def book_mandatory_annual_leave(
 
     basis = (annual.days_count_basis or 'working').strip().lower()
     reason_text = (reason or '').strip() or DEFAULT_MANDATORY_REASON
-    review_notes = MANDATORY_REVIEW_NOTES
+    review_notes = review_notes_for_period(start_date, end_date)
 
-    employees = (
+    q = (
         db.session.query(Employee)
         .options(joinedload(Employee.branch))
         .filter(Employee.company_id == company_id, Employee.status == 'active')
-        .order_by(Employee.last_name, Employee.first_name)
-        .all()
     )
+    if employee_ids is not None:
+        if not employee_ids:
+            return result
+        q = q.filter(Employee.id.in_(employee_ids))
+    employees = q.order_by(Employee.last_name, Employee.first_name).all()
     result.employees_processed = len(employees)
 
     for emp in employees:
         try:
+            window = _effective_period_for_employee(
+                emp, start_date, end_date, clip_to_hire_date=clip_to_hire_date
+            )
+            if not window:
+                result.employees_skipped_covered += 1
+                result.skipped_names.append(emp.full_name)
+                continue
+            eff_start, eff_end = window
+
             country = _country_for_employee(emp)
             chargeable = _chargeable_dates_in_range(
-                start_date,
-                end_date,
+                eff_start,
+                eff_end,
                 basis=basis,
                 company_id=company_id,
                 country_code=country,
@@ -263,7 +374,7 @@ def book_mandatory_annual_leave(
                 result.skipped_names.append(emp.full_name)
                 continue
 
-            already = approved_leave_dates_in_range(emp.id, start_date, end_date)
+            already = approved_leave_dates_in_range(emp.id, eff_start, eff_end)
             remaining = [d for d in chargeable if d not in already]
             if not remaining:
                 result.employees_skipped_covered += 1
@@ -300,4 +411,66 @@ def book_mandatory_annual_leave(
         except Exception as exc:
             result.errors.append(f'{emp.full_name}: {exc}')
 
+    return result
+
+
+def apply_mandatory_leave_to_employee(
+    employee: Employee,
+    reviewed_by_user_id: int,
+) -> MandatoryLeaveResult:
+    """
+    Book all known company mandatory periods onto one active employee
+    (hire_date clipped; already-covered days skipped). Does not commit.
+    """
+    result = MandatoryLeaveResult()
+    if not employee or not employee.company_id:
+        return result
+    if (employee.status or '').strip().lower() != 'active':
+        return result
+
+    migrate_mandatory_leave_status_to_booked(employee.company_id, commit=False)
+    windows = known_mandatory_period_windows(employee.company_id)
+    if not windows:
+        return result
+
+    for window in windows:
+        partial = book_mandatory_annual_leave(
+            employee.company_id,
+            window['start_date'],
+            window['end_date'],
+            reason=window['reason'],
+            reviewed_by_user_id=reviewed_by_user_id,
+            employee_ids=[employee.id],
+            clip_to_hire_date=True,
+        )
+        result.merge(partial)
+    return result
+
+
+def sync_mandatory_leave_for_new_joiners(
+    company_id: int,
+    reviewed_by_user_id: int,
+) -> MandatoryLeaveResult:
+    """
+    Re-apply every known mandatory period to all active employees.
+    Existing coverage is skipped; late joiners get hire_date-clipped days.
+    Does not commit.
+    """
+    result = MandatoryLeaveResult()
+    migrate_mandatory_leave_status_to_booked(company_id, commit=False)
+    windows = known_mandatory_period_windows(company_id)
+    if not windows:
+        result.errors.append('No booked mandatory leave periods to sync.')
+        return result
+
+    for window in windows:
+        partial = book_mandatory_annual_leave(
+            company_id,
+            window['start_date'],
+            window['end_date'],
+            reason=window['reason'],
+            reviewed_by_user_id=reviewed_by_user_id,
+            clip_to_hire_date=True,
+        )
+        result.merge(partial)
     return result

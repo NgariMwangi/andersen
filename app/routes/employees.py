@@ -624,9 +624,20 @@ def create():
             photo = request.files.get('photo')
             if photo and photo.filename:
                 emp.photo_url = _save_employee_photo(photo, emp.id)
+            mandatory_leave_result = None
+            if (emp.status or '').strip().lower() == 'active':
+                from app.services.leave_mandatory_service import apply_mandatory_leave_to_employee
+
+                mandatory_leave_result = apply_mandatory_leave_to_employee(emp, current_user.id)
             db.session.commit()
             log_create('Employee', emp.id, model_to_audit_dict(emp), user_id=current_user.id, description='Employee created')
             flash('Employee created successfully.', 'success')
+            if mandatory_leave_result and mandatory_leave_result.created_requests:
+                flash(
+                    f'Booked {mandatory_leave_result.total_days} mandatory leave day(s) '
+                    f'for company shutdown periods on/after their hire date.',
+                    'info',
+                )
             return redirect(url_for('employees.view', id=emp.id))
         except ValueError as e:
             db.session.rollback()
@@ -920,6 +931,9 @@ def reactivate_employee(id):
         from app.services.employee_account_service import set_employee_login_active
 
         login_user = set_employee_login_active(emp, active=True)
+        from app.services.leave_mandatory_service import apply_mandatory_leave_to_employee
+
+        mandatory_leave_result = apply_mandatory_leave_to_employee(emp, current_user.id)
         db.session.commit()
         log_update(
             'Employee',
@@ -933,6 +947,12 @@ def reactivate_employee(id):
             flash('Employee set back to active. Their login has been re-enabled.', 'success')
         else:
             flash('Employee set back to active.', 'success')
+        if mandatory_leave_result and mandatory_leave_result.created_requests:
+            flash(
+                f'Booked {mandatory_leave_result.total_days} mandatory leave day(s) '
+                f'for company shutdown periods on/after their hire date.',
+                'info',
+            )
     except Exception as exc:
         db.session.rollback()
         flash(f'Could not reactivate employee: {exc}', 'danger')
@@ -987,6 +1007,7 @@ def edit(id):
             before_assign = assignment_snapshot(emp)
             backfill_assignment_history_if_missing(emp)
             old = model_to_audit_dict(emp)
+            was_active = (emp.status or '').strip().lower() == 'active'
             employee_number = _clean_employee_number(form.employee_number.data)
             if employee_number:
                 existing_emp = (
@@ -1068,9 +1089,21 @@ def edit(id):
                 change_reason=assign_note,
                 created_by_id=current_user.id,
             )
+            mandatory_leave_result = None
+            became_active = (emp.status or '').strip().lower() == 'active' and not was_active
+            if became_active:
+                from app.services.leave_mandatory_service import apply_mandatory_leave_to_employee
+
+                mandatory_leave_result = apply_mandatory_leave_to_employee(emp, current_user.id)
             db.session.commit()
             log_update('Employee', emp.id, old, model_to_audit_dict(emp), user_id=current_user.id, description='Employee updated')
             flash('Employee updated.', 'success')
+            if mandatory_leave_result and mandatory_leave_result.created_requests:
+                flash(
+                    f'Booked {mandatory_leave_result.total_days} mandatory leave day(s) '
+                    f'for company shutdown periods on/after their hire date.',
+                    'info',
+                )
             return redirect(url_for('employees.view', id=emp.id))
         except ValueError as e:
             db.session.rollback()

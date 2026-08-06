@@ -1879,7 +1879,7 @@ def mandatory_leave():
             if result.employees_skipped_covered:
                 flash(
                     f'Skipped {result.employees_skipped_covered} employee(s) already fully covered '
-                    f'by approved leave for those dates (no double-count).',
+                    f'or hired after the period (no double-count).',
                     'info',
                 )
             for err in result.errors[:10]:
@@ -1890,6 +1890,41 @@ def mandatory_leave():
             flash(f'Could not book mandatory leave: {exc}', 'danger')
 
     return render_template('leave/mandatory.html', **_page_ctx())
+
+
+@leave_bp.route('/mandatory/sync', methods=['POST'])
+@login_required
+@permission_required('manage_leave_types')
+def mandatory_leave_sync():
+    """Re-apply all known mandatory periods to active employees (covers late joiners)."""
+    from app.services.leave_mandatory_service import sync_mandatory_leave_for_new_joiners
+
+    cid = require_company_id()
+    try:
+        result = sync_mandatory_leave_for_new_joiners(cid, current_user.id)
+        if result.errors and not result.created_requests:
+            for err in result.errors:
+                flash(err, 'warning' if 'No booked' in err else 'danger')
+            db.session.rollback()
+            return redirect(url_for('leave.mandatory_leave'))
+        db.session.commit()
+        if result.created_requests:
+            flash(
+                f'Synced mandatory leave for new joiners: {result.employees_booked} employee(s), '
+                f'{result.created_requests} leave period(s), {result.total_days} day(s) charged.',
+                'success',
+            )
+        else:
+            flash(
+                'All active employees are already covered for existing mandatory leave periods.',
+                'info',
+            )
+        for err in result.errors[:10]:
+            flash(err, 'warning')
+    except Exception as exc:
+        db.session.rollback()
+        flash(f'Could not sync mandatory leave: {exc}', 'danger')
+    return redirect(url_for('leave.mandatory_leave'))
 
 
 @leave_bp.route('/api/bulk-entry-context')

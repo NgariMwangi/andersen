@@ -9,9 +9,19 @@
         <p class="text-muted mb-0">
             Book company shutdown / planned break days as booked annual leave for all active employees.
             Days already covered by approved or booked leave are not charged again.
+            New joiners are booked automatically on hire/reactivation; you can also sync below.
         </p>
     </div>
-    <a href="{{ url_for('leave.index') }}" class="btn btn-outline-secondary btn-sm">Back to leave</a>
+    <div class="d-flex flex-wrap gap-2">
+        {% if periods %}
+        <form method="post" action="{{ url_for('leave.mandatory_leave_sync') }}" class="d-inline"
+              onsubmit="return confirm('Apply all booked mandatory periods to active employees who are not yet covered (including late joiners)? Days before each employee hire date are skipped.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="btn btn-outline-primary btn-sm">Sync to new joiners</button>
+        </form>
+        {% endif %}
+        <a href="{{ url_for('leave.index') }}" class="btn btn-outline-secondary btn-sm">Back to leave</a>
+    </div>
 </div>
 
 {% if not annual %}
@@ -70,6 +80,8 @@
                     <li class="mb-2">Uses leave type <strong>ANNUAL</strong>{% if annual %} ({{ annual.name }}){% endif %}.</li>
                     <li class="mb-2">Creates leave with status <strong>Booked</strong> immediately and updates annual leave balances.</li>
                     <li class="mb-2">If an employee already has approved or booked leave on some of those days, only the remaining days are booked — no double-count.</li>
+                    <li class="mb-2">Days before an employee’s <strong>hire date</strong> are not charged.</li>
+                    <li class="mb-2">Employees who join later get these periods automatically when created/reactivated as active, or via <strong>Sync to new joiners</strong>.</li>
                     <li>Employees already fully covered still appear away via their existing leave.</li>
                 </ul>
                 <p class="small text-muted mb-0">
