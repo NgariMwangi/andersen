@@ -26,20 +26,30 @@ def normalize_hr_sender_email(value: str | None) -> str:
     return email
 
 
+def _api_key_fingerprint(api_key: str) -> str:
+    """Safe identifier for logs (never the full key)."""
+    key = (api_key or '').strip()
+    if not key:
+        return '(missing)'
+    if len(key) <= 16:
+        return f'{key[:4]}…{key[-2:]} (len={len(key)})'
+    return f'{key[:12]}…{key[-6:]} (len={len(key)})'
+
+
 def brevo_configured() -> bool:
     api_key = (current_app.config.get('BREVO_API_KEY') or '').strip()
     sender = normalize_hr_sender_email(current_app.config.get('BREVO_SENDER_EMAIL'))
     configured = bool(api_key and sender)
     if not configured:
         logger.warning(
-            'Brevo not configured: api_key_set=%s sender=%r',
-            bool(api_key),
+            'Brevo not configured: api_key=%s sender=%r',
+            _api_key_fingerprint(api_key),
             sender or None,
         )
     else:
         logger.info(
-            'Brevo configured: api_key_len=%s sender=%r sender_name=%r',
-            len(api_key),
+            'Brevo configured: api_key=%s sender=%r sender_name=%r',
+            _api_key_fingerprint(api_key),
             sender,
             (current_app.config.get('BREVO_SENDER_NAME') or '').strip() or None,
         )
@@ -64,18 +74,19 @@ def send_transactional_email(
 
     if not api_key or not sender_email:
         logger.error(
-            'Email not sent to %s — Brevo not configured (api_key_set=%s sender=%r) subject=%r',
+            'Email not sent to %s — Brevo not configured (api_key=%r sender=%r) subject=%r',
             to_email,
-            bool(api_key),
+            api_key or '(missing)',
             sender_email or None,
             subject[:80] if subject else '',
         )
         return False
 
     logger.info(
-        'Sending email to %s from %r subject=%r',
+        'Sending email to %s from %r BREVO_API_KEY=%s subject=%r',
         to_email,
         sender_email,
+        api_key,
         subject[:80] if subject else '',
     )
 
