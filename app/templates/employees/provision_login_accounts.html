@@ -42,13 +42,23 @@
         <form method="post" onsubmit="return confirm('Create {{ preview.eligible }} login account(s) with the password you entered?');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="mb-3">
-                <label class="form-label">Initial password (all new accounts)</label>
-                <input type="password" name="password" class="form-control" value="{{ default_password }}" required autocomplete="new-password"/>
+                <label class="form-label" for="provision-password">Initial password (all new accounts)</label>
+                <div class="password-wrap">
+                    <input type="password" name="password" id="provision-password" class="form-control has-toggle" value="{{ default_password }}" required autocomplete="new-password"/>
+                    <button type="button" class="password-toggle-btn" aria-label="Show password" title="Show password">
+                        <i class="bi bi-eye" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <div class="form-text">Default: {{ default_password }} — at least {{ min_len }} characters. Share securely with staff.</div>
             </div>
             <div class="mb-3">
-                <label class="form-label">Confirm password</label>
-                <input type="password" name="confirm_password" class="form-control" value="{{ default_password }}" required autocomplete="new-password"/>
+                <label class="form-label" for="provision-password-confirm">Confirm password</label>
+                <div class="password-wrap">
+                    <input type="password" name="confirm_password" id="provision-password-confirm" class="form-control has-toggle" value="{{ default_password }}" required autocomplete="new-password"/>
+                    <button type="button" class="password-toggle-btn" aria-label="Show password" title="Show password">
+                        <i class="bi bi-eye" aria-hidden="true"></i>
+                    </button>
+                </div>
             </div>
             <div class="mb-3 form-check">
                 <input type="checkbox" class="form-check-input" name="must_change_password" value="1" id="must_change_password" checked/>
@@ -63,4 +73,7 @@
     </div>
 </div>
 {% endif %}
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
 {% endblock %}
