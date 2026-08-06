@@ -1653,7 +1653,7 @@ def provision_login_accounts():
 
     cid = require_company_id()
     min_len = current_app.config.get('PASSWORD_MIN_LENGTH', 8)
-    default_password = 'andersen 2026'
+    default_password = 'andersen2026'
     statuses = ('active',)
     preview = preview_bulk_provision(cid, statuses=statuses)
 
