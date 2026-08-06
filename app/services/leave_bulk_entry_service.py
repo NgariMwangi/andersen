@@ -57,7 +57,7 @@ def approved_leave_dates_for_employee(
         db.session.query(LeaveRequest)
         .filter(
             LeaveRequest.employee_id == employee_id,
-            LeaveRequest.status == 'approved',
+            LeaveRequest.status.in_(('approved', 'booked')),
             LeaveRequest.start_date <= y1,
             LeaveRequest.end_date >= y0,
         )
@@ -199,7 +199,7 @@ def bulk_entry_context(
         .filter(
             LR.employee_id == employee_id,
             LR.leave_type_id == leave_type_id,
-            LR.status == 'approved',
+            LR.status.in_(('approved', 'booked')),
             LR.start_date >= date(year, 1, 1),
             LR.start_date <= date(year, 12, 31),
         )

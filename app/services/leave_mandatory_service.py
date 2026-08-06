@@ -10,6 +10,11 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models.employee import Employee
 from app.models.leave import LeaveRequest, LeaveType
+from app.services.leave_approval_service import (
+    LEAVE_STATUS_APPROVED,
+    LEAVE_STATUS_BOOKED,
+    LEAVE_STATUSES_TAKEN,
+)
 from app.services.leave_balance_service import refresh_leave_balance_after_request_change
 from app.services.leave_bulk_entry_service import (
     _leave_dates_in_request,
@@ -17,8 +22,8 @@ from app.services.leave_bulk_entry_service import (
 )
 from app.services.public_holiday_service import public_holiday_dates_in_range
 
-
 DEFAULT_MANDATORY_REASON = 'Company mandatory annual leave'
+MANDATORY_REVIEW_NOTES = 'Booked as company mandatory annual leave.'
 
 
 @dataclass
@@ -36,6 +41,106 @@ def _country_for_employee(emp: Employee) -> str:
     if emp.branch and emp.branch.country_code:
         return (emp.branch.country_code or 'KE').upper()[:2]
     return 'KE'
+
+
+def _mandatory_leave_query(company_id: int):
+    """Leave requests created by company mandatory booking for this company."""
+    return (
+        db.session.query(LeaveRequest)
+        .join(Employee, Employee.id == LeaveRequest.employee_id)
+        .filter(
+            Employee.company_id == company_id,
+            db.or_(
+                LeaveRequest.status == LEAVE_STATUS_BOOKED,
+                LeaveRequest.review_notes == MANDATORY_REVIEW_NOTES,
+            ),
+        )
+    )
+
+
+def migrate_mandatory_leave_status_to_booked(company_id: int) -> int:
+    """
+    Flip legacy mandatory leave rows from approved → booked
+    (identified by review notes written at booking time).
+    """
+    rows = (
+        db.session.query(LeaveRequest)
+        .join(Employee, Employee.id == LeaveRequest.employee_id)
+        .filter(
+            Employee.company_id == company_id,
+            LeaveRequest.status == LEAVE_STATUS_APPROVED,
+            LeaveRequest.review_notes == MANDATORY_REVIEW_NOTES,
+        )
+        .all()
+    )
+    if not rows:
+        return 0
+    for lr in rows:
+        lr.status = LEAVE_STATUS_BOOKED
+    db.session.commit()
+    return len(rows)
+
+
+def list_mandatory_leave_periods(company_id: int) -> list[dict]:
+    """
+    Distinct mandatory leave date windows for the company, with employee counts.
+    Sorted newest start date first.
+    """
+    rows = (
+        _mandatory_leave_query(company_id)
+        .options(joinedload(LeaveRequest.employee))
+        .order_by(LeaveRequest.start_date.desc(), LeaveRequest.end_date.desc(), LeaveRequest.id.desc())
+        .all()
+    )
+    groups: dict[tuple, dict] = {}
+    for lr in rows:
+        key = (lr.start_date, lr.end_date, (lr.reason or '').strip())
+        if key not in groups:
+            groups[key] = {
+                'start_date': lr.start_date,
+                'end_date': lr.end_date,
+                'reason': (lr.reason or '').strip() or DEFAULT_MANDATORY_REASON,
+                'employee_count': 0,
+                'request_count': 0,
+                'total_days': Decimal('0'),
+                'booked_at': lr.reviewed_at or getattr(lr, 'created_at', None),
+                'employee_ids': set(),
+            }
+        g = groups[key]
+        g['request_count'] += 1
+        g['total_days'] += Decimal(str(lr.days_requested or 0))
+        if lr.employee_id not in g['employee_ids']:
+            g['employee_ids'].add(lr.employee_id)
+            g['employee_count'] += 1
+        stamped = lr.reviewed_at or getattr(lr, 'created_at', None)
+        if stamped and (g['booked_at'] is None or stamped > g['booked_at']):
+            g['booked_at'] = stamped
+
+    periods = []
+    for g in groups.values():
+        g.pop('employee_ids', None)
+        periods.append(g)
+    periods.sort(key=lambda p: (p['start_date'] or date.min, p['end_date'] or date.min), reverse=True)
+    return periods
+
+
+def list_mandatory_leave_requests(company_id: int) -> list[LeaveRequest]:
+    """Individual mandatory/booked leave rows for the company (newest first)."""
+    return (
+        _mandatory_leave_query(company_id)
+        .options(
+            joinedload(LeaveRequest.employee),
+            joinedload(LeaveRequest.leave_type),
+        )
+        .order_by(
+            LeaveRequest.start_date.desc(),
+            LeaveRequest.end_date.desc(),
+            Employee.last_name.asc(),
+            Employee.first_name.asc(),
+            LeaveRequest.id.desc(),
+        )
+        .all()
+    )
 
 
 def _chargeable_dates_in_range(
@@ -68,7 +173,7 @@ def approved_leave_dates_in_range(
     start: date,
     end: date,
 ) -> set[date]:
-    """Days already covered by any approved leave overlapping [start, end]."""
+    """Days already covered by approved or booked leave overlapping [start, end]."""
     emp = db.session.get(Employee, employee_id)
     if not emp:
         return set()
@@ -79,7 +184,7 @@ def approved_leave_dates_in_range(
         .options(joinedload(LeaveRequest.leave_type))
         .filter(
             LeaveRequest.employee_id == employee_id,
-            LeaveRequest.status == 'approved',
+            LeaveRequest.status.in_(tuple(LEAVE_STATUSES_TAKEN)),
             LeaveRequest.start_date <= end,
             LeaveRequest.end_date >= start,
         )
@@ -102,10 +207,10 @@ def book_mandatory_annual_leave(
     reviewed_by_user_id: int,
 ) -> MandatoryLeaveResult:
     """
-    Create approved ANNUAL leave for all active employees for the date range.
+    Create booked ANNUAL leave for all active employees for the date range.
 
-    Days already covered by approved leave are not charged again. Remaining days
-    are booked as contiguous approved leave segments.
+    Days already covered by approved or booked leave are not charged again.
+    Remaining days are stored as contiguous booked leave segments.
     """
     result = MandatoryLeaveResult()
     if not start_date or not end_date:
@@ -132,7 +237,7 @@ def book_mandatory_annual_leave(
 
     basis = (annual.days_count_basis or 'working').strip().lower()
     reason_text = (reason or '').strip() or DEFAULT_MANDATORY_REASON
-    review_notes = 'Booked as company mandatory annual leave.'
+    review_notes = MANDATORY_REVIEW_NOTES
 
     employees = (
         db.session.query(Employee)
@@ -176,7 +281,7 @@ def book_mandatory_annual_leave(
                     end_date=segment[-1],
                     days_requested=days,
                     reason=reason_text,
-                    status='approved',
+                    status=LEAVE_STATUS_BOOKED,
                     reviewed_by_id=reviewed_by_user_id,
                     reviewed_at=datetime.utcnow(),
                     review_notes=review_notes,

@@ -173,7 +173,7 @@ class MandatoryAnnualLeaveForm(FlaskForm):
         default='Company mandatory annual leave',
     )
     confirm = BooleanField(
-        'I confirm these days should be booked as approved annual leave for all active employees',
+        'I confirm these days should be booked as company annual leave for all active employees',
         validators=[DataRequired(message='Please confirm before booking.')],
     )
     submit = SubmitField('Book mandatory leave')

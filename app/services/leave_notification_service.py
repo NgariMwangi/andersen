@@ -16,6 +16,7 @@ from app.models.user import Role, User, UserRole
 from app.services.brevo_service import brevo_configured, send_transactional_email
 from app.services.leave_approval_service import (
     LEAVE_STATUS_APPROVED,
+    LEAVE_STATUS_BOOKED,
     LEAVE_STATUS_PENDING,
     LEAVE_STATUS_PENDING_HR,
     LEAVE_STATUS_REJECTED,
@@ -181,6 +182,8 @@ def _status_badge_html(status: str) -> str:
     st = (status or '').strip().lower()
     if st == LEAVE_STATUS_APPROVED:
         bg, fg = '#dcfce7', '#166534'
+    elif st == LEAVE_STATUS_BOOKED:
+        bg, fg = '#e0f2fe', '#075985'
     elif st == LEAVE_STATUS_REJECTED:
         bg, fg = '#fee2e2', '#991b1b'
     elif st in (LEAVE_STATUS_PENDING, LEAVE_STATUS_PENDING_HR):

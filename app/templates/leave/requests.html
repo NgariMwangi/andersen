@@ -4,7 +4,7 @@
 
 {% macro leave_status_badge(r) %}
 {% set st = (r.status or '')|lower %}
-<span class="badge bg-{% if st == 'approved' %}success{% elif st in ('pending', 'pending_hr') %}warning text-dark{% elif st == 'rejected' %}danger{% else %}secondary{% endif %}">{{ leave_status_label(r.status) }}</span>
+<span class="badge bg-{% if st == 'approved' %}success{% elif st == 'booked' %}info{% elif st in ('pending', 'pending_hr') %}warning text-dark{% elif st == 'rejected' %}danger{% else %}secondary{% endif %}">{{ leave_status_label(r.status) }}</span>
 {% endmacro %}
 
 {% macro supervisor_status_badge(r) %}
@@ -23,7 +23,7 @@
 {% endmacro %}
 
 {% macro leave_remaining_cell(r) %}
-{% if r.status == 'approved' and remaining_days.get(r.id) is not none %}
+{% if (r.status or '')|lower in ('approved', 'booked') and remaining_days.get(r.id) is not none %}
     {% set rem = remaining_days[r.id] %}
     {% if rem == 0 %}
         <span class="text-muted">0</span>
@@ -211,6 +211,6 @@
 </div>
 <p class="text-muted small mb-0">
     When a <strong>manager</strong> is set on the employee, they normally approve first; HR can still approve or reject anytime and will see supervisor status (Awaiting / Done).
-    <strong>Remaining</strong> is for <strong>approved</strong> leave only: days still to run in the period (from today through the end date), using the same rule as the leave type — <em>working days</em> (Mon–Fri) or <em>calendar days</em>.
+    <strong>Remaining</strong> is for <strong>approved</strong> or <strong>booked</strong> leave: days still to run in the period (from today through the end date), using the same rule as the leave type — <em>working days</em> (Mon–Fri) or <em>calendar days</em>.
 </p>
 {% endblock %}

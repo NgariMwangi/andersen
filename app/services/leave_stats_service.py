@@ -62,7 +62,9 @@ def leave_types_visible_for_gender(leave_types: list, gender_key: str | None) ->
 
 
 def _used_days_approved_in_year(employee_id: int, leave_type_id: int, year: int) -> Decimal:
-    """Sum approved leave days for requests overlapping the calendar year."""
+    """Sum taken leave days (approved or booked) overlapping the calendar year."""
+    from app.services.leave_approval_service import LEAVE_STATUSES_TAKEN
+
     y0 = date(year, 1, 1)
     y1 = date(year, 12, 31)
     total = (
@@ -70,7 +72,7 @@ def _used_days_approved_in_year(employee_id: int, leave_type_id: int, year: int)
         .filter(
             LeaveRequest.employee_id == employee_id,
             LeaveRequest.leave_type_id == leave_type_id,
-            LeaveRequest.status == "approved",
+            LeaveRequest.status.in_(tuple(LEAVE_STATUSES_TAKEN)),
             LeaveRequest.start_date <= y1,
             LeaveRequest.end_date >= y0,
         )

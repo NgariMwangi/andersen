@@ -74,7 +74,7 @@ class LeaveRequest(BaseModel):
         db.String(30),
         default='pending',
         nullable=False,
-    )  # pending → pending_hr → approved; or rejected / cancelled
+    )  # pending → pending_hr → approved; or booked (mandatory) / rejected / cancelled
     supervisor_reviewed_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     supervisor_reviewed_at = db.Column(db.DateTime, nullable=True)
     supervisor_notes = db.Column(db.Text, nullable=True)

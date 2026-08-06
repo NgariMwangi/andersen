@@ -56,6 +56,7 @@ from app.services.leave_approval_service import (
     LEAVE_STATUS_PENDING,
     LEAVE_STATUS_PENDING_HR,
     LEAVE_STATUS_REJECTED,
+    LEAVE_STATUSES_TAKEN,
     approval_stage_for_user,
     initial_leave_status_for_employee,
     leave_request_is_editable,
@@ -194,7 +195,7 @@ def _validate_days_within_leave_limits(employee_id: int, lt: LeaveType, year: in
             .filter(
                 LeaveRequest.employee_id == employee_id,
                 LeaveRequest.leave_type_id == lt.id,
-                LeaveRequest.status == 'approved',
+                LeaveRequest.status.in_(tuple(LEAVE_STATUSES_TAKEN)),
                 extract('year', LeaveRequest.start_date) == year,
             )
             .scalar()
@@ -203,7 +204,7 @@ def _validate_days_within_leave_limits(employee_id: int, lt: LeaveType, year: in
         if total_after_request > entitlement:
             return (
                 f'Request exceeds allowed days for {year}. '
-                f'Allowed: {entitlement} day(s), already approved: {Decimal(str(used_approved or 0))}, '
+                f'Allowed: {entitlement} day(s), already taken: {Decimal(str(used_approved or 0))}, '
                 f'requested: {days_requested}.'
             )
     return None
@@ -287,7 +288,8 @@ def _leave_remaining_days_map(requests, cid: int) -> dict:
     today = date.today()
     remaining_days = {}
     for r in requests:
-        if r.status != 'approved' or not r.leave_type or not r.start_date or not r.end_date:
+        st = (r.status or '').strip().lower()
+        if st not in LEAVE_STATUSES_TAKEN or not r.leave_type or not r.start_date or not r.end_date:
             remaining_days[r.id] = None
             continue
         basis = (r.leave_type.days_count_basis or 'working').lower()
@@ -304,6 +306,9 @@ def _leave_remaining_days_map(requests, cid: int) -> dict:
 
 
 def _render_leave_requests_page(cid: int, requests, *, list_mode: str):
+    from app.services.leave_mandatory_service import migrate_mandatory_leave_status_to_booked
+
+    migrate_mandatory_leave_status_to_booked(cid)
     leave_statistics = None
     stats_year = date.today().year
     if list_mode in ('mine', 'all') and current_user.employee_id:
@@ -674,7 +679,7 @@ def view_request(id):
         abort(403)
 
     remaining = None
-    if lr.status == LEAVE_STATUS_APPROVED and lr.leave_type and lr.start_date and lr.end_date:
+    if (lr.status or '').strip().lower() in LEAVE_STATUSES_TAKEN and lr.leave_type and lr.start_date and lr.end_date:
         basis = (lr.leave_type.days_count_basis or 'working').lower()
         if basis not in ('working', 'calendar'):
             basis = 'working'
@@ -1076,7 +1081,7 @@ def tracker():
             db.session.query(LeaveRequest)
             .filter(
                 LeaveRequest.employee_id.in_(emp_ids),
-                LeaveRequest.status == 'approved',
+                LeaveRequest.status.in_(tuple(LEAVE_STATUSES_TAKEN)),
                 LeaveRequest.start_date <= y1,
                 LeaveRequest.end_date >= y0,
             )
@@ -1811,9 +1816,13 @@ def mandatory_leave():
     from app.services.leave_mandatory_service import (
         DEFAULT_MANDATORY_REASON,
         book_mandatory_annual_leave,
+        list_mandatory_leave_periods,
+        list_mandatory_leave_requests,
+        migrate_mandatory_leave_status_to_booked,
     )
 
     cid = require_company_id()
+    migrate_mandatory_leave_status_to_booked(cid)
     form = MandatoryAnnualLeaveForm()
     if request.method == 'GET' and not form.reason.data:
         form.reason.data = DEFAULT_MANDATORY_REASON
@@ -1833,15 +1842,20 @@ def mandatory_leave():
         .first()
     )
 
+    def _page_ctx(**extra):
+        return {
+            'form': form,
+            'active_count': active_count,
+            'annual': annual,
+            'periods': list_mandatory_leave_periods(cid),
+            'bookings': list_mandatory_leave_requests(cid),
+            **extra,
+        }
+
     if form.validate_on_submit():
         if not annual:
             flash('Configure an active Annual leave type (code ANNUAL) before booking.', 'danger')
-            return render_template(
-                'leave/mandatory.html',
-                form=form,
-                active_count=active_count,
-                annual=annual,
-            )
+            return render_template('leave/mandatory.html', **_page_ctx())
         try:
             result = book_mandatory_annual_leave(
                 cid,
@@ -1854,12 +1868,7 @@ def mandatory_leave():
                 for err in result.errors:
                     flash(err, 'danger')
                 db.session.rollback()
-                return render_template(
-                    'leave/mandatory.html',
-                    form=form,
-                    active_count=active_count,
-                    annual=annual,
-                )
+                return render_template('leave/mandatory.html', **_page_ctx())
             db.session.commit()
             flash(
                 f'Booked mandatory leave for {result.employees_booked} of {result.employees_processed} '
@@ -1880,12 +1889,7 @@ def mandatory_leave():
             db.session.rollback()
             flash(f'Could not book mandatory leave: {exc}', 'danger')
 
-    return render_template(
-        'leave/mandatory.html',
-        form=form,
-        active_count=active_count,
-        annual=annual,
-    )
+    return render_template('leave/mandatory.html', **_page_ctx())
 
 
 @leave_bp.route('/api/bulk-entry-context')

@@ -11,7 +11,7 @@
         {% endif %}
     </div>
     {% set st = (request.status or '')|lower %}
-    <span class="badge fs-6 bg-{% if st == 'approved' %}success{% elif st in ('pending', 'pending_hr') %}warning text-dark{% elif st == 'rejected' %}danger{% else %}secondary{% endif %}">
+    <span class="badge fs-6 bg-{% if st == 'approved' %}success{% elif st == 'booked' %}info{% elif st in ('pending', 'pending_hr') %}warning text-dark{% elif st == 'rejected' %}danger{% else %}secondary{% endif %}">
         {{ leave_status_label(request.status) }}
     </span>
 </div>
@@ -143,6 +143,8 @@
         <p class="small mb-1">
             {% if st == 'approved' %}
             <span class="badge bg-success">Approved</span>
+            {% elif st == 'booked' %}
+            <span class="badge bg-info">Booked</span>
             {% elif st == 'rejected' %}
             <span class="badge bg-danger">Rejected</span>
             {% else %}

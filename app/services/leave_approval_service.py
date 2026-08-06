@@ -12,8 +12,12 @@ from app.services.employee_relations_service import (
 LEAVE_STATUS_PENDING = 'pending'
 LEAVE_STATUS_PENDING_HR = 'pending_hr'
 LEAVE_STATUS_APPROVED = 'approved'
+LEAVE_STATUS_BOOKED = 'booked'  # company mandatory leave (counts as taken)
 LEAVE_STATUS_REJECTED = 'rejected'
 LEAVE_STATUS_CANCELLED = 'cancelled'
+
+# Statuses that consume leave balance / block overlapping days.
+LEAVE_STATUSES_TAKEN = frozenset({LEAVE_STATUS_APPROVED, LEAVE_STATUS_BOOKED})
 
 EDITABLE_STATUSES = frozenset({LEAVE_STATUS_PENDING, LEAVE_STATUS_PENDING_HR})
 RESUBMITTABLE_STATUSES = frozenset({LEAVE_STATUS_REJECTED})
@@ -142,6 +146,7 @@ def leave_status_label(status: str) -> str:
         LEAVE_STATUS_PENDING: 'Pending supervisor',
         LEAVE_STATUS_PENDING_HR: 'Pending HR',
         LEAVE_STATUS_APPROVED: 'Approved',
+        LEAVE_STATUS_BOOKED: 'Booked',
         LEAVE_STATUS_REJECTED: 'Rejected',
         LEAVE_STATUS_CANCELLED: 'Cancelled',
     }

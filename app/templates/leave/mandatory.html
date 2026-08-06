@@ -1,12 +1,14 @@
 {% extends "layouts/base.html" %}
 {% block title %}Mandatory annual leave - {{ app_name }}{% endblock %}
 {% block content %}
+{% set periods = periods|default([]) %}
+{% set bookings = bookings|default([]) %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <div>
         <h1 class="h3 mb-1">Mandatory annual leave</h1>
         <p class="text-muted mb-0">
-            Book company shutdown / planned break days as approved annual leave for all active employees.
-            Days already covered by approved leave are not charged again.
+            Book company shutdown / planned break days as booked annual leave for all active employees.
+            Days already covered by approved or booked leave are not charged again.
         </p>
     </div>
     <a href="{{ url_for('leave.index') }}" class="btn btn-outline-secondary btn-sm">Back to leave</a>
@@ -18,10 +20,11 @@
 </div>
 {% endif %}
 
-<div class="row g-4">
+<div class="row g-4 mb-4">
     <div class="col-lg-7">
         <div class="card border-0 shadow-sm">
             <div class="card-body p-4">
+                <h2 class="h6 text-uppercase text-muted mb-3">Book new period</h2>
                 <form method="post" action="{{ url_for('leave.mandatory_leave') }}" novalidate
                       onsubmit="return confirm('Book mandatory annual leave for all {{ active_count }} active employee(s) for the selected dates?');">
                     {{ form.hidden_tag() }}
@@ -65,8 +68,8 @@
                 <ul class="small mb-3 ps-3">
                     <li class="mb-2">Applies to <strong>{{ active_count }}</strong> active employee(s).</li>
                     <li class="mb-2">Uses leave type <strong>ANNUAL</strong>{% if annual %} ({{ annual.name }}){% endif %}.</li>
-                    <li class="mb-2">Creates <strong>approved</strong> leave immediately and updates annual leave balances.</li>
-                    <li class="mb-2">If an employee already has approved leave on some of those days, only the remaining days are booked — no double-count.</li>
+                    <li class="mb-2">Creates leave with status <strong>Booked</strong> immediately and updates annual leave balances.</li>
+                    <li class="mb-2">If an employee already has approved or booked leave on some of those days, only the remaining days are booked — no double-count.</li>
                     <li>Employees already fully covered still appear away via their existing leave.</li>
                 </ul>
                 <p class="small text-muted mb-0">
@@ -74,6 +77,99 @@
                 </p>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="booked-periods">
+    <div class="card-body p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h5 mb-0">Booked periods</h2>
+            <span class="text-muted small">{{ periods|length }} period{{ 's' if periods|length != 1 else '' }}</span>
+        </div>
+        {% if periods %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>From</th>
+                        <th>To</th>
+                        <th class="text-center">Employees</th>
+                        <th class="text-center">Leave records</th>
+                        <th class="text-center">Days charged</th>
+                        <th>Reason</th>
+                        <th>Booked</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in periods %}
+                    <tr>
+                        <td>{{ p.start_date.strftime('%d %b %Y') if p.start_date else '—' }}</td>
+                        <td>{{ p.end_date.strftime('%d %b %Y') if p.end_date else '—' }}</td>
+                        <td class="text-center">{{ p.employee_count }}</td>
+                        <td class="text-center">{{ p.request_count }}</td>
+                        <td class="text-center">{{ p.total_days | fmt_days }}</td>
+                        <td class="small">{{ p.reason }}</td>
+                        <td class="small text-muted">
+                            {% if p.booked_at %}{{ p.booked_at.strftime('%d %b %Y %H:%M') }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No mandatory leave periods have been booked yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" id="booked-employees">
+    <div class="card-body p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="h5 mb-0">Booked leave by employee</h2>
+            <span class="text-muted small">{{ bookings|length }} record{{ 's' if bookings|length != 1 else '' }}</span>
+        </div>
+        {% if bookings %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th class="text-center">Days</th>
+                        <th>Status</th>
+                        <th>Reason</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in bookings %}
+                    <tr>
+                        <td>
+                            {% if r.employee %}
+                            <span class="fw-semibold">{{ r.employee.full_name }}</span>
+                            {% if r.employee.employee_number %}
+                            <span class="text-muted small d-block">{{ r.employee.employee_number }}</span>
+                            {% endif %}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>{{ r.start_date.strftime('%d %b %Y') if r.start_date else '—' }}</td>
+                        <td>{{ r.end_date.strftime('%d %b %Y') if r.end_date else '—' }}</td>
+                        <td class="text-center">{{ r.days_requested | fmt_days }}</td>
+                        <td><span class="badge bg-info">{{ leave_status_label(r.status) }}</span></td>
+                        <td class="small">{{ r.reason or '—' }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('leave.view_request', id=r.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No booked mandatory leave records yet.</p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
