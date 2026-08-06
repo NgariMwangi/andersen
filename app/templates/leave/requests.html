@@ -60,8 +60,15 @@
 {% endmacro %}
 
 {% block content %}
+{% set list_mode = list_mode|default('mine') %}
+{% set show_team_tab = show_team_tab|default(false) %}
+{% set page_title = {
+    'all': 'Leave Requests',
+    'team': 'Team Leave Requests',
+    'mine': 'My Leave Requests',
+}.get(list_mode, 'Leave Requests') %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="h3 mb-0">Leave Requests</h1>
+    <h1 class="h3 mb-0">{{ page_title }}</h1>
     {% if has_permission('manage_leave_types') %}
     <a href="{{ url_for('leave.types_index') }}" class="btn btn-outline-secondary btn-sm">Configure leave types</a>
     <a href="{{ url_for('leave.balances') }}" class="btn btn-outline-secondary btn-sm">Leave balances</a>
@@ -71,8 +78,27 @@
     {% endif %}
 </div>
 
-{% if leave_statistics %}
-<div class="card mb-4 border-0 shadow-sm">
+{% if show_team_tab or list_mode == 'all' %}
+<ul class="nav nav-pills gap-2 mb-4">
+    {% if list_mode == 'all' %}
+    <li class="nav-item">
+        <a class="nav-link active" href="{{ url_for('leave.index') }}">All requests</a>
+    </li>
+    {% else %}
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if list_mode == 'mine' else '' }}" href="{{ url_for('leave.index') }}">My leave</a>
+    </li>
+    {% endif %}
+    {% if show_team_tab %}
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if list_mode == 'team' else '' }}" href="{{ url_for('leave.team_requests') }}">Team leave</a>
+    </li>
+    {% endif %}
+</ul>
+{% endif %}
+
+{% if leave_statistics and list_mode in ('mine', 'all') %}
+<div class="card mb-4 border-0 shadow-sm" id="my-summary">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-3">Your leave summary ({{ stats_year }})</h2>
         <p class="text-muted small mb-3 mb-md-2">
@@ -93,16 +119,18 @@
         </div>
     </div>
 </div>
-{% elif not current_user.employee_id %}
+{% elif list_mode == 'mine' and not current_user.employee_id %}
 <div class="alert alert-light border mb-4 small">
     Link your login to an <strong>employee</strong> record to see personal leave statistics here.
 </div>
+{% elif list_mode == 'team' %}
+<p class="text-muted small mb-3">Leave requests from employees who report to you. Use <strong>Review</strong> to approve or decline.</p>
 {% endif %}
 
-{% set show_employee_column = has_permission('approve_leave') or is_line_manager() %}
-{% set show_supervisor_column = has_permission('approve_leave') %}
+{% set show_employee_column = list_mode in ('team', 'all') %}
+{% set show_supervisor_column = has_permission('approve_leave') and list_mode == 'all' %}
 {% set leave_table_cols = 8 + (1 if show_employee_column else 0) + (1 if show_supervisor_column else 0) %}
-{% if current_user.employee_id %}
+{% if current_user.employee_id and list_mode != 'team' %}
 <a href="{{ url_for('leave.request_leave') }}" class="btn btn-primary mb-3">New Request</a>
 {% endif %}
 <div class="d-none d-md-block table-responsive leave-requests-table-wrap">
@@ -138,7 +166,9 @@
             <td class="text-nowrap">{{ leave_request_actions(r) }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="{{ leave_table_cols }}" class="text-muted">No leave requests.</td></tr>
+        <tr><td colspan="{{ leave_table_cols }}" class="text-muted">
+            {% if list_mode == 'team' %}No team leave requests.{% else %}No leave requests.{% endif %}
+        </td></tr>
         {% endfor %}
         </tbody>
     </table>
@@ -183,7 +213,7 @@
         </div>
     </div>
     {% else %}
-    <p class="text-muted mb-0">No leave requests.</p>
+    <p class="text-muted mb-0">{% if list_mode == 'team' %}No team leave requests.{% else %}No leave requests.{% endif %}</p>
     {% endfor %}
 </div>
 <p class="text-muted small mb-0">

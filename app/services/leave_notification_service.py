@@ -254,17 +254,43 @@ def _highlight_box(message_html: str, *, tone: str = 'info') -> str:
     )
 
 
-def _email_button(label: str, href: str) -> str:
+def _email_button(label: str, href: str, *, bg: str | None = None) -> str:
     href_safe = escape(href)
     label_safe = escape(label)
+    color = bg or BRAND_PRIMARY
     return (
         f'<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" '
         f'style="margin:8px auto 4px;">'
-        f'<tr><td align="center" bgcolor="{BRAND_PRIMARY}" style="background-color:{BRAND_PRIMARY};border-radius:6px;">'
+        f'<tr><td align="center" bgcolor="{color}" style="background-color:{color};border-radius:6px;">'
         f'<a href="{href_safe}" target="_blank" style="display:inline-block;padding:14px 32px;'
         f'font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;'
         f'text-decoration:none;border-radius:6px;">{label_safe}</a>'
         f'</td></tr></table>'
+    )
+
+
+def _email_action_buttons(approve_href: str, decline_href: str) -> str:
+    approve_safe = escape(approve_href)
+    decline_safe = escape(decline_href)
+    return (
+        f'<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" '
+        f'style="margin:16px auto 8px;">'
+        f'<tr>'
+        f'<td align="center" bgcolor="#166534" style="background-color:#166534;border-radius:6px;">'
+        f'<a href="{approve_safe}" target="_blank" style="display:inline-block;padding:14px 28px;'
+        f'font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;'
+        f'text-decoration:none;border-radius:6px;">Approve</a>'
+        f'</td>'
+        f'<td width="16" style="font-size:0;line-height:0;">&nbsp;</td>'
+        f'<td align="center" bgcolor="#991b1b" style="background-color:#991b1b;border-radius:6px;">'
+        f'<a href="{decline_safe}" target="_blank" style="display:inline-block;padding:14px 28px;'
+        f'font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;'
+        f'text-decoration:none;border-radius:6px;">Decline</a>'
+        f'</td>'
+        f'</tr></table>'
+        f'<p style="margin:8px 0 0;font-size:12px;color:#64748b;text-align:center;'
+        f'font-family:Helvetica,Arial,sans-serif;">'
+        f'You will be asked to confirm on the next screen.</p>'
     )
 
 
@@ -389,33 +415,61 @@ def notify_leave_submitted(leave_request_id: int) -> None:
         hr_text,
     )
 
-    # Supervisor — when supervisor step applies
+    # Supervisor — when supervisor step applies (personalized Approve / Decline links)
     if lr.status == LEAVE_STATUS_PENDING:
-        sup_subject = f'{app_name} — {emp_name} applied for leave (your approval needed)'
-        sup_body = (
-            f'<p style="margin:0 0 16px;font-size:17px;color:{BRAND_SLATE};">Hello,</p>'
-            f'{_highlight_box(f"<strong>{escape(emp_name)}</strong> has applied for leave and is waiting for your response as their supervisor.", tone="warning")}'
-            f'<p style="margin:0 0 8px;">Requested dates: <strong>{escape(dates)}</strong></p>'
-            f'{summary}'
-            f'{_email_button("Review leave request", approve_link)}'
-        )
-        sup_text = (
-            f'{emp_name} has applied for leave and is waiting for your approval as supervisor.\n'
-            f'Dates: {dates}\n'
-            f'Review: {approve_link}\n'
-        )
-        _send_leave_email(
-            _supervisor_inboxes(emp),
-            sup_subject,
-            _wrap_email(
-                title='Supervisor approval needed',
-                subtitle='Your team member is waiting',
-                body_html=sup_body,
-                preheader=f'{emp_name} needs your leave approval',
-                employee=emp,
-            ),
-            sup_text,
-        )
+        from app.services.employee_relations_service import employee_supervisors
+        from app.services.leave_email_action_service import build_leave_email_action_url
+
+        for supervisor in employee_supervisors(emp):
+            inbox = _employee_inbox(supervisor)
+            if not inbox:
+                logger.warning(
+                    'Supervisor leave alert skipped: no email for supervisor employee_id=%s',
+                    supervisor.id,
+                )
+                continue
+            approve_action = build_leave_email_action_url(
+                leave_request_id=lr.id,
+                action='approve',
+                supervisor_employee_id=supervisor.id,
+            )
+            decline_action = build_leave_email_action_url(
+                leave_request_id=lr.id,
+                action='reject',
+                supervisor_employee_id=supervisor.id,
+            )
+            first = escape(supervisor.first_name or supervisor.full_name)
+            sup_subject = f'{app_name} — {emp_name} applied for leave (your approval needed)'
+            sup_body = (
+                f'<p style="margin:0 0 16px;font-size:17px;color:{BRAND_SLATE};">'
+                f'Hello <strong>{first}</strong>,</p>'
+                f'{_highlight_box(f"<strong>{escape(emp_name)}</strong> has applied for leave and is waiting for your response as their supervisor.", tone="warning")}'
+                f'<p style="margin:0 0 8px;">Requested dates: <strong>{escape(dates)}</strong></p>'
+                f'{summary}'
+                f'{_email_action_buttons(approve_action, decline_action)}'
+                f'<p style="margin:16px 0 0;font-size:13px;color:#64748b;text-align:center;">'
+                f'Or open the portal to review: '
+                f'<a href="{escape(approve_link)}" style="color:{BRAND_PRIMARY};">{escape(approve_link)}</a></p>'
+            )
+            sup_text = (
+                f'{emp_name} has applied for leave and is waiting for your approval as supervisor.\n'
+                f'Dates: {dates}\n'
+                f'Approve: {approve_action}\n'
+                f'Decline: {decline_action}\n'
+                f'Review in portal: {approve_link}\n'
+            )
+            _send_leave_email(
+                [inbox],
+                sup_subject,
+                _wrap_email(
+                    title='Supervisor approval needed',
+                    subtitle='Approve or decline below',
+                    body_html=sup_body,
+                    preheader=f'{emp_name} needs your leave approval',
+                    employee=emp,
+                ),
+                sup_text,
+            )
 
     # Employee confirmation
     employee_email = _employee_inbox(emp)
@@ -473,14 +527,23 @@ def notify_leave_responded(
     *,
     actor_stage: str,
     action: str,
+    actor_user_id: int | None = None,
 ) -> None:
-    """Notify the employee after a supervisor or HR action."""
+    """Notify the employee after a supervisor or HR action; confirm to supervisor when they acted."""
     lr = _load_leave_request(leave_request_id)
     if not lr:
         return
     emp = lr.employee or db.session.get(Employee, lr.employee_id)
     if not emp:
         return
+
+    if actor_stage == 'supervisor':
+        notify_supervisor_response_confirmation(
+            leave_request_id,
+            action=action,
+            actor_user_id=actor_user_id,
+        )
+
     employee_email = _employee_inbox(emp)
     if not employee_email:
         logger.warning('Leave response notification skipped: no email for employee %s', emp.id)
@@ -575,6 +638,92 @@ def notify_leave_responded(
             subtitle=subtitle,
             body_html=body,
             preheader=detail_text,
+            employee=emp,
+        ),
+        text,
+    )
+
+
+def notify_supervisor_response_confirmation(
+    leave_request_id: int,
+    *,
+    action: str,
+    actor_user_id: int | None = None,
+) -> None:
+    """Email the supervisor confirming they approved or declined a leave request."""
+    from app.models.user import User
+
+    lr = _load_leave_request(leave_request_id)
+    if not lr:
+        return
+    emp = lr.employee or db.session.get(Employee, lr.employee_id)
+    if not emp:
+        return
+
+    actor = None
+    if actor_user_id:
+        actor = db.session.get(User, actor_user_id)
+    if actor is None and lr.supervisor_reviewed_by_id:
+        actor = db.session.get(User, lr.supervisor_reviewed_by_id)
+
+    supervisor_emp = None
+    if actor and actor.employee_id:
+        supervisor_emp = db.session.get(Employee, actor.employee_id)
+
+    inbox = _employee_inbox(supervisor_emp) if supervisor_emp else None
+    if not inbox and actor and (actor.email or '').strip():
+        inbox = actor.email.strip().lower()
+    if not inbox:
+        logger.warning(
+            'Supervisor confirmation skipped: no email for leave_request_id=%s actor_user_id=%s',
+            leave_request_id,
+            actor_user_id,
+        )
+        return
+
+    app_name = _app_name()
+    dates = _dates_phrase(lr)
+    emp_name = emp.full_name
+    approved = action != 'reject'
+    decision = 'approved' if approved else 'declined'
+    tone = 'success' if approved else 'danger'
+    next_step = (
+        'The request has been forwarded to HR for final approval.'
+        if approved
+        else 'The employee has been notified of your decision.'
+    )
+    first = escape(
+        (supervisor_emp.first_name if supervisor_emp else None)
+        or (supervisor_emp.full_name if supervisor_emp else None)
+        or 'there'
+    )
+    subject = f'{app_name} — You {decision} leave for {emp_name}'
+    detail_html = (
+        f'You have <strong>{decision}</strong> the leave request from '
+        f'<strong>{escape(emp_name)}</strong> for <strong>{escape(dates)}</strong>.'
+    )
+    body = (
+        f'<p style="margin:0 0 16px;font-size:17px;color:{BRAND_SLATE};">'
+        f'Hello <strong>{first}</strong>,</p>'
+        f'{_highlight_box(detail_html, tone=tone)}'
+        f'<p style="margin:0 0 16px;">{escape(next_step)}</p>'
+        f'{_leave_summary_html(lr)}'
+        f'{_email_button("Open leave portal", _leave_index_url())}'
+    )
+    text = (
+        f'Hello,\n\n'
+        f'You have {decision} the leave request from {emp_name} for {dates}.\n'
+        f'{next_step}\n'
+        f'Portal: {_leave_index_url()}\n'
+    )
+    _send_leave_email(
+        [inbox],
+        subject,
+        _wrap_email(
+            title=f'Leave {decision}',
+            subtitle='Your response was recorded',
+            body_html=body,
+            preheader=f'You {decision} leave for {emp_name}',
             employee=emp,
         ),
         text,

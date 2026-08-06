@@ -80,6 +80,8 @@ class Config:
     RATELIMIT_ENABLED = _env_bool('RATELIMIT_ENABLED', False)
     RATE_LIMIT_AUTH = '50 per minute'
     PASSWORD_RESET_EXPIRY_SECONDS = int(os.environ.get('PASSWORD_RESET_EXPIRY_SECONDS', '3600'))
+    # Supervisor approve/decline links in leave emails (default 7 days)
+    LEAVE_EMAIL_ACTION_EXPIRY_SECONDS = int(os.environ.get('LEAVE_EMAIL_ACTION_EXPIRY_SECONDS', str(7 * 24 * 3600)))
 
     # Brevo transactional email (password reset, leave notifications)
     BREVO_API_KEY = os.environ.get('BREVO_API_KEY') or ''

@@ -419,9 +419,12 @@ def _register_error_handlers(app):
         if request.path.endswith('/documents/upload') or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify(status='error', message='Your session expired. Refresh the page and try again.'), 400
         endpoint = request.endpoint or ''
-        if endpoint in ('auth.forgot_password', 'auth.reset_password'):
+        if request.endpoint in ('auth.forgot_password', 'auth.reset_password'):
             flash('Your session expired. Please try again.', 'warning')
             return redirect(url_for('auth.forgot_password'))
+        if request.endpoint == 'leave.email_action':
+            flash('Your session expired. Please open the link from your email again.', 'warning')
+            return redirect(request.url)
         if endpoint == 'auth.register':
             flash('Your session expired. Please try again.', 'warning')
             return redirect(url_for('auth.register'))
@@ -458,6 +461,7 @@ def _register_request_hooks(app):
             'auth.forgot_password',
             'auth.reset_password',
             'auth.register',
+            'leave.email_action',
         ):
             return None
         return redirect(url_for('auth.change_password'))

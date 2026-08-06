@@ -114,9 +114,14 @@
                 </button>
                 <div id="nav-sidebar-leave" class="collapse {{ 'show' if leave_section_active else '' }}">
                     <div class="collapse-inner">
-                        <a class="nav-link {{ 'active' if leave_main_active else '' }}" href="{{ url_for('leave.index') }}">
+                        <a class="nav-link {{ 'active' if leave_main_active and ep != 'leave.team_requests' else '' }}" href="{{ url_for('leave.index') }}">
                             <i class="bi bi-calendar-check"></i> Calendar &amp; requests
                         </a>
+                        {% if is_line_manager() %}
+                        <a class="nav-link {{ 'active' if ep == 'leave.team_requests' else '' }}" href="{{ url_for('leave.team_requests') }}">
+                            <i class="bi bi-people"></i> Team leave
+                        </a>
+                        {% endif %}
                         <a class="nav-link {{ 'active' if leave_types_active else '' }}" href="{{ url_for('leave.types_index') }}">
                             <i class="bi bi-tags"></i> Leave types
                         </a>
@@ -136,9 +141,28 @@
                 </div>
             </div>
             {% elif has_permission('view_leave') %}
+            {% if is_line_manager() %}
+            <div class="sidebar-nav-group">
+                <button class="sidebar-nav-toggle {{ 'collapsed' if not leave_section_active else '' }}" type="button" data-bs-toggle="collapse" data-bs-target="#nav-sidebar-leave-ess" aria-expanded="{{ 'true' if leave_section_active else 'false' }}" aria-controls="nav-sidebar-leave-ess">
+                    <span>Leave</span>
+                    <span class="toggle-chevron" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
+                </button>
+                <div id="nav-sidebar-leave-ess" class="collapse {{ 'show' if leave_section_active else '' }}">
+                    <div class="collapse-inner">
+                        <a class="nav-link {{ 'active' if leave_main_active and ep != 'leave.team_requests' else '' }}" href="{{ url_for('leave.index') }}">
+                            <i class="bi bi-calendar-check"></i> My leave
+                        </a>
+                        <a class="nav-link {{ 'active' if ep == 'leave.team_requests' else '' }}" href="{{ url_for('leave.team_requests') }}">
+                            <i class="bi bi-people"></i> Team leave
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% else %}
             <a class="nav-link {{ 'active' if leave_main_active else '' }}" href="{{ url_for('leave.index') }}">
                 <i class="bi bi-calendar-check"></i> Leave
             </a>
+            {% endif %}
             {% endif %}
             {% set messages_active = ep and ep.startswith('messages') %}
             <a class="nav-link {{ 'active' if messages_active else '' }}" href="{{ url_for('messages.index') }}" id="messagesNavLink">

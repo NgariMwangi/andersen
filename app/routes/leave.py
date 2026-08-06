@@ -281,30 +281,7 @@ def _apply_leave_type_form(form: LeaveTypeForm, lt: LeaveType) -> None:
     lt.days_count_basis = basis if basis in ('working', 'calendar') else 'working'
 
 
-@leave_bp.route('/')
-@login_required
-def index():
-    """Leave list - my requests or all (for HR/manager)."""
-    cid = require_company_id()
-    q = _leave_requests_visible_query(cid)
-    if current_user.has_permission('approve_leave'):
-        requests = q.order_by(LeaveRequest.created_at.desc()).all()
-    elif current_user.employee_id and user_is_line_manager(current_user, cid):
-        from app.services.employee_relations_service import subordinate_employee_ids
-
-        team_ids = subordinate_employee_ids(current_user.employee_id, cid)
-        team_ids.add(current_user.employee_id)
-        requests = (
-            q.filter(LeaveRequest.employee_id.in_(team_ids))
-            .order_by(LeaveRequest.created_at.desc())
-            .all()
-        )
-    else:
-        emp_id = current_user.employee_id
-        if not emp_id:
-            requests = []
-        else:
-            requests = q.filter(LeaveRequest.employee_id == emp_id).order_by(LeaveRequest.created_at.desc()).all()
+def _leave_remaining_days_map(requests, cid: int) -> dict:
     today = date.today()
     remaining_days = {}
     for r in requests:
@@ -321,17 +298,74 @@ def index():
         remaining_days[r.id] = approved_leave_remaining_days(
             r.start_date, r.end_date, basis, today=today, exclude_dates=excl
         )
+    return remaining_days
+
+
+def _render_leave_requests_page(cid: int, requests, *, list_mode: str):
     leave_statistics = None
-    stats_year = today.year
-    if current_user.employee_id:
+    stats_year = date.today().year
+    if list_mode in ('mine', 'all') and current_user.employee_id:
         leave_statistics = statistics_for_employee(current_user.employee_id, stats_year)
+    show_team_tab = bool(
+        current_user.employee_id and user_is_line_manager(current_user, cid)
+    )
     return render_template(
         'leave/requests.html',
         requests=requests,
-        remaining_days=remaining_days,
+        remaining_days=_leave_remaining_days_map(requests, cid),
         leave_statistics=leave_statistics,
         stats_year=stats_year,
+        list_mode=list_mode,
+        show_team_tab=show_team_tab,
     )
+
+
+@leave_bp.route('/')
+@login_required
+def index():
+    """Own leave requests (HR sees all company requests)."""
+    cid = require_company_id()
+    q = _leave_requests_visible_query(cid)
+    if current_user.has_permission('approve_leave'):
+        requests = q.order_by(LeaveRequest.created_at.desc()).all()
+        list_mode = 'all'
+    else:
+        emp_id = current_user.employee_id
+        if not emp_id:
+            requests = []
+        else:
+            requests = (
+                q.filter(LeaveRequest.employee_id == emp_id)
+                .order_by(LeaveRequest.created_at.desc())
+                .all()
+            )
+        list_mode = 'mine'
+    return _render_leave_requests_page(cid, requests, list_mode=list_mode)
+
+
+@leave_bp.route('/team')
+@login_required
+def team_requests():
+    """Leave requests for people who report to the current supervisor."""
+    cid = require_company_id()
+    if not current_user.employee_id or not user_is_line_manager(current_user, cid):
+        flash('You do not have a team leave queue.', 'warning')
+        return redirect(url_for('leave.index'))
+
+    from app.services.employee_relations_service import subordinate_employee_ids
+
+    team_ids = subordinate_employee_ids(current_user.employee_id, cid)
+    q = _leave_requests_visible_query(cid)
+    if not team_ids:
+        requests = []
+    else:
+        requests = (
+            q.filter(LeaveRequest.employee_id.in_(team_ids))
+            .order_by(LeaveRequest.created_at.desc())
+            .all()
+        )
+    return _render_leave_requests_page(cid, requests, list_mode='team')
+
 
 
 @leave_bp.route('/request', methods=['GET', 'POST'])
@@ -1167,10 +1201,17 @@ def approve(id):
                 refresh_leave_balance_after_request_change(lr.employee_id, lr.leave_type_id, y)
         db.session.commit()
         try:
-            notify_leave_responded(lr.id, actor_stage=stage, action=action)
+            notify_leave_responded(
+                lr.id,
+                actor_stage=stage,
+                action=action,
+                actor_user_id=current_user.id,
+            )
         except Exception:
             current_app.logger.exception('Leave response email failed for request %s', lr.id)
         flash('Leave request updated.', 'success')
+        if stage == 'supervisor':
+            return redirect(url_for('leave.team_requests'))
         return redirect(url_for('leave.index'))
     stage_labels = {'supervisor': 'Supervisor', 'hr': 'HR'}
     sup = supervisor_step_summary(lr)
@@ -1183,6 +1224,98 @@ def approve(id):
         approval_stage=stage,
         stage_label=stage_labels.get(stage, stage),
         supervisor_summary=sup,
+    )
+
+
+@leave_bp.route('/email-action/<token>', methods=['GET', 'POST'])
+def email_action(token):
+    """Supervisor approve/decline from email link (no login required)."""
+    from app.services.leave_email_action_service import (
+        apply_supervisor_email_action,
+        load_leave_for_email_action,
+        validate_supervisor_email_action,
+        verify_leave_email_action_token,
+    )
+
+    payload = verify_leave_email_action_token(token)
+    if not payload:
+        flash('This leave action link is invalid or has expired.', 'warning')
+        return redirect(url_for('auth.login'))
+
+    lr = load_leave_for_email_action(payload['leave_request_id'])
+    if not lr:
+        flash('Leave request not found.', 'danger')
+        return redirect(url_for('auth.login'))
+
+    action = payload['action']
+    supervisor_employee_id = payload['supervisor_employee_id']
+    ok, err = validate_supervisor_email_action(
+        leave_request=lr,
+        action=action,
+        supervisor_employee_id=supervisor_employee_id,
+    )
+    decision_label = 'approve' if action == 'approve' else 'decline'
+
+    if request.method == 'POST':
+        if not ok:
+            flash(err, 'warning')
+            return render_template(
+                'leave/email_action.html',
+                leave_request=lr,
+                action=action,
+                decision_label=decision_label,
+                error=err,
+                token=token,
+                done=False,
+            )
+        try:
+            actor = apply_supervisor_email_action(
+                leave_request=lr,
+                action=action,
+                supervisor_employee_id=supervisor_employee_id,
+            )
+            db.session.commit()
+        except ValueError as exc:
+            db.session.rollback()
+            flash(str(exc), 'danger')
+            return render_template(
+                'leave/email_action.html',
+                leave_request=lr,
+                action=action,
+                decision_label=decision_label,
+                error=str(exc),
+                token=token,
+                done=False,
+            )
+        try:
+            notify_leave_responded(
+                lr.id,
+                actor_stage='supervisor',
+                action=action,
+                actor_user_id=actor.id,
+            )
+        except Exception:
+            current_app.logger.exception(
+                'Leave email-action notification failed for request %s', lr.id
+            )
+        return render_template(
+            'leave/email_action.html',
+            leave_request=lr,
+            action=action,
+            decision_label=decision_label,
+            error=None,
+            token=token,
+            done=True,
+        )
+
+    return render_template(
+        'leave/email_action.html',
+        leave_request=lr,
+        action=action,
+        decision_label=decision_label,
+        error=None if ok else err,
+        token=token,
+        done=False,
     )
 
 
