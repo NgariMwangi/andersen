@@ -59,17 +59,17 @@ def send_transactional_email(
     sender_name = (sender_name or current_app.config.get('BREVO_SENDER_NAME') or 'HR NexGen Fuelworks').strip() or 'HR NexGen Fuelworks'
 
     if not api_key or not sender_email:
-        logger.warning(
-            'Brevo send skipped — missing config (api_key_set=%s sender=%r) to=%s subject=%r',
+        logger.error(
+            'Email not sent to %s — Brevo not configured (api_key_set=%s sender=%r) subject=%r',
+            to_email,
             bool(api_key),
             sender_email or None,
-            to_email,
             subject[:80] if subject else '',
         )
         return False
 
     logger.info(
-        'Brevo sending email to=%s from=%r subject=%r',
+        'Sending email to %s from %r subject=%r',
         to_email,
         sender_email,
         subject[:80] if subject else '',
@@ -106,9 +106,19 @@ def send_transactional_email(
     try:
         with urlopen(req, timeout=30) as resp:
             if 200 <= resp.status < 300:
-                logger.info('Brevo email sent OK to=%s status=%s', to_email, resp.status)
+                logger.info(
+                    'Email sent successfully to %s (HTTP %s) subject=%r',
+                    to_email,
+                    resp.status,
+                    subject[:80] if subject else '',
+                )
                 return True
-            logger.error('Brevo API unexpected status %s for %s', resp.status, to_email)
+            logger.error(
+                'Email not sent to %s — unexpected HTTP status %s subject=%r',
+                to_email,
+                resp.status,
+                subject[:80] if subject else '',
+            )
             return False
     except HTTPError as exc:
         body = ''
@@ -116,8 +126,20 @@ def send_transactional_email(
             body = exc.read().decode('utf-8', errors='replace')[:500]
         except Exception:
             pass
-        logger.error('Brevo API HTTP error %s for %s: %s', exc.code, to_email, body)
+        logger.error(
+            'Email not sent to %s — Brevo HTTP %s: %s',
+            to_email,
+            exc.code,
+            body or exc.reason or str(exc),
+        )
         return False
     except URLError as exc:
-        logger.error('Brevo API connection error for %s: %s', to_email, exc)
+        logger.error(
+            'Email not sent to %s — connection error: %s',
+            to_email,
+            exc.reason if getattr(exc, 'reason', None) else exc,
+        )
+        return False
+    except Exception as exc:
+        logger.exception('Email not sent to %s — unexpected error: %s', to_email, exc)
         return False
