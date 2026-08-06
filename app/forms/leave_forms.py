@@ -161,3 +161,23 @@ class PublicHolidayForm(FlaskForm):
                 self.holiday_date.errors.append('Date is required for a one-off holiday.')
                 return False
         return True
+
+
+class MandatoryAnnualLeaveForm(FlaskForm):
+    """HR: book company mandatory annual leave for all active employees."""
+    start_date = DateField('Start date', validators=[DataRequired()])
+    end_date = DateField('End date', validators=[DataRequired()])
+    reason = TextAreaField(
+        'Reason shown on leave requests',
+        validators=[Optional(), Length(max=2000)],
+        default='Company mandatory annual leave',
+    )
+    confirm = BooleanField(
+        'I confirm these days should be booked as approved annual leave for all active employees',
+        validators=[DataRequired(message='Please confirm before booking.')],
+    )
+    submit = SubmitField('Book mandatory leave')
+
+    def validate_end_date(self, field):
+        if self.start_date.data and field.data and field.data < self.start_date.data:
+            raise ValidationError('End date must be on or after the start date.')

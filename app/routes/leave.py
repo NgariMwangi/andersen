@@ -24,6 +24,7 @@ from app.forms.leave_forms import (
     LeaveApprovalForm,
     LeaveTypeForm,
     LeaveYearRolloverForm,
+    MandatoryAnnualLeaveForm,
     PublicHolidayForm,
 )
 from app.services.leave_balance_service import (
@@ -1799,6 +1800,91 @@ def bulk_entry():
         employee=employee,
         leave_type=leave_type,
         year=year,
+    )
+
+
+@leave_bp.route('/mandatory', methods=['GET', 'POST'])
+@login_required
+@permission_required('manage_leave_types')
+def mandatory_leave():
+    """HR: book company mandatory annual leave for all active employees."""
+    from app.services.leave_mandatory_service import (
+        DEFAULT_MANDATORY_REASON,
+        book_mandatory_annual_leave,
+    )
+
+    cid = require_company_id()
+    form = MandatoryAnnualLeaveForm()
+    if request.method == 'GET' and not form.reason.data:
+        form.reason.data = DEFAULT_MANDATORY_REASON
+
+    active_count = (
+        db.session.query(Employee)
+        .filter(Employee.company_id == cid, Employee.status == 'active')
+        .count()
+    )
+    annual = (
+        db.session.query(LeaveType)
+        .filter(
+            LeaveType.company_id == cid,
+            LeaveType.code == 'ANNUAL',
+            LeaveType.is_active.is_(True),
+        )
+        .first()
+    )
+
+    if form.validate_on_submit():
+        if not annual:
+            flash('Configure an active Annual leave type (code ANNUAL) before booking.', 'danger')
+            return render_template(
+                'leave/mandatory.html',
+                form=form,
+                active_count=active_count,
+                annual=annual,
+            )
+        try:
+            result = book_mandatory_annual_leave(
+                cid,
+                form.start_date.data,
+                form.end_date.data,
+                reason=form.reason.data,
+                reviewed_by_user_id=current_user.id,
+            )
+            if result.errors and not result.created_requests:
+                for err in result.errors:
+                    flash(err, 'danger')
+                db.session.rollback()
+                return render_template(
+                    'leave/mandatory.html',
+                    form=form,
+                    active_count=active_count,
+                    annual=annual,
+                )
+            db.session.commit()
+            flash(
+                f'Booked mandatory leave for {result.employees_booked} of {result.employees_processed} '
+                f'active employee(s): {result.created_requests} leave period(s), '
+                f'{result.total_days} day(s) charged.',
+                'success',
+            )
+            if result.employees_skipped_covered:
+                flash(
+                    f'Skipped {result.employees_skipped_covered} employee(s) already fully covered '
+                    f'by approved leave for those dates (no double-count).',
+                    'info',
+                )
+            for err in result.errors[:10]:
+                flash(err, 'warning')
+            return redirect(url_for('leave.mandatory_leave'))
+        except Exception as exc:
+            db.session.rollback()
+            flash(f'Could not book mandatory leave: {exc}', 'danger')
+
+    return render_template(
+        'leave/mandatory.html',
+        form=form,
+        active_count=active_count,
+        annual=annual,
     )
 
 

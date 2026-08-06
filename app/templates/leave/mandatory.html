@@ -1,0 +1,79 @@
+{% extends "layouts/base.html" %}
+{% block title %}Mandatory annual leave - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Mandatory annual leave</h1>
+        <p class="text-muted mb-0">
+            Book company shutdown / planned break days as approved annual leave for all active employees.
+            Days already covered by approved leave are not charged again.
+        </p>
+    </div>
+    <a href="{{ url_for('leave.index') }}" class="btn btn-outline-secondary btn-sm">Back to leave</a>
+</div>
+
+{% if not annual %}
+<div class="alert alert-warning">
+    No active leave type with code <strong>ANNUAL</strong> is configured. Add one under Leave types before booking.
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="post" action="{{ url_for('leave.mandatory_leave') }}" novalidate
+                      onsubmit="return confirm('Book mandatory annual leave for all {{ active_count }} active employee(s) for the selected dates?');">
+                    {{ form.hidden_tag() }}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="start_date">{{ form.start_date.label.text }}</label>
+                            {{ form.start_date(class='form-control', id='start_date') }}
+                            {% if form.start_date.errors %}<div class="text-danger small">{{ form.start_date.errors[0] }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="end_date">{{ form.end_date.label.text }}</label>
+                            {{ form.end_date(class='form-control', id='end_date') }}
+                            {% if form.end_date.errors %}<div class="text-danger small">{{ form.end_date.errors[0] }}</div>{% endif %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="reason">{{ form.reason.label.text }}</label>
+                            {{ form.reason(class='form-control', id='reason', rows=3) }}
+                            {% if form.reason.errors %}<div class="text-danger small">{{ form.reason.errors[0] }}</div>{% endif %}
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.confirm(class='form-check-input', id='confirm') }}
+                                <label class="form-check-label" for="confirm">{{ form.confirm.label.text }}</label>
+                            </div>
+                            {% if form.confirm.errors %}<div class="text-danger small">{{ form.confirm.errors[0] }}</div>{% endif %}
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary" {% if not annual %}disabled{% endif %}>
+                                {{ form.submit.label.text }}
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card border-0 bg-light">
+            <div class="card-body">
+                <h2 class="h6 text-uppercase text-muted mb-3">How this works</h2>
+                <ul class="small mb-3 ps-3">
+                    <li class="mb-2">Applies to <strong>{{ active_count }}</strong> active employee(s).</li>
+                    <li class="mb-2">Uses leave type <strong>ANNUAL</strong>{% if annual %} ({{ annual.name }}){% endif %}.</li>
+                    <li class="mb-2">Creates <strong>approved</strong> leave immediately and updates annual leave balances.</li>
+                    <li class="mb-2">If an employee already has approved leave on some of those days, only the remaining days are booked — no double-count.</li>
+                    <li>Employees already fully covered still appear away via their existing leave.</li>
+                </ul>
+                <p class="small text-muted mb-0">
+                    Day counting follows the Annual leave type rule (working or calendar days) and excludes public holidays.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
