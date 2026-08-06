@@ -1593,11 +1593,25 @@ def link_user(id):
     if not emp or emp.company_id != require_company_id():
         from flask import abort
         abort(404)
+    from app.services.employee_account_service import employee_may_receive_login
+
+    if not employee_may_receive_login(emp):
+        flash(
+            f'Cannot link a login account while employment status is {(emp.status or "unknown")}.',
+            'danger',
+        )
+        return redirect(url_for('employees.view', id=id))
     if emp.user:
         flash('This employee already has a linked login account.', 'info')
         return redirect(url_for('employees.view', id=id))
     employee_role = None
     if request.method == 'POST':
+        if not employee_may_receive_login(emp):
+            flash(
+                f'Cannot link a login account while employment status is {(emp.status or "unknown")}.',
+                'danger',
+            )
+            return redirect(url_for('employees.view', id=id))
         email = (request.form.get('email') or '').strip().lower()
         password = request.form.get('password') or ''
         if not email:
@@ -1707,6 +1721,8 @@ def provision_login_accounts():
                 )
         if result.skipped_has_account:
             msg += f' Skipped {result.skipped_has_account} already linked.'
+        if getattr(result, 'skipped_blocked_status', 0):
+            msg += f' Skipped {result.skipped_blocked_status} terminated/inactive.'
         if result.errors:
             msg += f' {len(result.errors)} error(s).'
             for err in result.errors[:5]:

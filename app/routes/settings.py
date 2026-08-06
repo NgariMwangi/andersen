@@ -32,15 +32,35 @@ def users():
     return render_template('settings/users.html', users=users_q)
 
 
-def _populate_user_form_choices(form: UserForm, company_id: int):
+def _populate_user_form_choices(form: UserForm, company_id: int, *, keep_employee_id: int | None = None):
+    from app.services.employee_account_service import employee_may_receive_login
+
     employees = (
         db.session.query(Employee)
         .filter(Employee.company_id == company_id)
         .order_by(Employee.first_name, Employee.last_name)
         .all()
     )
-    # 0 means "no employee link"
-    form.employee_id.choices = [(0, '-- None --')] + [(e.id, f"{e.employee_number} - {e.full_name}") for e in employees]
+    choices = [(0, '-- None --')]
+    seen: set[int] = set()
+    for e in employees:
+        if not employee_may_receive_login(e) and e.id != keep_employee_id:
+            continue
+        label = f'{e.employee_number} - {e.full_name}'
+        if not employee_may_receive_login(e):
+            label += f' ({(e.status or "inactive")})'
+        choices.append((e.id, label))
+        seen.add(e.id)
+    if keep_employee_id and keep_employee_id not in seen:
+        keep = db.session.get(Employee, keep_employee_id)
+        if keep and keep.company_id == company_id:
+            choices.append(
+                (
+                    keep.id,
+                    f'{keep.employee_number} - {keep.full_name} ({(keep.status or "inactive")})',
+                )
+            )
+    form.employee_id.choices = choices
     roles = db.session.query(Role).order_by(Role.name).all()
     form.role_ids.choices = [(r.id, r.name) for r in roles]
 
@@ -67,9 +87,17 @@ def user_create():
             return render_template('settings/user_form.html', form=form, user=None)
         employee_id = form.employee_id.data or 0
         if employee_id:
+            from app.services.employee_account_service import employee_may_receive_login
+
             link_emp = db.session.get(Employee, employee_id)
             if not link_emp or link_emp.company_id != cid:
                 flash('Invalid employee selected for this organization.', 'danger')
+                return render_template('settings/user_form.html', form=form, user=None)
+            if not employee_may_receive_login(link_emp):
+                flash(
+                    f'Cannot link a login to an employee with status {(link_emp.status or "unknown")}.',
+                    'danger',
+                )
                 return render_template('settings/user_form.html', form=form, user=None)
         user = User(
             email=email,
@@ -105,7 +133,7 @@ def user_edit(user_id):
         flash('User not found.', 'danger')
         return redirect(url_for('settings.users'))
     form = UserForm()
-    _populate_user_form_choices(form, cid)
+    _populate_user_form_choices(form, cid, keep_employee_id=user.employee_id)
     if form.validate_on_submit():
         email = form.email.data.strip().lower()
         existing = db.session.query(User).filter(User.email == email, User.id != user.id).first()
@@ -117,9 +145,21 @@ def user_edit(user_id):
         user.is_superuser = form.is_superuser.data
         employee_id = form.employee_id.data or 0
         if employee_id:
+            from app.services.employee_account_service import employee_may_receive_login
+
             link_emp = db.session.get(Employee, employee_id)
             if not link_emp or link_emp.company_id != cid:
                 flash('Invalid employee selected for this organization.', 'danger')
+                return render_template('settings/user_form.html', form=form, user=user)
+            # Allow keeping an existing terminated link so HR can unlink; block new links.
+            if (
+                employee_id != (user.employee_id or 0)
+                and not employee_may_receive_login(link_emp)
+            ):
+                flash(
+                    f'Cannot link a login to an employee with status {(link_emp.status or "unknown")}.',
+                    'danger',
+                )
                 return render_template('settings/user_form.html', form=form, user=user)
         user.employee_id = employee_id or None
         if form.password.data:

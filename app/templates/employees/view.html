@@ -234,7 +234,11 @@
             <a href="{{ url_for('employees.employee_benefits', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-wallet2 me-1"></i>Benefits</a>
             {% endif %}
             {% if not employee.user %}
+            {% if (employee.status or '')|lower not in ('terminated', 'suspended', 'resigned', 'retired') %}
             <a href="{{ url_for('employees.link_user', id=employee.id) }}" class="btn btn-outline-primary"><i class="bi bi-person-badge me-1"></i>Link login account</a>
+            {% else %}
+            <span class="btn btn-outline-secondary disabled" title="Login accounts cannot be linked for this employment status"><i class="bi bi-person-x me-1"></i>Login linking unavailable</span>
+            {% endif %}
             {% else %}
             <span class="btn btn-outline-secondary disabled"><i class="bi bi-person-check me-1"></i>Account linked</span>
             {% endif %}

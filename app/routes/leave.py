@@ -63,6 +63,7 @@ from app.services.leave_approval_service import (
     reset_leave_request_after_employee_edit,
     reset_leave_request_for_resubmission,
     supervisor_step_summary,
+    user_can_access_team_leave,
     user_is_line_manager,
 )
 from app.services.employee_relations_service import employee_has_supervisor
@@ -306,9 +307,7 @@ def _render_leave_requests_page(cid: int, requests, *, list_mode: str):
     stats_year = date.today().year
     if list_mode in ('mine', 'all') and current_user.employee_id:
         leave_statistics = statistics_for_employee(current_user.employee_id, stats_year)
-    show_team_tab = bool(
-        current_user.employee_id and user_is_line_manager(current_user, cid)
-    )
+    show_team_tab = user_can_access_team_leave(current_user, cid)
     return render_template(
         'leave/requests.html',
         requests=requests,
@@ -348,9 +347,8 @@ def index():
 def team_requests():
     """Leave requests for people who report to the current supervisor."""
     cid = require_company_id()
-    if not current_user.employee_id or not user_is_line_manager(current_user, cid):
-        flash('You do not have a team leave queue.', 'warning')
-        return redirect(url_for('leave.index'))
+    if not user_can_access_team_leave(current_user, cid):
+        abort(403)
 
     from app.services.employee_relations_service import subordinate_employee_ids
 
@@ -1210,7 +1208,7 @@ def approve(id):
         except Exception:
             current_app.logger.exception('Leave response email failed for request %s', lr.id)
         flash('Leave request updated.', 'success')
-        if stage == 'supervisor':
+        if stage == 'supervisor' and user_can_access_team_leave(current_user, require_company_id()):
             return redirect(url_for('leave.team_requests'))
         return redirect(url_for('leave.index'))
     stage_labels = {'supervisor': 'Supervisor', 'hr': 'HR'}

@@ -55,6 +55,7 @@ class ProvisionResult:
     created: int = 0
     skipped_has_account: int = 0
     skipped_no_email: int = 0
+    skipped_blocked_status: int = 0
     errors: list[str] = field(default_factory=list)
     created_emails: list[str] = field(default_factory=list)
     welcome_recipients: list[dict] = field(default_factory=list)
@@ -83,13 +84,21 @@ def set_employee_login_active(employee: Employee, *, active: bool) -> User | Non
     return user
 
 
-# Employment statuses that must not be able to sign in.
+# Employment statuses that must not be able to sign in / receive new login links.
 LOGIN_BLOCKED_EMPLOYEE_STATUSES = frozenset({
     'suspended',
     'terminated',
     'resigned',
     'retired',
 })
+
+
+def employee_may_receive_login(employee: Employee | None) -> bool:
+    """False when employment status must not get a provisioned or linked login account."""
+    if not employee:
+        return False
+    status = (employee.status or '').strip().lower()
+    return status not in LOGIN_BLOCKED_EMPLOYEE_STATUSES
 
 
 def sync_employee_login_access(employee: Employee) -> User | None:
@@ -136,6 +145,11 @@ def provision_employee_login(
     email: str | None = None,
 ) -> User:
     """Create a user linked to employee, or raise ValueError."""
+    if not employee_may_receive_login(employee):
+        status = (employee.status or 'unknown').strip().lower()
+        raise ValueError(
+            f'Cannot create a login for {employee.full_name} — employment status is {status}.'
+        )
     if _employee_has_user(employee):
         raise ValueError(f'{employee.full_name} already has a login account.')
     login_email = (email or suggest_login_email(employee)).strip().lower()
@@ -180,6 +194,8 @@ def preview_bulk_provision(company_id: int, *, statuses: tuple[str, ...] = ('act
     for emp in employees:
         if statuses and emp.status not in statuses:
             continue
+        if not employee_may_receive_login(emp):
+            continue
         if _employee_has_user(emp):
             preview.already_linked += 1
             continue
@@ -208,6 +224,9 @@ def bulk_provision_employee_logins(
     )
     for emp in employees:
         if statuses and emp.status not in statuses:
+            continue
+        if not employee_may_receive_login(emp):
+            result.skipped_blocked_status += 1
             continue
         if _employee_has_user(emp):
             result.skipped_has_account += 1

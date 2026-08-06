@@ -208,6 +208,7 @@ def inject_leave_approval_helpers():
         leave_request_is_editable,
         leave_status_label,
         supervisor_step_summary,
+        user_can_access_team_leave,
         user_is_line_manager,
     )
 
@@ -221,11 +222,17 @@ def inject_leave_approval_helpers():
             return False
         return user_is_line_manager(current_user, current_user.company_id)
 
+    def can_access_team_leave():
+        if not current_user.is_authenticated or not getattr(current_user, 'company_id', None):
+            return False
+        return user_can_access_team_leave(current_user, current_user.company_id)
+
     return {
         'leave_status_label': leave_status_label,
         'leave_request_is_editable': leave_request_is_editable,
         'leave_approval_stage': leave_approval_stage,
         'is_line_manager': is_line_manager,
+        'can_access_team_leave': can_access_team_leave,
         'supervisor_step_summary': supervisor_step_summary,
     }
 

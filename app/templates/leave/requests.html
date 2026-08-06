@@ -78,22 +78,14 @@
     {% endif %}
 </div>
 
-{% if show_team_tab or list_mode == 'all' %}
+{% if show_team_tab %}
 <ul class="nav nav-pills gap-2 mb-4">
-    {% if list_mode == 'all' %}
-    <li class="nav-item">
-        <a class="nav-link active" href="{{ url_for('leave.index') }}">All requests</a>
-    </li>
-    {% else %}
     <li class="nav-item">
         <a class="nav-link {{ 'active' if list_mode == 'mine' else '' }}" href="{{ url_for('leave.index') }}">My leave</a>
     </li>
-    {% endif %}
-    {% if show_team_tab %}
     <li class="nav-item">
         <a class="nav-link {{ 'active' if list_mode == 'team' else '' }}" href="{{ url_for('leave.team_requests') }}">Team leave</a>
     </li>
-    {% endif %}
 </ul>
 {% endif %}
 

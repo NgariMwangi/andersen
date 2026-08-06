@@ -117,7 +117,7 @@
                         <a class="nav-link {{ 'active' if leave_main_active and ep != 'leave.team_requests' else '' }}" href="{{ url_for('leave.index') }}">
                             <i class="bi bi-calendar-check"></i> Calendar &amp; requests
                         </a>
-                        {% if is_line_manager() %}
+                        {% if can_access_team_leave() %}
                         <a class="nav-link {{ 'active' if ep == 'leave.team_requests' else '' }}" href="{{ url_for('leave.team_requests') }}">
                             <i class="bi bi-people"></i> Team leave
                         </a>
@@ -141,7 +141,7 @@
                 </div>
             </div>
             {% elif has_permission('view_leave') %}
-            {% if is_line_manager() %}
+            {% if can_access_team_leave() %}
             <div class="sidebar-nav-group">
                 <button class="sidebar-nav-toggle {{ 'collapsed' if not leave_section_active else '' }}" type="button" data-bs-toggle="collapse" data-bs-target="#nav-sidebar-leave-ess" aria-expanded="{{ 'true' if leave_section_active else 'false' }}" aria-controls="nav-sidebar-leave-ess">
                     <span>Leave</span>

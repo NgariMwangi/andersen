@@ -107,6 +107,11 @@ def user_is_line_manager(user, company_id: int) -> bool:
     )
 
 
+def user_can_access_team_leave(user, company_id: int) -> bool:
+    """Team leave page is only for supervisors who have at least one direct report."""
+    return user_is_line_manager(user, company_id)
+
+
 def approval_stage_for_user(user, leave_request: LeaveRequest) -> str | None:
     """
     Return 'supervisor' or 'hr' if this user may act on the request now, else None.
