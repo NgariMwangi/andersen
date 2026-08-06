@@ -1016,8 +1016,8 @@ def edit(id):
             emp.kra_pin = form.kra_pin.data or None
             emp.nssf_number = form.nssf_number.data or None
             emp.nhif_number = form.nhif_number.data or None
-            emp.email = form.email.data or None
-            emp.secondary_email = form.secondary_email.data or None
+            emp.email = (form.email.data or '').strip() or None
+            emp.secondary_email = (form.secondary_email.data or '').strip() or None
             emp.phone = normalize_phone(form.phone.data, branch.country_code) if form.phone.data else None
             emp.secondary_phone = normalize_phone(form.secondary_phone.data, branch.country_code) if form.secondary_phone.data else None
             emp.phone_alt = normalize_phone(form.secondary_phone.data, branch.country_code) if form.secondary_phone.data else None
@@ -1030,8 +1030,12 @@ def edit(id):
             sync_employee_supervisors(emp, form.supervisor_ids.data, cid)
             sync_employee_next_of_kin(emp, request, branch.country_code)
             emp.status = form.status.data
-            from app.services.employee_account_service import sync_employee_login_access
+            from app.services.employee_account_service import (
+                sync_employee_login_access,
+                sync_employee_login_email,
+            )
 
+            sync_employee_login_email(emp)
             sync_employee_login_access(emp)
             emp.employment_type = form.employment_type.data or None
             emp.hire_date = form.hire_date.data

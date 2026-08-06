@@ -104,6 +104,29 @@ def sync_employee_login_access(employee: Employee) -> User | None:
     )
 
 
+def sync_employee_login_email(employee: Employee) -> User | None:
+    """
+    Keep the linked login User.email aligned with the employee primary email.
+    No-op when there is no linked user or primary email is empty (User.email is required).
+    Raises ValueError if the new address is already used by another account.
+    """
+    user = linked_user_for_employee(employee)
+    if not user:
+        return None
+    raw = (employee.email or '').strip()
+    if not raw or '@' not in raw:
+        return None
+    new_email = raw.lower()
+    if (user.email or '').strip().lower() == new_email:
+        return user
+    if _email_taken(new_email, exclude_user_id=user.id):
+        raise ValueError(
+            f'Cannot update sign-in email: {new_email} is already used by another account.'
+        )
+    user.email = new_email
+    return user
+
+
 def provision_employee_login(
     employee: Employee,
     password: str,
