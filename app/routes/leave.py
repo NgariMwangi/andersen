@@ -50,7 +50,11 @@ from app.services.leave_bulk_entry_service import (
     parse_bulk_selected_dates,
     record_bulk_historical_leave,
 )
-from app.services.leave_notification_service import notify_leave_responded, notify_leave_submitted
+from app.services.leave_notification_service import (
+    notify_leave_responded,
+    notify_leave_submitted,
+    resend_supervisor_leave_alerts,
+)
 from app.services.leave_approval_service import (
     LEAVE_STATUS_APPROVED,
     LEAVE_STATUS_PENDING,
@@ -706,6 +710,11 @@ def view_request(id):
 
     is_owner = (current_user.employee_id or 0) == lr.employee_id
     can_manage = current_user.has_permission('approve_leave') or is_owner
+    can_resend_supervisor_alert = (
+        current_user.has_permission('approve_leave')
+        and (lr.status or '').strip().lower() == LEAVE_STATUS_PENDING
+        and sup.get('state') == 'awaiting'
+    )
 
     return render_template(
         'leave/view_request.html',
@@ -718,7 +727,40 @@ def view_request(id):
         can_edit=leave_request_is_editable(lr) and can_manage and not leave_request_is_resubmittable(lr),
         can_resubmit=leave_request_is_resubmittable(lr) and can_manage,
         can_review=bool(stage),
+        can_resend_supervisor_alert=can_resend_supervisor_alert,
     )
+
+
+@leave_bp.route('/<int:id>/resend-supervisor-alert', methods=['POST'])
+@login_required
+@permission_required('approve_leave')
+def resend_supervisor_alert(id):
+    """HR: re-send the leave-applied alert to the employee's current supervisor(s)."""
+    cid = require_company_id()
+    lr = _leave_requests_visible_query(cid).filter(LeaveRequest.id == id).first()
+    if not lr:
+        abort(404)
+    if not _can_view_leave_request(lr, cid):
+        abort(403)
+
+    result = resend_supervisor_leave_alerts(lr.id)
+    if result.get('sent'):
+        names = ', '.join(
+            s['name'] for s in result.get('supervisors') or [] if s.get('email')
+        ) or 'supervisor(s)'
+        flash(
+            f'Supervisor leave alert re-sent to {result["sent"]} recipient(s): {names}.',
+            'success',
+        )
+    else:
+        for err in (result.get('errors') or ['Could not send supervisor alert.'])[:5]:
+            flash(err, 'warning')
+        if result.get('skipped_no_email'):
+            flash(
+                f'{result["skipped_no_email"]} supervisor(s) have no email address on file.',
+                'warning',
+            )
+    return redirect(url_for('leave.view_request', id=lr.id))
 
 
 @leave_bp.route('/<int:id>/edit', methods=['GET', 'POST'])

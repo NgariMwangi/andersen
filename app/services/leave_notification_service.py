@@ -376,6 +376,129 @@ def _send_leave_email(to_addresses: list[str], subject: str, html_body: str, tex
             logger.warning('Leave notification not sent to %s (%s)', email, subject)
 
 
+def _notify_supervisors_for_leave_request(lr: LeaveRequest) -> dict:
+    """
+    Email current supervisors that leave is waiting for their approval.
+    Returns {sent, skipped_no_email, supervisors: [{id, name, email}], errors}.
+    """
+    from app.services.employee_relations_service import employee_supervisors
+    from app.services.leave_email_action_service import build_leave_email_action_url
+
+    result = {
+        'sent': 0,
+        'skipped_no_email': 0,
+        'supervisors': [],
+        'errors': [],
+    }
+    emp = lr.employee or db.session.get(Employee, lr.employee_id)
+    if not emp:
+        result['errors'].append('Employee not found for this leave request.')
+        return result
+
+    status = (lr.status or '').strip().lower()
+    if status != LEAVE_STATUS_PENDING:
+        result['errors'].append(
+            'Supervisor alerts are only sent while the request is awaiting supervisor approval.'
+        )
+        return result
+
+    supervisors = employee_supervisors(emp)
+    if not supervisors:
+        result['errors'].append('No supervisor is assigned to this employee.')
+        return result
+
+    app_name = _app_name()
+    approve_link = _leave_url(lr.id)
+    dates = _dates_phrase(lr)
+    emp_name = emp.full_name
+    summary = _leave_summary_html(lr)
+
+    for supervisor in supervisors:
+        inbox = _employee_inbox(supervisor)
+        info = {
+            'id': supervisor.id,
+            'name': supervisor.full_name,
+            'email': inbox,
+        }
+        result['supervisors'].append(info)
+        if not inbox:
+            result['skipped_no_email'] += 1
+            logger.warning(
+                'Supervisor leave alert skipped: no email for supervisor employee_id=%s',
+                supervisor.id,
+            )
+            continue
+        try:
+            approve_action = build_leave_email_action_url(
+                leave_request_id=lr.id,
+                action='approve',
+                supervisor_employee_id=supervisor.id,
+            )
+            decline_action = build_leave_email_action_url(
+                leave_request_id=lr.id,
+                action='reject',
+                supervisor_employee_id=supervisor.id,
+            )
+            first = escape(supervisor.first_name or supervisor.full_name)
+            sup_subject = f'{app_name} — {emp_name} applied for leave (your approval needed)'
+            sup_body = (
+                f'<p style="margin:0 0 16px;font-size:17px;color:{BRAND_SLATE};">'
+                f'Hello <strong>{first}</strong>,</p>'
+                f'{_highlight_box(f"<strong>{escape(emp_name)}</strong> has applied for leave and is waiting for your response as their supervisor.", tone="warning")}'
+                f'<p style="margin:0 0 8px;">Requested dates: <strong>{escape(dates)}</strong></p>'
+                f'{summary}'
+                f'{_email_action_buttons(approve_action, decline_action)}'
+                f'<p style="margin:16px 0 0;font-size:13px;color:#64748b;text-align:center;">'
+                f'Or open the portal to review: '
+                f'<a href="{escape(approve_link)}" style="color:{BRAND_PRIMARY};">{escape(approve_link)}</a></p>'
+            )
+            sup_text = (
+                f'{emp_name} has applied for leave and is waiting for your approval as supervisor.\n'
+                f'Dates: {dates}\n'
+                f'Approve: {approve_action}\n'
+                f'Decline: {decline_action}\n'
+                f'Review in portal: {approve_link}\n'
+            )
+            _send_leave_email(
+                [inbox],
+                sup_subject,
+                _wrap_email(
+                    title='Supervisor approval needed',
+                    subtitle='Approve or decline below',
+                    body_html=sup_body,
+                    preheader=f'{emp_name} needs your leave approval',
+                    employee=emp,
+                ),
+                sup_text,
+            )
+            result['sent'] += 1
+        except Exception as exc:
+            logger.exception(
+                'Failed supervisor leave alert for leave_request_id=%s supervisor_id=%s',
+                lr.id,
+                supervisor.id,
+            )
+            result['errors'].append(f'{supervisor.full_name}: {exc}')
+
+    return result
+
+
+def resend_supervisor_leave_alerts(leave_request_id: int) -> dict:
+    """
+    HR action: re-send the supervisor leave alert to currently assigned supervisors.
+    Use after correcting a wrong supervisor assignment.
+    """
+    lr = _load_leave_request(leave_request_id)
+    if not lr:
+        return {
+            'sent': 0,
+            'skipped_no_email': 0,
+            'supervisors': [],
+            'errors': ['Leave request not found.'],
+        }
+    return _notify_supervisors_for_leave_request(lr)
+
+
 def notify_leave_submitted(leave_request_id: int) -> None:
     """Confirm to employee; alert supervisor and HR that a request is waiting."""
     lr = _load_leave_request(leave_request_id)
@@ -420,59 +543,7 @@ def notify_leave_submitted(leave_request_id: int) -> None:
 
     # Supervisor — when supervisor step applies (personalized Approve / Decline links)
     if lr.status == LEAVE_STATUS_PENDING:
-        from app.services.employee_relations_service import employee_supervisors
-        from app.services.leave_email_action_service import build_leave_email_action_url
-
-        for supervisor in employee_supervisors(emp):
-            inbox = _employee_inbox(supervisor)
-            if not inbox:
-                logger.warning(
-                    'Supervisor leave alert skipped: no email for supervisor employee_id=%s',
-                    supervisor.id,
-                )
-                continue
-            approve_action = build_leave_email_action_url(
-                leave_request_id=lr.id,
-                action='approve',
-                supervisor_employee_id=supervisor.id,
-            )
-            decline_action = build_leave_email_action_url(
-                leave_request_id=lr.id,
-                action='reject',
-                supervisor_employee_id=supervisor.id,
-            )
-            first = escape(supervisor.first_name or supervisor.full_name)
-            sup_subject = f'{app_name} — {emp_name} applied for leave (your approval needed)'
-            sup_body = (
-                f'<p style="margin:0 0 16px;font-size:17px;color:{BRAND_SLATE};">'
-                f'Hello <strong>{first}</strong>,</p>'
-                f'{_highlight_box(f"<strong>{escape(emp_name)}</strong> has applied for leave and is waiting for your response as their supervisor.", tone="warning")}'
-                f'<p style="margin:0 0 8px;">Requested dates: <strong>{escape(dates)}</strong></p>'
-                f'{summary}'
-                f'{_email_action_buttons(approve_action, decline_action)}'
-                f'<p style="margin:16px 0 0;font-size:13px;color:#64748b;text-align:center;">'
-                f'Or open the portal to review: '
-                f'<a href="{escape(approve_link)}" style="color:{BRAND_PRIMARY};">{escape(approve_link)}</a></p>'
-            )
-            sup_text = (
-                f'{emp_name} has applied for leave and is waiting for your approval as supervisor.\n'
-                f'Dates: {dates}\n'
-                f'Approve: {approve_action}\n'
-                f'Decline: {decline_action}\n'
-                f'Review in portal: {approve_link}\n'
-            )
-            _send_leave_email(
-                [inbox],
-                sup_subject,
-                _wrap_email(
-                    title='Supervisor approval needed',
-                    subtitle='Approve or decline below',
-                    body_html=sup_body,
-                    preheader=f'{emp_name} needs your leave approval',
-                    employee=emp,
-                ),
-                sup_text,
-            )
+        _notify_supervisors_for_leave_request(lr)
 
     # Employee confirmation
     employee_email = _employee_inbox(emp)

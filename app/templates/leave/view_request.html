@@ -114,7 +114,19 @@
         <p class="small mb-0 text-muted">{{ supervisor_summary.label }} — HR is the first approver for this request.</p>
         {% elif supervisor_summary.state == 'awaiting' %}
         <p class="small mb-1"><span class="badge bg-warning text-dark">{{ supervisor_summary.label }}</span></p>
-        <p class="small mb-0 text-muted">Assigned supervisor(s): <strong>{{ supervisor_summary.manager_name or '—' }}</strong></p>
+        <p class="small mb-2 text-muted">Assigned supervisor(s): <strong>{{ supervisor_summary.manager_name or '—' }}</strong></p>
+        {% if can_resend_supervisor_alert %}
+        <form method="post" action="{{ url_for('leave.resend_supervisor_alert', id=request.id) }}" class="d-inline"
+              onsubmit="return confirm('Re-send the leave application alert to the currently assigned supervisor(s)?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                Resend alert to supervisor
+            </button>
+        </form>
+        <p class="small text-muted mt-2 mb-0">
+            Use this after correcting the employee’s supervisor so the right person gets the approval email.
+        </p>
+        {% endif %}
         {% elif supervisor_summary.state == 'completed' %}
         <p class="small mb-1">
             <span class="badge bg-success">Supervisor approved</span>
