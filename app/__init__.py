@@ -471,6 +471,7 @@ def _register_context_processors(app):
     """Register template context processors."""
     from app.context_processors import (
         inject_config,
+        inject_employee_status_helpers,
         inject_leave_approval_helpers,
         inject_page_nav,
         inject_pending_approvals,
@@ -487,6 +488,7 @@ def _register_context_processors(app):
     app.context_processor(inject_today)
     app.context_processor(inject_unread_messages)
     app.context_processor(inject_leave_approval_helpers)
+    app.context_processor(inject_employee_status_helpers)
     app.context_processor(inject_pending_approvals)
     register_template_filters(app)
 

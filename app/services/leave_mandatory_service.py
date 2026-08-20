@@ -17,6 +17,10 @@ from app.services.leave_approval_service import (
     LEAVE_STATUSES_TAKEN,
 )
 from app.services.leave_balance_service import refresh_leave_balance_after_request_change
+from app.services.employee_status_service import (
+    apply_operational_employee_filter,
+    employee_is_operational,
+)
 from app.services.leave_bulk_entry_service import (
     _leave_dates_in_request,
     merge_consecutive_dates,
@@ -341,8 +345,9 @@ def book_mandatory_annual_leave(
     q = (
         db.session.query(Employee)
         .options(joinedload(Employee.branch))
-        .filter(Employee.company_id == company_id, Employee.status == 'active')
+        .filter(Employee.company_id == company_id)
     )
+    q = apply_operational_employee_filter(q)
     if employee_ids is not None:
         if not employee_ids:
             return result
@@ -425,7 +430,7 @@ def apply_mandatory_leave_to_employee(
     result = MandatoryLeaveResult()
     if not employee or not employee.company_id:
         return result
-    if (employee.status or '').strip().lower() != 'active':
+    if not employee_is_operational(employee):
         return result
 
     migrate_mandatory_leave_status_to_booked(employee.company_id, commit=False)

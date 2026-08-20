@@ -237,8 +237,26 @@ def inject_leave_approval_helpers():
     }
 
 
+def inject_employee_status_helpers():
+    from app.services.employee_status_service import (
+        employee_has_started,
+        employee_is_operational,
+        employee_is_pending_join,
+        employee_status_label,
+    )
+
+    return {
+        'employee_status_label': employee_status_label,
+        'employee_has_started': employee_has_started,
+        'employee_is_operational': employee_is_operational,
+        'employee_is_pending_join': employee_is_pending_join,
+    }
+
+
 def inject_pending_approvals():
     """Global pending approvals counters for top-bar notifications."""
+    from app.services.employee_status_service import activate_due_pending_join_employees
+
     empty = {
         'pending_approvals': {
             'leave': 0,
@@ -257,6 +275,12 @@ def inject_pending_approvals():
     from app.models.overtime import OvertimeRequest
 
     cid = current_user.company_id
+    from flask import current_app
+
+    try:
+        activate_due_pending_join_employees(cid)
+    except Exception:
+        current_app.logger.exception('Pending join auto-activation failed for company_id=%s', cid)
     leave_pending = 0
     overtime_pending = 0
     documents_pending = 0

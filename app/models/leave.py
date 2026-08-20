@@ -45,7 +45,8 @@ class LeaveBalance(BaseModel):
     opening_balance = db.Column(db.Numeric(8, 2), default=Decimal('0'), nullable=False)
     accrued = db.Column(db.Numeric(8, 2), default=Decimal('0'), nullable=False)
     used = db.Column(db.Numeric(8, 2), default=Decimal('0'), nullable=False)
-    adjusted = db.Column(db.Numeric(8, 2), default=Decimal('0'), nullable=False)  # manual adjustment
+    adjusted = db.Column(db.Numeric(8, 2), default=Decimal('0'), nullable=False)  # negative = HR days deducted
+    adjustment_note = db.Column(db.Text, nullable=True)  # reason for manual deduction (e.g. mid-year join)
     closing_balance = db.Column(db.Numeric(8, 2), nullable=False)  # opening + accrued + adjusted - used
 
     employee = db.relationship('Employee', backref='leave_balances')

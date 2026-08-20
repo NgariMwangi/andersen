@@ -6,14 +6,15 @@
     {% if leave_carry_forward_enabled %}
     Set <strong>opening balance</strong> for mid-year go-live (days from before this system — not year-end carry).
     {% endif %}
-    Monthly <strong>earned</strong> days come from each leave type’s accrual settings. Use <strong>adjustment</strong> for one-off corrections.
+    Monthly <strong>earned</strong> days come from each leave type’s accrual settings.
+    Use <strong>days to deduct</strong> when an employee should receive less than the standard yearly entitlement (e.g. joined mid-year — enter <strong>6</strong> to reduce a 21-day entitlement to 15).
     {% if leave_carry_forward_enabled %}
     At year-end, run <strong>rollover</strong> to copy capped unused days into the next year’s opening (see max carry on each leave type).
     {% else %}
     <strong>Unused leave does not carry</strong> to the next calendar year at this company.
     {% endif %}
     To record days already taken, use <a href="{{ url_for('leave.bulk_entry') }}">Bulk leave entry</a>.
-    Opening balance and adjustment apply only to leave types with <strong>monthly accrual</strong>; other types show entitlement and usage for the year.
+    Deductions apply only to leave types with <strong>monthly accrual</strong>; other types show entitlement and usage for the year.
 </p>
 
 <div class="card border-0 shadow-sm mb-4">
@@ -56,11 +57,13 @@
                     {% if leave_carry_forward_enabled %}
                     <th class="text-end">Opening balance</th>
                     {% endif %}
-                    <th class="text-end">Entitled / yr</th>
+                    <th class="text-end">Standard / yr</th>
                     <th class="text-end">Earned this year</th>
-                    <th class="text-end">Adjustment</th>
+                    <th class="text-end" style="min-width:6rem;">Days to deduct</th>
+                    <th class="text-end">Effective / yr</th>
+                    <th>Reason</th>
                     <th class="text-end">Used this year</th>
-                    <th class="text-end">Remaining this year</th>
+                    <th class="text-end">Remaining</th>
                     {% if leave_carry_forward_enabled %}
                     <th class="text-muted small">Carry cap</th>
                     {% endif %}
@@ -91,10 +94,27 @@
                     <td class="text-end">{% if sn and sn.accrued is not none %}{{ sn.accrued | fmt_days }}{% elif lt.accrues_monthly %}—{% else %}—{% endif %}</td>
                     <td class="text-end" style="max-width:7rem;">
                         {% if br.uses_ledger %}
-                        <input type="text" class="form-control form-control-sm text-end" name="adjusted_{{ lt.id }}" value="{{ br.adjusted_field }}"/>
+                        <input type="text" class="form-control form-control-sm text-end" name="deduct_{{ lt.id }}" value="{{ br.deduction_field }}" placeholder="0" inputmode="decimal"/>
                         {% else %}
                         <span class="text-muted">—</span>
-                        <input type="hidden" name="adjusted_{{ lt.id }}" value="0"/>
+                        <input type="hidden" name="deduct_{{ lt.id }}" value="0"/>
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-semibold">
+                        {% if br.effective_entitlement is not none %}
+                            {{ br.effective_entitlement | fmt_days }}
+                        {% elif lt.days_per_year is not none %}
+                            {{ lt.days_per_year | fmt_days }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td style="min-width:12rem;">
+                        {% if br.uses_ledger %}
+                        <input type="text" class="form-control form-control-sm" name="note_{{ lt.id }}" value="{{ br.note_field or '' }}" placeholder="e.g. Joined 1 Jul {{ year }}"/>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        <input type="hidden" name="note_{{ lt.id }}" value=""/>
                         {% endif %}
                     </td>
                     <td class="text-end">{{ sn.used | fmt_days if sn else '—' }}</td>

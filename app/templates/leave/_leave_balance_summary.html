@@ -13,7 +13,18 @@
     <dt class="col-6 text-muted">Opening balance</dt>
     <dd class="col-6 text-end mb-1">{{ row.opening_balance | fmt_days }}</dd>
     {% endif %}
-    {% if hr_extras and row.get('adjusted') %}
+    {% if row.get('days_deducted') %}
+    <dt class="col-6 text-muted">Days deducted</dt>
+    <dd class="col-6 text-end mb-1 text-danger">−{{ row.days_deducted | fmt_days }}</dd>
+    {% if row.get('effective_entitlement_per_year') is not none %}
+    <dt class="col-6 text-muted">Effective this year</dt>
+    <dd class="col-6 text-end mb-1">{{ row.effective_entitlement_per_year | fmt_days }}</dd>
+    {% endif %}
+    {% if row.get('adjustment_note') %}
+    <dt class="col-6 text-muted">HR note</dt>
+    <dd class="col-6 text-end mb-1 text-muted">{{ row.adjustment_note }}</dd>
+    {% endif %}
+    {% elif hr_extras and row.get('adjusted') and row.adjusted != 0 %}
     <dt class="col-6 text-muted">Adjustment</dt>
     <dd class="col-6 text-end mb-1">{{ row.adjusted | fmt_days }}</dd>
     {% endif %}

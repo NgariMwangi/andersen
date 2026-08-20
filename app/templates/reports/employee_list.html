@@ -42,7 +42,7 @@
                 <select name="branch_id" class="form-select form-select-sm">
                     <option value="">All branches</option>
                     {% for b in branches %}
-                    <option value="{{ b.id }}" {% if request.args.get('branch_id', type=int) == b.id %}selected{% endif %}>{{ b.name }}{% if b.country_code %} ({{ b.country_code }}){% endif %}</option>
+                    <option value="{{ b.id }}" {% if request.args.get('branch_id', '')|int == b.id %}selected{% endif %}>{{ b.name }}{% if b.country_code %} ({{ b.country_code }}){% endif %}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -52,7 +52,7 @@
                 <select name="department_id" class="form-select form-select-sm">
                     <option value="">All departments</option>
                     {% for d in departments %}
-                    <option value="{{ d.id }}" {% if request.args.get('department_id', type=int) == d.id %}selected{% endif %}>{{ d.name }}</option>
+                    <option value="{{ d.id }}" {% if request.args.get('department_id', '')|int == d.id %}selected{% endif %}>{{ d.name }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -61,6 +61,7 @@
                 <select name="status" class="form-select form-select-sm">
                     <option value="">All statuses</option>
                     <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Active</option>
+                    <option value="pending_join" {% if request.args.get('status') == 'pending_join' %}selected{% endif %}>Pending join</option>
                     <option value="terminated" {% if request.args.get('status') == 'terminated' %}selected{% endif %}>Terminated</option>
                     <option value="resigned" {% if request.args.get('status') == 'resigned' %}selected{% endif %}>Resigned</option>
                     <option value="retired" {% if request.args.get('status') == 'retired' %}selected{% endif %}>Retired</option>
@@ -121,6 +122,8 @@
                     <td>
                         {% if e.status == 'active' %}
                         <span class="badge bg-success-subtle text-success">Active</span>
+                        {% elif e.status == 'pending_join' %}
+                        <span class="badge bg-info-subtle text-info">Pending join</span>
                         {% elif e.status == 'terminated' %}
                         <span class="badge bg-danger-subtle text-danger">Terminated</span>
                         {% elif e.status == 'resigned' %}

@@ -64,8 +64,14 @@
                     if (showOpeningCarry && data.opening_balance && parseFloat(data.opening_balance) > 0) {
                         rows.push('<dt class="col-7 col-md-5 text-muted">Opening balance</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.opening_balance) + '</dd>');
                     }
-                    if (data.adjusted && data.adjusted !== '0') {
-                        rows.push('<dt class="col-7 col-md-5 text-muted">Adjustment</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.adjusted) + '</dd>');
+                    if (data.days_deducted && data.days_deducted !== '0') {
+                        rows.push('<dt class="col-7 col-md-5 text-muted">Days deducted</dt><dd class="col-5 col-md-7 text-end text-danger">−' + escapeHtml(data.days_deducted) + '</dd>');
+                    }
+                    if (data.effective_entitlement_per_year && data.days_deducted && data.days_deducted !== '0') {
+                        rows.push('<dt class="col-7 col-md-5 text-muted">Effective this year</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.effective_entitlement_per_year) + '</dd>');
+                    }
+                    if (data.adjustment_note) {
+                        rows.push('<dt class="col-7 col-md-5 text-muted">HR note</dt><dd class="col-5 col-md-7 text-end text-muted">' + escapeHtml(data.adjustment_note) + '</dd>');
                     }
                     rows.push('<dt class="col-7 col-md-5 text-muted">Used this year</dt><dd class="col-5 col-md-7 text-end">' + escapeHtml(data.used_approved) + '</dd>');
                     rows.push('<dt class="col-7 col-md-5 text-muted">Remaining this year</dt><dd class="col-5 col-md-7 text-end fw-semibold text-primary">' + escapeHtml(data.remaining || data.available) + '</dd>');

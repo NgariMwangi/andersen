@@ -43,6 +43,7 @@
                 <select name="status" class="form-select" style="width:auto;min-width:140px">
                     <option value="">All statuses</option>
                     <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Active</option>
+                    <option value="pending_join" {% if request.args.get('status') == 'pending_join' %}selected{% endif %}>Pending join</option>
                     <option value="terminated" {% if request.args.get('status') == 'terminated' %}selected{% endif %}>Terminated</option>
                 </select>
             </div>
@@ -63,6 +64,8 @@
                     <td>
                         {% if e.status == 'active' %}
                         <span class="badge bg-success">Active</span>
+                        {% elif e.status == 'pending_join' %}
+                        <span class="badge bg-info">Pending join{% if e.hire_date %} · {{ e.hire_date.strftime('%d %b %Y') }}{% endif %}</span>
                         {% elif e.status == 'suspended' %}
                         <span class="badge bg-warning text-dark">Suspended</span>
                         {% elif e.status == 'terminated' %}

@@ -1,7 +1,13 @@
 """Leave notification email helpers."""
 from decimal import Decimal
 
-from app.services.leave_notification_service import _employee_inbox, _format_leave_days, _supervisor_inboxes
+from app.services.leave_notification_service import (
+    _employee_inbox,
+    _format_leave_days,
+    _leave_staff_notify_addresses,
+    _superuser_notify_addresses,
+    _supervisor_inboxes,
+)
 
 
 class _User:
@@ -43,3 +49,28 @@ def test_format_leave_days_removes_decimals():
 
 def test_format_leave_days_keeps_half_days():
     assert _format_leave_days(Decimal('0.5')) == '0.5'
+
+
+def test_leave_staff_notify_addresses_merges_hr_and_superuser(monkeypatch):
+    monkeypatch.setattr(
+        'app.services.leave_notification_service._hr_notify_addresses',
+        lambda cid: ['hr@co.com'],
+    )
+    monkeypatch.setattr(
+        'app.services.leave_notification_service._superuser_notify_addresses',
+        lambda cid: ['super@co.com'],
+    )
+    assert _leave_staff_notify_addresses(1) == ['hr@co.com', 'super@co.com']
+
+
+def test_leave_staff_notify_addresses_dedupes_overlap(monkeypatch):
+    monkeypatch.setattr(
+        'app.services.leave_notification_service._hr_notify_addresses',
+        lambda cid: ['admin@co.com'],
+    )
+    monkeypatch.setattr(
+        'app.services.leave_notification_service._superuser_notify_addresses',
+        lambda cid: ['admin@co.com'],
+    )
+    assert _leave_staff_notify_addresses(1) == ['admin@co.com']
+

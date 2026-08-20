@@ -54,7 +54,7 @@ class Employee(BaseModel):
     department_id = db.Column(db.Integer, db.ForeignKey('departments.id', ondelete='SET NULL'), nullable=True)
     job_title_id = db.Column(db.Integer, db.ForeignKey('job_titles.id', ondelete='SET NULL'), nullable=True)
     manager_id = db.Column(db.Integer, db.ForeignKey('employees.id', ondelete='SET NULL'), nullable=True)
-    status = db.Column(db.String(30), default='active', nullable=False)  # active, terminated, resigned, retired, on_leave, suspended
+    status = db.Column(db.String(30), default='active', nullable=False)  # active, pending_join, terminated, ...
     employment_type = db.Column(db.String(30), nullable=True)  # permanent, contract, probation, intern, casual
     hire_date = db.Column(db.Date, nullable=False)
     probation_start_date = db.Column(db.Date, nullable=True)

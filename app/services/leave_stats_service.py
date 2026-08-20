@@ -13,6 +13,8 @@ from app.models.employee import Employee
 from app.models.leave import LeaveRequest, LeaveType
 from app.services.leave_balance_service import (
     compute_balance_snapshot,
+    deduction_days_from_adjusted,
+    effective_entitlement_for_year,
     is_fixed_annual_entitlement_leave,
     leave_type_uses_balance_ledger,
 )
@@ -113,6 +115,10 @@ def statistics_for_employee(employee_id: int, year: int | None = None) -> list[d
             if snap:
                 total_book = snap["opening_balance"] + snap["accrued"] + snap["adjusted"]
                 remaining = max(Decimal("0"), snap["closing_balance"])
+                deduct = snap.get("days_deducted") or deduction_days_from_adjusted(snap["adjusted"])
+                effective = snap.get("effective_entitlement_per_year")
+                if effective is None and entitled_per_year is not None:
+                    effective = effective_entitlement_for_year(lt, deduct)
                 cap = lt.carry_forward_max
                 carry_max = int(cap) if cap is not None else 0
                 rows.append(
@@ -122,6 +128,9 @@ def statistics_for_employee(employee_id: int, year: int | None = None) -> list[d
                         "name": leave_type_display_name(lt),
                         "mode": "ledger",
                         "entitled_per_year": entitled_per_year,
+                        "days_deducted": deduct if deduct > 0 else None,
+                        "effective_entitlement_per_year": effective,
+                        "adjustment_note": snap.get("adjustment_note") or None,
                         "show_earned_this_year": show_earned_this_year,
                         "entitlement": total_book.quantize(Decimal("0.01")),
                         "opening_balance": snap["opening_balance"],

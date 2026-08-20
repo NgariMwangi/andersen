@@ -91,8 +91,13 @@ class EmployeeForm(FlaskForm):
     manager_id = SelectField('Manager', coerce=_coerce_optional_int, validators=[Optional()])
     supervisor_ids = SelectMultipleField('Supervisors', coerce=int, validators=[Optional()])
     status = SelectField('Status', choices=[
-        ('active', 'Active'), ('terminated', 'Terminated'), ('resigned', 'Resigned'),
-        ('retired', 'Retired'), ('on_leave', 'On Leave'), ('suspended', 'Suspended'),
+        ('active', 'Active'),
+        ('pending_join', 'Pending join'),
+        ('terminated', 'Terminated'),
+        ('resigned', 'Resigned'),
+        ('retired', 'Retired'),
+        ('on_leave', 'On Leave'),
+        ('suspended', 'Suspended'),
     ], default='active')
     employment_type = SelectField('Employment Type', choices=[
         ('', '--'), ('permanent', 'Permanent'), ('contract', 'Contract'),
@@ -119,10 +124,6 @@ class EmployeeForm(FlaskForm):
     def validate_supervisor_ids(self, field):
         if self._employee_id and field.data and int(self._employee_id) in field.data:
             raise ValidationError('An employee cannot be their own supervisor.')
-
-    def validate_hire_date(self, field):
-        if field.data and field.data > date.today():
-            raise ValidationError('Hire date cannot be in the future.')
 
     def validate_date_of_birth(self, field):
         if field.data:

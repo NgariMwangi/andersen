@@ -6,7 +6,7 @@ from flask import Request
 from app.extensions import db
 from app.models.employee import Employee
 from app.models.employee_relations import EmployeeNextOfKin, EmployeeSupervisor
-from app.utils.validators import normalize_phone
+from app.services.employee_status_service import employee_is_operational
 
 
 def employee_supervisor_ids(employee: Employee | None) -> list[int]:
@@ -89,7 +89,7 @@ def sync_employee_supervisors(
         if sid == employee.id or sid in seen:
             continue
         sup = db.session.get(Employee, sid)
-        if not sup or sup.company_id != company_id or sup.status != 'active':
+        if not sup or sup.company_id != company_id or not employee_is_operational(sup):
             continue
         seen.add(sid)
         cleaned.append(sid)

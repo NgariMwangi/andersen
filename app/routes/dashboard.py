@@ -33,12 +33,16 @@ def index():
         flash('Your account is not linked to a company. Contact your administrator.', 'danger')
         return redirect(url_for('auth.logout'))
     cid = require_company_id()
-    # Headcount
-    total_employees = (
-        db.session.query(Employee)
-        .filter(Employee.status == 'active', Employee.company_id == cid)
-        .count()
+    from app.services.employee_status_service import (
+        activate_due_pending_join_employees,
+        apply_operational_employee_filter,
     )
+
+    activate_due_pending_join_employees(cid)
+    # Headcount (started active employees only)
+    total_employees = apply_operational_employee_filter(
+        db.session.query(Employee).filter(Employee.company_id == cid)
+    ).count()
     # Pending leave (supervisor queue + HR queue)
     pending_leave = 0
     if current_user.has_permission('approve_leave') or getattr(current_user, 'employee_id', None):

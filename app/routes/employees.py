@@ -119,11 +119,11 @@ def _get_employee_for_status_action(employee_id: int) -> Employee:
 
 
 def _populate_supervisor_choices(form, cid, exclude_employee_id=None):
-    q = (
-        db.session.query(Employee)
-        .filter(Employee.company_id == cid, Employee.status == 'active')
-        .order_by(Employee.first_name, Employee.last_name)
-    )
+    from app.services.employee_status_service import apply_operational_employee_filter
+
+    q = apply_operational_employee_filter(
+        db.session.query(Employee).filter(Employee.company_id == cid)
+    ).order_by(Employee.first_name, Employee.last_name)
     if exclude_employee_id:
         q = q.filter(Employee.id != exclude_employee_id)
     choices = [(e.id, e.full_name) for e in q.all()]
@@ -164,6 +164,9 @@ def _can_view_employee(emp: Employee) -> bool:
 @permission_required('view_employees')
 def list():
     cid = require_company_id()
+    from app.services.employee_status_service import activate_due_pending_join_employees
+
+    activate_due_pending_join_employees(cid)
     director_title_ids = {
         jt.id
         for jt in db.session.query(JobTitle)
@@ -565,6 +568,11 @@ def create():
                 if existing_emp:
                     flash('Employee number already exists in this branch. Use a different number.', 'danger')
                     return render_template('employees/create.html', form=form)
+            from app.services.employee_status_service import (
+                employee_is_operational,
+                resolve_employee_status_on_save,
+            )
+
             emp = Employee(
                 company_id=cid,
                 branch_id=branch.id,
@@ -593,7 +601,7 @@ def create():
                 department_id=form.department_id.data or None,
                 job_title_id=form.job_title_id.data or None,
                 manager_id=None,
-                status=form.status.data,
+                status=resolve_employee_status_on_save(form.status.data, form.hire_date.data),
                 employment_type=form.employment_type.data or None,
                 hire_date=form.hire_date.data,
                 probation_start_date=(
@@ -625,13 +633,20 @@ def create():
             if photo and photo.filename:
                 emp.photo_url = _save_employee_photo(photo, emp.id)
             mandatory_leave_result = None
-            if (emp.status or '').strip().lower() == 'active':
-                from app.services.leave_mandatory_service import apply_mandatory_leave_to_employee
+            from app.services.employee_status_service import employee_is_operational
+            from app.services.leave_mandatory_service import apply_mandatory_leave_to_employee
 
+            if employee_is_operational(emp):
                 mandatory_leave_result = apply_mandatory_leave_to_employee(emp, current_user.id)
             db.session.commit()
             log_create('Employee', emp.id, model_to_audit_dict(emp), user_id=current_user.id, description='Employee created')
             flash('Employee created successfully.', 'success')
+            if (emp.status or '').strip().lower() == 'pending_join' and emp.hire_date:
+                flash(
+                    f'Record saved as Pending join until {emp.hire_date.strftime("%d %b %Y")}. '
+                    f'They will become active automatically on that date.',
+                    'info',
+                )
             if mandatory_leave_result and mandatory_leave_result.created_requests:
                 flash(
                     f'Booked {mandatory_leave_result.total_days} mandatory leave day(s) '
@@ -709,6 +724,7 @@ def history(id):
 def _save_employee_self_contact(emp: Employee, user: User, form: EmployeeSelfContactForm) -> bool:
     """Apply validated self-service contact form to employee and user login email."""
     old = model_to_audit_dict(emp)
+    previous_primary_email = emp.email
     user.email = (form.login_email.data or '').strip().lower()
     emp.email = (form.email.data or '').strip() or None
     emp.secondary_email = (form.secondary_email.data or '').strip() or None
@@ -736,6 +752,9 @@ def _save_employee_self_contact(emp: Employee, user: User, form: EmployeeSelfCon
             user_id=current_user.id,
             description='Employee updated own contact details',
         )
+        from app.services.employee_email_notification_service import notify_primary_email_changed
+
+        notify_primary_email_changed(emp, previous_primary_email, emp.email)
         flash('Contact details and sign-in email saved.', 'success')
         return True
     except Exception as exc:
@@ -923,7 +942,9 @@ def reactivate_employee(id):
         return redirect(url_for('employees.view', id=id))
     try:
         old = model_to_audit_dict(emp)
-        emp.status = 'active'
+        from app.services.employee_status_service import resolve_employee_status_on_save
+
+        emp.status = resolve_employee_status_on_save('active', emp.hire_date)
         emp.suspension_from_date = None
         emp.suspension_to_date = None
         emp.termination_date = None
@@ -1000,6 +1021,11 @@ def edit(id):
     _apply_default_branch_to_form(form, cid)
     if form.validate_on_submit():
         try:
+            from app.services.employee_status_service import (
+                employee_is_operational,
+                resolve_employee_status_on_save,
+            )
+
             branch = db.session.get(Branch, form.branch_id.data)
             if not branch or branch.company_id != cid:
                 flash('Select a valid branch for this company.', 'danger')
@@ -1007,7 +1033,8 @@ def edit(id):
             before_assign = assignment_snapshot(emp)
             backfill_assignment_history_if_missing(emp)
             old = model_to_audit_dict(emp)
-            was_active = (emp.status or '').strip().lower() == 'active'
+            was_active = employee_is_operational(emp)
+            previous_primary_email = emp.email
             employee_number = _clean_employee_number(form.employee_number.data)
             if employee_number:
                 existing_emp = (
@@ -1050,7 +1077,7 @@ def edit(id):
             emp.job_title_id = form.job_title_id.data or None
             sync_employee_supervisors(emp, form.supervisor_ids.data, cid)
             sync_employee_next_of_kin(emp, request, branch.country_code)
-            emp.status = form.status.data
+            emp.status = resolve_employee_status_on_save(form.status.data, form.hire_date.data)
             from app.services.employee_account_service import (
                 sync_employee_login_access,
                 sync_employee_login_email,
@@ -1089,14 +1116,19 @@ def edit(id):
                 change_reason=assign_note,
                 created_by_id=current_user.id,
             )
+            from app.services.employee_status_service import employee_is_operational
+
             mandatory_leave_result = None
-            became_active = (emp.status or '').strip().lower() == 'active' and not was_active
+            became_active = employee_is_operational(emp) and not was_active
             if became_active:
                 from app.services.leave_mandatory_service import apply_mandatory_leave_to_employee
 
                 mandatory_leave_result = apply_mandatory_leave_to_employee(emp, current_user.id)
             db.session.commit()
             log_update('Employee', emp.id, old, model_to_audit_dict(emp), user_id=current_user.id, description='Employee updated')
+            from app.services.employee_email_notification_service import notify_primary_email_changed
+
+            notify_primary_email_changed(emp, previous_primary_email, emp.email)
             flash('Employee updated.', 'success')
             if mandatory_leave_result and mandatory_leave_result.created_requests:
                 flash(

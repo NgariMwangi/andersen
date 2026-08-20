@@ -53,6 +53,8 @@
                 <p class="mb-1"><strong>Status:</strong>
                     {% if employee.status == 'active' %}
                     <span class="badge bg-success">Active</span>
+                    {% elif employee.status == 'pending_join' %}
+                    <span class="badge bg-info">Pending join{% if employee.hire_date %} · starts {{ employee.hire_date.strftime('%d %b %Y') }}{% endif %}</span>
                     {% elif employee.status == 'suspended' %}
                     <span class="badge bg-warning text-dark">Suspended</span>
                     {% elif employee.status == 'terminated' %}

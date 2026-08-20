@@ -17,6 +17,26 @@ def _d(x) -> Decimal:
     return Decimal(str(x or 0)).quantize(Decimal("0.01"))
 
 
+def deduction_days_from_adjusted(adjusted) -> Decimal:
+    """Positive days HR deducted (stored as negative adjusted)."""
+    return max(Decimal("0"), -_d(adjusted))
+
+
+def effective_entitlement_for_year(lt: LeaveType, deduction_days) -> Decimal | None:
+    """Standard days_per_year minus HR deduction for display (e.g. 21 − 6 = 15)."""
+    if lt.days_per_year is None:
+        return None
+    deduct = _d(deduction_days)
+    if deduct <= 0:
+        return _d(lt.days_per_year)
+    return max(Decimal("0"), _d(lt.days_per_year) - deduct)
+
+
+def year_book_limit_from_snapshot(snap: dict) -> Decimal:
+    """Max bookable days for the year after HR deduction (opening + earned + adjustment)."""
+    return _d(snap["opening_balance"]) + _d(snap["accrued"]) + _d(snap["adjusted"])
+
+
 FIXED_ANNUAL_ENTITLEMENT_CODES = frozenset({'SICK'})
 
 
@@ -112,6 +132,8 @@ def compute_balance_snapshot(
     )
     opening = _d(row.opening_balance) if row else Decimal("0")
     adjusted = _d(row.adjusted) if row else Decimal("0")
+    note = (row.adjustment_note or "").strip() if row else ""
+    deduct = deduction_days_from_adjusted(adjusted)
     used = _used_days_approved_in_year(employee_id, leave_type_id, year)
     accrued = compute_accrued_for_year(lt, emp, year, as_of) if lt.accrues_monthly else Decimal("0")
     closing = opening + accrued + adjusted - used
@@ -119,6 +141,9 @@ def compute_balance_snapshot(
         "opening_balance": opening,
         "accrued": accrued,
         "adjusted": adjusted,
+        "days_deducted": deduct,
+        "adjustment_note": note,
+        "effective_entitlement_per_year": effective_entitlement_for_year(lt, deduct),
         "used": used,
         "closing_balance": closing,
         "has_persisted_row": row is not None,
@@ -138,12 +163,15 @@ def balance_row_for_hr_page(
         snap = compute_balance_snapshot(employee_id, lt.id, year, as_of=as_of)
         if snap is None:
             return None
+        deduct = snap["days_deducted"]
         return {
             "leave_type": lt,
             "uses_ledger": True,
             "snapshot": snap,
             "opening_field": snap["opening_balance"],
-            "adjusted_field": snap["adjusted"],
+            "deduction_field": deduct,
+            "note_field": snap["adjustment_note"],
+            "effective_entitlement": snap["effective_entitlement_per_year"],
             "closing": snap["closing_balance"],
         }
 
@@ -276,9 +304,18 @@ def preview_leave_balance_for_apply(employee_id: int, leave_type_id: int, year: 
             "available": _decimal_display(avail),
             "remaining": _decimal_display(max(Decimal("0"), avail)),
         }
+        deduct = snap["days_deducted"]
         if lt.days_per_year is not None:
             out["entitled_per_year"] = _decimal_display(_d(lt.days_per_year))
             out["days_per_year_cap"] = _decimal_display(_d(lt.days_per_year))
+        if deduct > 0:
+            out["days_deducted"] = _decimal_display(deduct)
+            if snap["effective_entitlement_per_year"] is not None:
+                out["effective_entitlement_per_year"] = _decimal_display(
+                    snap["effective_entitlement_per_year"]
+                )
+        if snap["adjustment_note"]:
+            out["adjustment_note"] = snap["adjustment_note"]
         return out
 
     used = _used_days_approved_in_year(employee_id, leave_type_id, year)

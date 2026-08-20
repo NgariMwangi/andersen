@@ -93,6 +93,32 @@ def _supervisor_inboxes(employee: Employee | None) -> list[str]:
     return addresses
 
 
+def _superuser_notify_addresses(company_id: int) -> list[str]:
+    """Active tenant superusers who should receive leave workflow alerts."""
+    rows = (
+        db.session.query(User.email)
+        .filter(
+            User.is_active.is_(True),
+            User.is_superuser.is_(True),
+            User.company_id == company_id,
+        )
+        .distinct()
+        .all()
+    )
+    addresses: set[str] = set()
+    for (email,) in rows:
+        if email and str(email).strip():
+            addresses.add(str(email).strip().lower())
+    return sorted(addresses)
+
+
+def _leave_staff_notify_addresses(company_id: int) -> list[str]:
+    """HR leave recipients plus tenant superusers (deduped)."""
+    addresses = set(_hr_notify_addresses(company_id))
+    addresses.update(_superuser_notify_addresses(company_id))
+    return sorted(addresses)
+
+
 def _hr_notify_addresses(company_id: int) -> list[str]:
     """Active login users with HR Manager or HR Staff role for this company."""
     rows = (
@@ -483,6 +509,59 @@ def _notify_supervisors_for_leave_request(lr: LeaveRequest) -> dict:
     return result
 
 
+def _notify_staff_supervisor_approved(lr: LeaveRequest) -> None:
+    """Alert HR/superusers that a supervisor approved and HR final approval is needed."""
+    emp = lr.employee or db.session.get(Employee, lr.employee_id)
+    if not emp or not emp.company_id:
+        return
+
+    recipients = _leave_staff_notify_addresses(emp.company_id)
+    if not recipients:
+        return
+
+    app_name = _app_name()
+    approve_link = _leave_url(lr.id)
+    dates = _dates_phrase(lr)
+    emp_name = emp.full_name
+    summary = _leave_summary_html(lr)
+    supervisor_name = 'Supervisor'
+    if lr.supervisor_reviewed_by_id:
+        reviewer = db.session.get(User, lr.supervisor_reviewed_by_id)
+        if reviewer and reviewer.employee_id:
+            sup_emp = db.session.get(Employee, reviewer.employee_id)
+            if sup_emp:
+                supervisor_name = sup_emp.full_name
+        elif reviewer and (reviewer.email or '').strip():
+            supervisor_name = reviewer.email.strip()
+
+    subject = f'{app_name} — Supervisor approved leave for {emp_name}'
+    body = (
+        f'<p style="margin:0 0 16px;font-size:17px;color:{BRAND_SLATE};">Hello,</p>'
+        f'{_highlight_box(f"<strong>{escape(supervisor_name)}</strong> has approved leave for <strong>{escape(emp_name)}</strong>. "
+        f"<strong>HR final approval</strong> is still required.", tone="warning")}'
+        f'<p style="margin:0 0 8px;">Requested dates: <strong>{escape(dates)}</strong></p>'
+        f'{summary}'
+        f'{_email_button("Review for HR approval", approve_link)}'
+    )
+    text = (
+        f'{supervisor_name} has approved leave for {emp_name}. HR final approval is still required.\n'
+        f'Dates: {dates}\n'
+        f'Review: {approve_link}\n'
+    )
+    _send_leave_email(
+        recipients,
+        subject,
+        _wrap_email(
+            title='Supervisor approved leave',
+            subtitle='Awaiting HR final approval',
+            body_html=body,
+            preheader=f'{emp_name} — supervisor approved, HR action needed',
+            employee=emp,
+        ),
+        text,
+    )
+
+
 def resend_supervisor_leave_alerts(leave_request_id: int) -> dict:
     """
     HR action: re-send the supervisor leave alert to currently assigned supervisors.
@@ -529,7 +608,7 @@ def notify_leave_submitted(leave_request_id: int) -> None:
         f'Review: {approve_link}\n'
     )
     _send_leave_email(
-        _hr_notify_addresses(emp.company_id),
+        _leave_staff_notify_addresses(emp.company_id),
         hr_subject,
         _wrap_email(
             title='Leave request pending',
@@ -617,6 +696,8 @@ def notify_leave_responded(
             action=action,
             actor_user_id=actor_user_id,
         )
+        if action != 'reject' and lr.status == LEAVE_STATUS_PENDING_HR:
+            _notify_staff_supervisor_approved(lr)
 
     employee_email = _employee_inbox(emp)
     if not employee_email:

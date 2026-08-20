@@ -37,6 +37,7 @@ from app.services.leave_balance_service import (
     refresh_leave_balance_after_request_change,
     rollover_opening_for_next_year,
     ensure_balance,
+    year_book_limit_from_snapshot,
 )
 from app.services.public_holiday_service import public_holiday_dates_in_range
 from app.services.leave_document_service import (
@@ -74,6 +75,11 @@ from app.services.leave_approval_service import (
 )
 from app.services.employee_relations_service import employee_has_supervisor
 from app.decorators.permissions import permission_required
+from app.services.employee_status_service import (
+    apply_operational_employee_filter,
+    employee_is_operational,
+    employee_is_pending_join,
+)
 from app.utils.tenant import require_company_id
 from app.utils.date_helpers import (
     approved_leave_remaining_days,
@@ -177,7 +183,7 @@ def _days_requested_for_leave(
 def _validate_days_within_leave_limits(employee_id: int, lt: LeaveType, year: int, days_requested: Decimal) -> str | None:
     """
     Validate request against leave type configured limits.
-    Allows negative accrued/available balances but enforces leave type caps.
+    Ledger types enforce available balance and HR-adjusted year cap.
     """
     if lt.min_days_request is not None:
         min_req = Decimal(str(lt.min_days_request))
@@ -186,6 +192,29 @@ def _validate_days_within_leave_limits(employee_id: int, lt: LeaveType, year: in
 
     if lt.max_consecutive_days is not None and days_requested > Decimal(str(lt.max_consecutive_days)):
         return f'Maximum consecutive days for {lt.name} is {lt.max_consecutive_days} day(s).'
+
+    if leave_type_uses_balance_ledger(lt):
+        snap = compute_balance_snapshot(employee_id, lt.id, year)
+        if snap:
+            avail = max(Decimal("0"), Decimal(str(snap["closing_balance"])))
+            if days_requested > avail:
+                deduct = snap.get("days_deducted") or Decimal("0")
+                hint = ''
+                if deduct > 0:
+                    hint = f' (includes {deduct} day(s) HR deduction this year)'
+                return (
+                    f'Request exceeds available {lt.name} balance for {year}. '
+                    f'Available: {avail} day(s), requested: {days_requested}{hint}.'
+                )
+            year_cap = year_book_limit_from_snapshot(snap)
+            used_approved = Decimal(str(snap["used"]))
+            if used_approved + days_requested > year_cap:
+                return (
+                    f'Request exceeds allowed days for {year}. '
+                    f'Allowed after HR adjustments: {year_cap} day(s), '
+                    f'already taken: {used_approved}, requested: {days_requested}.'
+                )
+        return None
 
     if lt.days_per_year is not None:
         entitlement = Decimal(str(lt.days_per_year))
@@ -237,12 +266,9 @@ def _leave_type_allowed_for_employee(lt: LeaveType | None, emp: Employee | None)
 
 
 def _handover_employee_choices(exclude_employee_id: int | None) -> list[tuple[int, str]]:
-    """Active employees other than the person going on leave (same company only)."""
-    q = (
-        db.session.query(Employee)
-        .filter(Employee.status == 'active')
-        .order_by(Employee.last_name, Employee.first_name)
-    )
+    """Operational employees other than the person going on leave (same company only)."""
+    q = db.session.query(Employee).order_by(Employee.last_name, Employee.first_name)
+    q = apply_operational_employee_filter(q)
     if exclude_employee_id:
         q = q.filter(Employee.id != exclude_employee_id)
         ex = db.session.get(Employee, exclude_employee_id)
@@ -385,6 +411,7 @@ def request_leave():
     form.leave_type_id.choices = _active_leave_type_choices_for_employee(emp_id)
     attachment_ctx = _leave_attachment_template_ctx()
     handover_required = _apply_handover_field(form, emp_id)
+    leave_not_started = bool(emp_me and not employee_is_operational(emp_me))
     if form.validate_on_submit():
         if not emp_id:
             flash('No employee linked to your account. Contact HR.', 'warning')
@@ -393,6 +420,24 @@ def request_leave():
                 form=form,
                 balance_preview_requires_employee_id=False,
                 handover_required=handover_required,
+                leave_not_started=leave_not_started,
+                **attachment_ctx,
+            )
+        if leave_not_started:
+            if employee_is_pending_join(emp_me) and emp_me.hire_date:
+                flash(
+                    f'You can apply for leave from {emp_me.hire_date.strftime("%d %b %Y")} '
+                    f'when your employment starts.',
+                    'warning',
+                )
+            else:
+                flash('You are not eligible to apply for leave yet. Contact HR.', 'warning')
+            return render_template(
+                'leave/my_requests.html',
+                form=form,
+                balance_preview_requires_employee_id=False,
+                handover_required=handover_required,
+                leave_not_started=leave_not_started,
                 **attachment_ctx,
             )
         if handover_required and form.handover_to_id.data is None:
@@ -410,7 +455,7 @@ def request_leave():
             ho = db.session.get(Employee, ho_id)
             if (
                 not ho
-                or ho.status != 'active'
+                or not employee_is_operational(ho)
                 or ho.id == emp_id
                 or not emp_self
                 or ho.company_id != emp_self.company_id
@@ -503,6 +548,7 @@ def request_leave():
         form=form,
         balance_preview_requires_employee_id=False,
         handover_required=handover_required,
+        leave_not_started=leave_not_started,
         **attachment_ctx,
     )
 
@@ -515,12 +561,9 @@ def admin_request_leave():
     pre_emp = request.args.get('employee_id', type=int)
     form = AdminLeaveRequestForm()
     cid = require_company_id()
-    employees = (
-        db.session.query(Employee)
-        .filter(Employee.company_id == cid, Employee.status == 'active')
-        .order_by(Employee.last_name, Employee.first_name)
-        .all()
-    )
+    employees = apply_operational_employee_filter(
+        db.session.query(Employee).filter(Employee.company_id == cid)
+    ).order_by(Employee.last_name, Employee.first_name).all()
     form.employee_id.choices = [(e.id, f'{e.employee_number} — {e.full_name}') for e in employees]
     if not form.employee_id.choices:
         flash('No active employees to assign leave.', 'warning')
@@ -559,7 +602,7 @@ def admin_request_leave():
             ho = db.session.get(Employee, ho_id)
             if (
                 not ho
-                or ho.status != 'active'
+                or not employee_is_operational(ho)
                 or ho.id == emp_id
                 or ho.company_id != emp.company_id
             ):
@@ -820,7 +863,7 @@ def edit_request(id):
             ho = db.session.get(Employee, ho_id)
             if (
                 not ho
-                or ho.status != 'active'
+                or not employee_is_operational(ho)
                 or ho.id == lr.employee_id
                 or ho.company_id != emp.company_id
             ):
@@ -1686,19 +1729,25 @@ def balances():
             return redirect(url_for('leave.balances'))
         for lt in ledger_types:
             okey = f'opening_{lt.id}'
-            akey = f'adjusted_{lt.id}'
-            if okey not in request.form and akey not in request.form:
+            dkey = f'deduct_{lt.id}'
+            nkey = f'note_{lt.id}'
+            if okey not in request.form and dkey not in request.form and nkey not in request.form:
                 continue
             try:
                 o_val = Decimal(str(request.form.get(okey, '0') or '0').strip() or '0')
-                a_val = Decimal(str(request.form.get(akey, '0') or '0').strip() or '0')
+                deduct_val = Decimal(str(request.form.get(dkey, '0') or '0').strip() or '0')
+                if deduct_val < 0:
+                    raise ValueError('negative deduction')
+                a_val = -deduct_val
             except Exception:
                 flash(f'Invalid number for leave type {lt.name}.', 'danger')
                 return redirect(url_for('leave.balances', employee_id=employee_id, year=year))
+            note = (request.form.get(nkey) or '').strip() or None
             row = ensure_balance(employee_id, lt.id, year)
             if row:
                 row.opening_balance = o_val
                 row.adjusted = a_val
+                row.adjustment_note = note if deduct_val > 0 else None
                 recalculate_balance(row)
         db.session.commit()
         flash('Leave balances saved.', 'success')
@@ -1766,12 +1815,9 @@ def bulk_entry():
     leave_type_id = request.args.get('leave_type_id', type=int) or request.form.get('leave_type_id', type=int)
     year = request.args.get('year', type=int) or request.form.get('year', type=int) or today.year
 
-    employees = (
-        db.session.query(Employee)
-        .filter(Employee.company_id == cid, Employee.status == 'active')
-        .order_by(Employee.last_name, Employee.first_name)
-        .all()
-    )
+    employees = apply_operational_employee_filter(
+        db.session.query(Employee).filter(Employee.company_id == cid)
+    ).order_by(Employee.last_name, Employee.first_name).all()
     leave_types = (
         db.session.query(LeaveType)
         .filter(LeaveType.company_id == cid, LeaveType.is_active.is_(True))
@@ -1869,11 +1915,9 @@ def mandatory_leave():
     if request.method == 'GET' and not form.reason.data:
         form.reason.data = DEFAULT_MANDATORY_REASON
 
-    active_count = (
-        db.session.query(Employee)
-        .filter(Employee.company_id == cid, Employee.status == 'active')
-        .count()
-    )
+    active_count = apply_operational_employee_filter(
+        db.session.query(Employee).filter(Employee.company_id == cid)
+    ).count()
     annual = (
         db.session.query(LeaveType)
         .filter(

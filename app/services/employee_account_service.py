@@ -84,33 +84,19 @@ def set_employee_login_active(employee: Employee, *, active: bool) -> User | Non
     return user
 
 
-# Employment statuses that must not be able to sign in / receive new login links.
-LOGIN_BLOCKED_EMPLOYEE_STATUSES = frozenset({
-    'suspended',
-    'terminated',
-    'resigned',
-    'retired',
-})
-
-
-def employee_may_receive_login(employee: Employee | None) -> bool:
-    """False when employment status must not get a provisioned or linked login account."""
-    if not employee:
-        return False
-    status = (employee.status or '').strip().lower()
-    return status not in LOGIN_BLOCKED_EMPLOYEE_STATUSES
+# Re-exported from employee_status_service for backwards compatibility.
+from app.services.employee_status_service import (  # noqa: E402
+    LOGIN_BLOCKED_EMPLOYEE_STATUSES,
+    employee_may_receive_login,
+)
 
 
 def sync_employee_login_access(employee: Employee) -> User | None:
     """
     Align login access with employment status.
-    Suspended/terminated/resigned/retired → login off; otherwise → login on.
+    Suspended/terminated/resigned/retired/pending join → login off; otherwise → login on.
     """
-    status = (employee.status or '').strip().lower()
-    return set_employee_login_active(
-        employee,
-        active=status not in LOGIN_BLOCKED_EMPLOYEE_STATUSES,
-    )
+    return set_employee_login_active(employee, active=employee_may_receive_login(employee))
 
 
 def sync_employee_login_email(employee: Employee) -> User | None:
