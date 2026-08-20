@@ -195,7 +195,9 @@ def balance_row_for_hr_page(
         "uses_ledger": False,
         "snapshot": snap,
         "opening_field": Decimal("0"),
-        "adjusted_field": Decimal("0"),
+        "deduction_field": Decimal("0"),
+        "note_field": "",
+        "effective_entitlement": entitled,
         "closing": closing,
     }
 

@@ -101,7 +101,7 @@
                         {% endif %}
                     </td>
                     <td class="text-end fw-semibold">
-                        {% if br.effective_entitlement is not none %}
+                        {% if br.get('effective_entitlement') is not none %}
                             {{ br.effective_entitlement | fmt_days }}
                         {% elif lt.days_per_year is not none %}
                             {{ lt.days_per_year | fmt_days }}
