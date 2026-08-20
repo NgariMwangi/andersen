@@ -293,6 +293,7 @@ def _apply_schema_patches(app):
         SET approval_status = 'approved'
         WHERE approval_status IS NULL OR approval_status = ''
         """,
+        "ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS adjustment_note TEXT NULL",
     )
     try:
         with db.engine.begin() as conn:
