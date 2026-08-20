@@ -57,6 +57,34 @@ def leave_type_uses_balance_ledger(lt: LeaveType) -> bool:
     return cap is not None and int(cap) > 0
 
 
+def leave_type_supports_hr_deduction(lt: LeaveType) -> bool:
+    """Leave types where HR can manually deduct days from the standard yearly entitlement."""
+    if not lt or not lt.is_active:
+        return False
+    if lt.days_per_year is None:
+        return False
+    return _d(lt.days_per_year) > 0
+
+
+def _hr_deduction_from_balance_row(row: LeaveBalance | None) -> tuple[Decimal, str, Decimal]:
+    if not row:
+        return Decimal("0"), "", Decimal("0")
+    adjusted = _d(row.adjusted)
+    return deduction_days_from_adjusted(adjusted), (row.adjustment_note or "").strip(), adjusted
+
+
+def get_hr_deduction_record(employee_id: int, leave_type_id: int, year: int) -> LeaveBalance | None:
+    return (
+        db.session.query(LeaveBalance)
+        .filter(
+            LeaveBalance.employee_id == employee_id,
+            LeaveBalance.leave_type_id == leave_type_id,
+            LeaveBalance.year == year,
+        )
+        .first()
+    )
+
+
 def _used_days_approved_in_year(employee_id: int, leave_type_id: int, year: int) -> Decimal:
     from app.services.leave_approval_service import LEAVE_STATUSES_TAKEN
 
@@ -167,6 +195,7 @@ def balance_row_for_hr_page(
         return {
             "leave_type": lt,
             "uses_ledger": True,
+            "supports_deduction": leave_type_supports_hr_deduction(lt),
             "snapshot": snap,
             "opening_field": snap["opening_balance"],
             "deduction_field": deduct,
@@ -177,15 +206,21 @@ def balance_row_for_hr_page(
 
     used = _used_days_approved_in_year(employee_id, lt.id, year)
     entitled = _d(lt.days_per_year) if lt.days_per_year is not None else None
+    deduct, note, adjusted = _hr_deduction_from_balance_row(
+        get_hr_deduction_record(employee_id, lt.id, year)
+    )
+    effective = effective_entitlement_for_year(lt, deduct) if entitled is not None else None
     earned = entitled if is_fixed_annual_entitlement_leave(lt) and entitled is not None else None
-    if entitled is not None:
+    if effective is not None:
+        closing = max(Decimal("0"), effective - used)
+    elif entitled is not None:
         closing = max(Decimal("0"), entitled - used)
     else:
         closing = None
     snap = {
         "opening_balance": Decimal("0"),
         "accrued": earned,
-        "adjusted": Decimal("0"),
+        "adjusted": adjusted,
         "used": used,
         "closing_balance": closing,
         "has_persisted_row": False,
@@ -193,13 +228,38 @@ def balance_row_for_hr_page(
     return {
         "leave_type": lt,
         "uses_ledger": False,
+        "supports_deduction": leave_type_supports_hr_deduction(lt),
         "snapshot": snap,
         "opening_field": Decimal("0"),
-        "deduction_field": Decimal("0"),
-        "note_field": "",
-        "effective_entitlement": entitled,
+        "deduction_field": deduct,
+        "note_field": note,
+        "effective_entitlement": effective if effective is not None else entitled,
         "closing": closing,
     }
+
+
+def ensure_hr_deduction_row(employee_id: int, leave_type_id: int, year: int) -> LeaveBalance | None:
+    """Persist HR deduction/adjustment for any leave type with a yearly entitlement."""
+    lt = db.session.get(LeaveType, leave_type_id)
+    emp = db.session.get(Employee, employee_id)
+    if not lt or not emp or lt.company_id != emp.company_id or not leave_type_supports_hr_deduction(lt):
+        return None
+    row = get_hr_deduction_record(employee_id, leave_type_id, year)
+    if row:
+        return row
+    row = LeaveBalance(
+        employee_id=employee_id,
+        leave_type_id=leave_type_id,
+        year=year,
+        opening_balance=Decimal("0"),
+        accrued=Decimal("0"),
+        used=Decimal("0"),
+        adjusted=Decimal("0"),
+        closing_balance=Decimal("0"),
+    )
+    db.session.add(row)
+    db.session.flush()
+    return row
 
 
 def ensure_balance(employee_id: int, leave_type_id: int, year: int) -> LeaveBalance | None:
@@ -323,18 +383,30 @@ def preview_leave_balance_for_apply(employee_id: int, leave_type_id: int, year: 
     used = _used_days_approved_in_year(employee_id, leave_type_id, year)
     if lt.days_per_year is not None:
         ent = _d(lt.days_per_year)
-        avail = max(Decimal("0"), ent - used)
-        return {
+        deduct, note, _ = _hr_deduction_from_balance_row(
+            get_hr_deduction_record(employee_id, leave_type_id, year)
+        )
+        effective = effective_entitlement_for_year(lt, deduct)
+        base = effective if effective is not None else ent
+        avail = max(Decimal("0"), base - used)
+        out = {
             "mode": "simple",
             "year": year,
             "leave_type_name": lt.name,
             "show_earned_this_year": False,
             "entitled_per_year": _decimal_display(ent),
-            "entitlement": _decimal_display(ent),
+            "entitlement": _decimal_display(base),
             "used_approved": _decimal_display(used),
             "available": _decimal_display(avail),
             "remaining": _decimal_display(avail),
         }
+        if deduct > 0:
+            out["days_deducted"] = _decimal_display(deduct)
+            if effective is not None:
+                out["effective_entitlement_per_year"] = _decimal_display(effective)
+        if note:
+            out["adjustment_note"] = note
+        return out
     return {
         "mode": "unlimited",
         "year": year,

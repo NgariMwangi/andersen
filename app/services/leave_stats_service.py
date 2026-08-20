@@ -15,8 +15,10 @@ from app.services.leave_balance_service import (
     compute_balance_snapshot,
     deduction_days_from_adjusted,
     effective_entitlement_for_year,
+    get_hr_deduction_record,
     is_fixed_annual_entitlement_leave,
     leave_type_uses_balance_ledger,
+    _hr_deduction_from_balance_row,
 )
 
 
@@ -145,13 +147,19 @@ def statistics_for_employee(employee_id: int, year: int | None = None) -> list[d
                 continue
 
         ent = lt.days_per_year
+        deduct, note, _ = _hr_deduction_from_balance_row(
+            get_hr_deduction_record(employee_id, lt.id, year)
+        )
         if ent is not None:
             entitlement = Decimal(str(ent)).quantize(Decimal("0.01"))
-            remaining = entitlement - used
+            effective = effective_entitlement_for_year(lt, deduct)
+            base = effective if effective is not None else entitlement
+            remaining = base - used
             if remaining < 0:
                 remaining = Decimal("0")
         else:
             entitlement = None
+            effective = None
             remaining = None
 
         mode = "annual_grant" if is_fixed_annual_entitlement_leave(lt) else "simple"
@@ -161,8 +169,11 @@ def statistics_for_employee(employee_id: int, year: int | None = None) -> list[d
             "name": leave_type_display_name(lt),
             "mode": mode,
             "entitled_per_year": entitled_per_year,
+            "days_deducted": deduct if deduct > 0 else None,
+            "effective_entitlement_per_year": effective,
+            "adjustment_note": note or None,
             "show_earned_this_year": show_earned_this_year,
-            "entitlement": entitlement,
+            "entitlement": effective if effective is not None else entitlement,
             "used": used,
             "remaining": remaining,
         }

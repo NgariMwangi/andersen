@@ -14,7 +14,7 @@
     <strong>Unused leave does not carry</strong> to the next calendar year at this company.
     {% endif %}
     To record days already taken, use <a href="{{ url_for('leave.bulk_entry') }}">Bulk leave entry</a>.
-    Deductions apply only to leave types with <strong>monthly accrual</strong>; other types show entitlement and usage for the year.
+    <strong>Days to deduct</strong> is available on any leave type with a standard yearly entitlement (Annual, Sick, etc.). Scroll the table horizontally if needed on smaller screens.
 </p>
 
 <div class="card border-0 shadow-sm mb-4">
@@ -93,7 +93,7 @@
                     <td class="text-end">{{ lt.days_per_year | fmt_days if lt.days_per_year is not none else '—' }}</td>
                     <td class="text-end">{% if sn and sn.accrued is not none %}{{ sn.accrued | fmt_days }}{% elif lt.accrues_monthly %}—{% else %}—{% endif %}</td>
                     <td class="text-end" style="max-width:7rem;">
-                        {% if br.uses_ledger %}
+                        {% if br.supports_deduction %}
                         <input type="text" class="form-control form-control-sm text-end" name="deduct_{{ lt.id }}" value="{{ br.deduction_field }}" placeholder="0" inputmode="decimal"/>
                         {% else %}
                         <span class="text-muted">—</span>
@@ -110,7 +110,7 @@
                         {% endif %}
                     </td>
                     <td style="min-width:12rem;">
-                        {% if br.uses_ledger %}
+                        {% if br.supports_deduction %}
                         <input type="text" class="form-control form-control-sm" name="note_{{ lt.id }}" value="{{ br.note_field or '' }}" placeholder="e.g. Joined 1 Jul {{ year }}"/>
                         {% else %}
                         <span class="text-muted">—</span>

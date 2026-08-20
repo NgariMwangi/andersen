@@ -34,3 +34,13 @@ def test_year_book_limit_includes_deduction():
         'adjusted': Decimal('-6'),
     }
     assert year_book_limit_from_snapshot(snap) == Decimal('8.00')
+
+
+def test_leave_type_supports_hr_deduction():
+    from types import SimpleNamespace
+    from app.services.leave_balance_service import leave_type_supports_hr_deduction
+
+    annual = SimpleNamespace(is_active=True, days_per_year=Decimal('21'))
+    unpaid = SimpleNamespace(is_active=True, days_per_year=Decimal('0'))
+    assert leave_type_supports_hr_deduction(annual) is True
+    assert leave_type_supports_hr_deduction(unpaid) is False

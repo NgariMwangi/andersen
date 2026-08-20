@@ -30,14 +30,20 @@ from app.forms.leave_forms import (
 from app.services.leave_balance_service import (
     balance_row_for_hr_page,
     compute_balance_snapshot,
+    effective_entitlement_for_year,
     get_available_days,
+    get_hr_deduction_record,
+    leave_type_supports_hr_deduction,
     leave_type_uses_balance_ledger,
     preview_leave_balance_for_apply,
     recalculate_balance,
     refresh_leave_balance_after_request_change,
     rollover_opening_for_next_year,
     ensure_balance,
+    ensure_hr_deduction_row,
     year_book_limit_from_snapshot,
+    _hr_deduction_from_balance_row,
+    _used_days_approved_in_year,
 )
 from app.services.public_holiday_service import public_holiday_dates_in_range
 from app.services.leave_document_service import (
@@ -217,7 +223,11 @@ def _validate_days_within_leave_limits(employee_id: int, lt: LeaveType, year: in
         return None
 
     if lt.days_per_year is not None:
-        entitlement = Decimal(str(lt.days_per_year))
+        deduct, _, _ = _hr_deduction_from_balance_row(
+            get_hr_deduction_record(employee_id, lt.id, year)
+        )
+        effective = effective_entitlement_for_year(lt, deduct)
+        entitlement = effective if effective is not None else Decimal(str(lt.days_per_year))
         if days_requested > entitlement:
             return (
                 f'Requested days exceed allowed days for {lt.name}. '
@@ -1727,7 +1737,10 @@ def balances():
         if not emp or emp.company_id != require_company_id():
             flash('Employee not found.', 'danger')
             return redirect(url_for('leave.balances'))
-        for lt in ledger_types:
+        leave_types_to_save = _leave_types_for_balance_page(emp)
+        for lt in leave_types_to_save:
+            if not leave_type_supports_hr_deduction(lt):
+                continue
             okey = f'opening_{lt.id}'
             dkey = f'deduct_{lt.id}'
             nkey = f'note_{lt.id}'
@@ -1743,12 +1756,25 @@ def balances():
                 flash(f'Invalid number for leave type {lt.name}.', 'danger')
                 return redirect(url_for('leave.balances', employee_id=employee_id, year=year))
             note = (request.form.get(nkey) or '').strip() or None
-            row = ensure_balance(employee_id, lt.id, year)
-            if row:
-                row.opening_balance = o_val
-                row.adjusted = a_val
-                row.adjustment_note = note if deduct_val > 0 else None
-                recalculate_balance(row)
+            if leave_type_uses_balance_ledger(lt):
+                row = ensure_balance(employee_id, lt.id, year)
+                if row:
+                    row.opening_balance = o_val
+                    row.adjusted = a_val
+                    row.adjustment_note = note if deduct_val > 0 else None
+                    recalculate_balance(row)
+            else:
+                row = ensure_hr_deduction_row(employee_id, lt.id, year)
+                if row:
+                    row.adjusted = a_val
+                    row.adjustment_note = note if deduct_val > 0 else None
+                    used = _used_days_approved_in_year(employee_id, lt.id, year)
+                    effective = effective_entitlement_for_year(lt, deduct_val)
+                    row.used = used
+                    row.closing_balance = max(
+                        Decimal("0"),
+                        (effective or Decimal("0")) - used,
+                    )
         db.session.commit()
         flash('Leave balances saved.', 'success')
         return redirect(url_for('leave.balances', employee_id=employee_id, year=year))
