@@ -70,7 +70,7 @@ def send_transactional_email(
     """
     api_key = (current_app.config.get('BREVO_API_KEY') or '').strip()
     sender_email = normalize_hr_sender_email(current_app.config.get('BREVO_SENDER_EMAIL'))
-    sender_name = (sender_name or current_app.config.get('BREVO_SENDER_NAME') or 'Andersen').strip() or 'Andersen'
+    sender_name = (sender_name or current_app.config.get('BREVO_SENDER_NAME') or 'Andersen HRMS').strip() or 'Andersen HRMS'
 
     if not api_key or not sender_email:
         logger.error(

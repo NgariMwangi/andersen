@@ -14,7 +14,7 @@ services:
       SESSION_COOKIE_SECURE: "false"
       APP_BASE_URL: https://hrms.nexusafrica.co.ke
       BREVO_SENDER_EMAIL: hrms@nexusafrica.co.ke
-      BREVO_SENDER_NAME: Andersen
+      BREVO_SENDER_NAME: Andersen HRMS
       SALARY_BASIS: annual
       SESSION_LIFETIME_HOURS: "2"
       EMPLOYEE_UPLOADS_ROOT: /employeeuploads
