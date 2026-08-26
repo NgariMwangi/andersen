@@ -883,3 +883,68 @@ def notify_supervisor_response_confirmation(
         ),
         text,
     )
+
+
+def notify_leave_document_reupload_requested(leave_request_id: int) -> dict:
+    """
+    Email the employee that their supporting document is missing and must be re-uploaded urgently.
+    Returns {sent: bool, email: str|None, error: str|None}.
+    """
+    lr = _load_leave_request(leave_request_id)
+    if not lr:
+        return {'sent': False, 'email': None, 'error': 'Leave request not found.'}
+    emp = lr.employee or db.session.get(Employee, lr.employee_id)
+    if not emp:
+        return {'sent': False, 'email': None, 'error': 'Employee not found.'}
+
+    inbox = _employee_inbox(emp)
+    if not inbox:
+        return {
+            'sent': False,
+            'email': None,
+            'error': 'Employee has no email address on file.',
+        }
+
+    app_name = _app_name()
+    dates = _dates_phrase(lr)
+    reupload_url = _portal_base() + url_for('leave.reupload_document', id=lr.id)
+    lt_name = lr.leave_type.name if lr.leave_type else 'leave'
+    first = escape(emp.first_name or emp.full_name)
+
+    subject = f'{app_name} — Urgent: re-upload leave supporting document'
+    detail_html = (
+        f'There was a storage issue with the supporting document you uploaded for your '
+        f'<strong>{escape(lt_name)}</strong> request ({escape(dates)}). '
+        f'The file is no longer available and <strong>must be re-uploaded urgently</strong>.'
+    )
+    body = (
+        f'<p style="margin:0 0 16px;font-size:17px;color:{BRAND_SLATE};">'
+        f'Hello <strong>{first}</strong>,</p>'
+        f'{_highlight_box(detail_html, tone="danger")}'
+        f'<p style="margin:0 0 16px;">Please open the portal and upload the document again as soon as possible '
+        f'so HR can complete review of your leave request.</p>'
+        f'{_leave_summary_html(lr, include_employee=False)}'
+        f'{_email_button("Re-upload document now", reupload_url)}'
+        f'<p style="margin:16px 0 0;font-size:13px;color:#64748b;text-align:center;">'
+        f'Or open: <a href="{escape(reupload_url)}" style="color:{BRAND_PRIMARY};">{escape(reupload_url)}</a></p>'
+    )
+    text = (
+        f'Hello {emp.first_name or emp.full_name},\n\n'
+        f'There was a storage issue with the supporting document you uploaded for your '
+        f'{lt_name} request ({dates}). The file is no longer available and must be '
+        f're-uploaded urgently.\n\n'
+        f'Re-upload here: {reupload_url}\n'
+    )
+    _send_leave_email(
+        [inbox],
+        subject,
+        _wrap_email(
+            title='Re-upload required',
+            subtitle='Urgent — supporting document missing',
+            body_html=body,
+            preheader=f'Urgent: re-upload document for {lt_name} leave',
+            employee=emp,
+        ),
+        text,
+    )
+    return {'sent': True, 'email': inbox, 'error': None}

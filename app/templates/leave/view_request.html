@@ -175,15 +175,48 @@
 {% endif %}
 
 {% if request.document_path %}
-<p class="mb-4">
-    <strong>Supporting document:</strong>
-    <a href="{{ url_for('leave.leave_request_document', id=request.id) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
-        <i class="bi bi-eye me-1"></i>View
-    </a>
-    <a href="{{ url_for('leave.leave_request_document', id=request.id, download=1) }}" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-download me-1"></i>Download
-    </a>
-</p>
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h6 mb-2">Supporting document</h2>
+        {% if document_missing %}
+        <div class="alert alert-danger py-2 small mb-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            The file recorded for this request is <strong>missing from storage</strong>.
+            Ask the employee to re-upload it urgently.
+        </div>
+        {% else %}
+        <p class="mb-3">
+            <a href="{{ url_for('leave.leave_request_document', id=request.id) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+                <i class="bi bi-eye me-1"></i>View
+            </a>
+            <a href="{{ url_for('leave.leave_request_document', id=request.id, download=1) }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-download me-1"></i>Download
+            </a>
+        </p>
+        {% endif %}
+        <div class="d-flex flex-wrap gap-2">
+            {% if can_request_document_reupload %}
+            <form method="post" action="{{ url_for('leave.request_document_reupload', id=request.id) }}" class="d-inline"
+                  onsubmit="return confirm('Email this employee to re-upload their supporting document urgently?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn btn-sm btn-warning">
+                    <i class="bi bi-envelope-exclamation me-1"></i>Ask for re-upload
+                </button>
+            </form>
+            {% endif %}
+            {% if can_reupload_document %}
+            <a href="{{ url_for('leave.reupload_document', id=request.id) }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-upload me-1"></i>Re-upload document
+            </a>
+            {% endif %}
+        </div>
+        {% if can_request_document_reupload %}
+        <p class="small text-muted mt-2 mb-0">
+            “Ask for re-upload” emails the employee that there was a storage issue and the document must be uploaded again urgently.
+        </p>
+        {% endif %}
+    </div>
+</div>
 {% else %}
 <p class="alert alert-light border py-2 small mb-4">No supporting document was attached to this request.</p>
 {% endif %}

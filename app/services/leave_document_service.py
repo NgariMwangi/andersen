@@ -99,3 +99,10 @@ def resolve_leave_document_full_path(relative_path: str) -> str | None:
     if os.path.isfile(full):
         return full
     return None
+
+
+def leave_document_is_missing(relative_path: str | None) -> bool:
+    """True when a document was recorded but the file is not on disk."""
+    if not (relative_path or '').strip():
+        return False
+    return resolve_leave_document_full_path(relative_path) is None

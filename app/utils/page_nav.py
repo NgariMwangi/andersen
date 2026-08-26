@@ -30,6 +30,8 @@ _PAGE_NAV: dict[str, tuple[str, str]] = {
     'leave.my_requests': ('Leave', 'Request leave'),
     'leave.requests': ('Leave', 'Leave requests'),
     'leave.tracker': ('Leave', 'Leave tracker'),
+    'leave.view_request': ('Leave', 'Leave request'),
+    'leave.reupload_document': ('Leave', 'Re-upload document'),
     'departments.index': ('Organization', 'Departments'),
     'departments.create': ('Organization', 'Add department'),
     'branches.index': ('Organization', 'Branches'),

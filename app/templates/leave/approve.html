@@ -35,15 +35,26 @@
 {% else %}<p class="text-muted small">No handover colleague recorded on this request.</p>{% endif %}
 {% if request.reason %}<p><strong>Reason:</strong> {{ request.reason }}</p>{% endif %}
 {% if request.document_path %}
-<p class="mb-3">
+<div class="mb-3">
     <strong>Supporting document:</strong>
+    {% if document_missing %}
+    <div class="alert alert-danger py-2 small mt-2 mb-2">
+        File is missing from storage.
+        {% if current_user.has_permission('approve_leave') %}
+        <a href="{{ url_for('leave.view_request', id=request.id) }}">Ask the employee to re-upload</a>
+        or
+        <a href="{{ url_for('leave.reupload_document', id=request.id) }}">upload it here</a>.
+        {% endif %}
+    </div>
+    {% else %}
     <a href="{{ url_for('leave.leave_request_document', id=request.id) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
         <i class="bi bi-eye me-1"></i>View
     </a>
     <a href="{{ url_for('leave.leave_request_document', id=request.id, download=1) }}" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-download me-1"></i>Download
     </a>
-</p>
+    {% endif %}
+</div>
 {% else %}
 <p class="alert alert-warning py-2 small mb-3">
     <i class="bi bi-exclamation-triangle me-1"></i>No supporting document was attached to this leave request.

@@ -48,6 +48,7 @@ from app.services.leave_balance_service import (
 from app.services.public_holiday_service import public_holiday_dates_in_range
 from app.services.leave_document_service import (
     delete_leave_request_document,
+    leave_document_is_missing,
     leave_max_attachment_mb,
     resolve_leave_document_full_path,
     save_leave_request_document,
@@ -58,6 +59,7 @@ from app.services.leave_bulk_entry_service import (
     record_bulk_historical_leave,
 )
 from app.services.leave_notification_service import (
+    notify_leave_document_reupload_requested,
     notify_leave_responded,
     notify_leave_submitted,
     resend_supervisor_leave_alerts,
@@ -768,6 +770,11 @@ def view_request(id):
         and (lr.status or '').strip().lower() == LEAVE_STATUS_PENDING
         and sup.get('state') == 'awaiting'
     )
+    document_missing = leave_document_is_missing(lr.document_path)
+    can_request_document_reupload = (
+        current_user.has_permission('approve_leave') and bool(lr.document_path)
+    )
+    can_reupload_document = can_manage and bool(lr.document_path)
 
     return render_template(
         'leave/view_request.html',
@@ -781,6 +788,9 @@ def view_request(id):
         can_resubmit=leave_request_is_resubmittable(lr) and can_manage,
         can_review=bool(stage),
         can_resend_supervisor_alert=can_resend_supervisor_alert,
+        document_missing=document_missing,
+        can_request_document_reupload=can_request_document_reupload,
+        can_reupload_document=can_reupload_document,
     )
 
 
@@ -814,6 +824,95 @@ def resend_supervisor_alert(id):
                 'warning',
             )
     return redirect(url_for('leave.view_request', id=lr.id))
+
+
+@leave_bp.route('/<int:id>/request-document-reupload', methods=['POST'])
+@login_required
+@permission_required('approve_leave')
+def request_document_reupload(id):
+    """HR: email the employee to urgently re-upload a missing supporting document."""
+    cid = require_company_id()
+    lr = _leave_requests_visible_query(cid).filter(LeaveRequest.id == id).first()
+    if not lr:
+        abort(404)
+    if not _can_view_leave_request(lr, cid):
+        abort(403)
+    if not lr.document_path:
+        flash('This leave request has no supporting document on record.', 'warning')
+        return redirect(url_for('leave.view_request', id=lr.id))
+
+    result = notify_leave_document_reupload_requested(lr.id)
+    if result.get('sent'):
+        flash(
+            f'Re-upload request emailed to {result.get("email")}. '
+            'Ask the employee to upload the document again from the link in that email.',
+            'success',
+        )
+    else:
+        flash(result.get('error') or 'Could not send re-upload email.', 'danger')
+    return redirect(url_for('leave.view_request', id=lr.id))
+
+
+@leave_bp.route('/<int:id>/reupload-document', methods=['GET', 'POST'])
+@login_required
+def reupload_document(id):
+    """Employee (or HR) replaces a missing supporting document without editing the leave dates."""
+    cid = require_company_id()
+    lr = _leave_requests_visible_query(cid).filter(LeaveRequest.id == id).first()
+    if not lr:
+        abort(404)
+    if not _can_view_leave_request(lr, cid):
+        abort(403)
+
+    is_owner = (current_user.employee_id or 0) == lr.employee_id
+    is_hr = current_user.has_permission('approve_leave')
+    if not is_owner and not is_hr:
+        abort(403)
+    if not lr.document_path:
+        flash('This leave request has no supporting document on record to replace.', 'warning')
+        return redirect(url_for('leave.view_request', id=lr.id))
+
+    document_missing = leave_document_is_missing(lr.document_path)
+    attachment_ctx = _leave_attachment_template_ctx(lr)
+
+    if request.method == 'POST':
+        f = request.files.get('supporting_document')
+        if not f or not getattr(f, 'filename', None):
+            flash('Choose a file to upload.', 'danger')
+            return render_template(
+                'leave/reupload_document.html',
+                leave_request=lr,
+                document_missing=document_missing,
+                **attachment_ctx,
+            )
+        ok, upload_err, attached = _process_leave_supporting_upload(lr, lr.employee_id)
+        if not ok:
+            db.session.rollback()
+            flash(upload_err, 'danger')
+            return render_template(
+                'leave/reupload_document.html',
+                leave_request=lr,
+                document_missing=document_missing,
+                **attachment_ctx,
+            )
+        if not attached:
+            flash('Choose a file to upload.', 'danger')
+            return render_template(
+                'leave/reupload_document.html',
+                leave_request=lr,
+                document_missing=document_missing,
+                **attachment_ctx,
+            )
+        db.session.commit()
+        flash('Supporting document uploaded successfully.', 'success')
+        return redirect(url_for('leave.view_request', id=lr.id))
+
+    return render_template(
+        'leave/reupload_document.html',
+        leave_request=lr,
+        document_missing=document_missing,
+        **attachment_ctx,
+    )
 
 
 @leave_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
@@ -1009,7 +1108,7 @@ def leave_request_document(id):
     full_path = resolve_leave_document_full_path(lr.document_path)
     if not full_path:
         flash('Supporting document file is missing from storage.', 'danger')
-        return redirect(url_for('leave.index'))
+        return redirect(url_for('leave.view_request', id=lr.id))
     download = request.args.get('download') in {'1', 'true', 'yes'}
     mime, _ = mimetypes.guess_type(full_path)
     return send_file(
@@ -1323,6 +1422,7 @@ def approve(id):
         approval_stage=stage,
         stage_label=stage_labels.get(stage, stage),
         supervisor_summary=sup,
+        document_missing=leave_document_is_missing(lr.document_path),
     )
 
 
