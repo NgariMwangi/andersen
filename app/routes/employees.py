@@ -2090,37 +2090,29 @@ def documents(id):
     leave_rows = (
         db.session.query(LeaveRequest)
         .options(joinedload(LeaveRequest.leave_type))
-        .filter(LeaveRequest.employee_id == emp.id)
+        .filter(
+            LeaveRequest.employee_id == emp.id,
+            LeaveRequest.document_path.isnot(None),
+            LeaveRequest.document_path != '',
+        )
         .order_by(LeaveRequest.start_date.desc(), LeaveRequest.id.desc())
         .all()
     )
     leave_documents = []
     for lr in leave_rows:
-        lt = lr.leave_type
-        code = (lt.code or '').upper() if lt else ''
-        requires_doc = bool(lt and (lt.requires_document or code == 'SICK'))
-        if not lr.document_path and not requires_doc:
+        if leave_document_is_missing(lr.document_path):
             continue
-        if not lr.document_path:
-            doc_status = 'none'
-        elif leave_document_is_missing(lr.document_path):
-            doc_status = 'missing'
-        else:
-            doc_status = 'uploaded'
-        filename = None
-        if lr.document_path:
-            filename = os.path.basename(lr.document_path.replace('\\', '/'))
+        lt = lr.leave_type
         leave_documents.append(
             {
                 'id': lr.id,
                 'leave_type_name': lt.name if lt else 'Leave',
-                'leave_type_code': code,
+                'leave_type_code': (lt.code or '').upper() if lt else '',
                 'start_date': lr.start_date,
                 'end_date': lr.end_date,
                 'status': lr.status,
                 'status_label': leave_status_label(lr.status),
-                'document_status': doc_status,
-                'filename': filename,
+                'filename': os.path.basename(lr.document_path.replace('\\', '/')),
                 'days_requested': lr.days_requested,
             }
         )
@@ -2134,8 +2126,6 @@ def documents(id):
         is_self_service=is_self_service,
         employee_uploads_category_code=EMPLOYEE_UPLOADS_CATEGORY_CODE,
         leave_documents=leave_documents,
-        can_manage_leave_docs=current_user.has_permission('approve_leave')
-        or _is_own_employee_documents(id),
     )
 
 
