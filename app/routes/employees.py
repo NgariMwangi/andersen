@@ -2082,6 +2082,49 @@ def documents(id):
     grouped = documents_grouped_by_category(id, categories)
     max_mb = max(1, int(current_app.config.get('EMPLOYEE_DOCUMENT_MAX_BYTES', 25 * 1024 * 1024)) // (1024 * 1024))
     is_self_service = _is_own_employee_documents(id) and not current_user.has_permission('edit_employees')
+
+    from app.models.leave import LeaveRequest
+    from app.services.leave_document_service import leave_document_is_missing
+    from app.services.leave_approval_service import leave_status_label
+
+    leave_rows = (
+        db.session.query(LeaveRequest)
+        .options(joinedload(LeaveRequest.leave_type))
+        .filter(LeaveRequest.employee_id == emp.id)
+        .order_by(LeaveRequest.start_date.desc(), LeaveRequest.id.desc())
+        .all()
+    )
+    leave_documents = []
+    for lr in leave_rows:
+        lt = lr.leave_type
+        code = (lt.code or '').upper() if lt else ''
+        requires_doc = bool(lt and (lt.requires_document or code == 'SICK'))
+        if not lr.document_path and not requires_doc:
+            continue
+        if not lr.document_path:
+            doc_status = 'none'
+        elif leave_document_is_missing(lr.document_path):
+            doc_status = 'missing'
+        else:
+            doc_status = 'uploaded'
+        filename = None
+        if lr.document_path:
+            filename = os.path.basename(lr.document_path.replace('\\', '/'))
+        leave_documents.append(
+            {
+                'id': lr.id,
+                'leave_type_name': lt.name if lt else 'Leave',
+                'leave_type_code': code,
+                'start_date': lr.start_date,
+                'end_date': lr.end_date,
+                'status': lr.status,
+                'status_label': leave_status_label(lr.status),
+                'document_status': doc_status,
+                'filename': filename,
+                'days_requested': lr.days_requested,
+            }
+        )
+
     return render_template(
         'employees/documents.html',
         employee=emp,
@@ -2090,6 +2133,9 @@ def documents(id):
         max_upload_mb=max_mb,
         is_self_service=is_self_service,
         employee_uploads_category_code=EMPLOYEE_UPLOADS_CATEGORY_CODE,
+        leave_documents=leave_documents,
+        can_manage_leave_docs=current_user.has_permission('approve_leave')
+        or _is_own_employee_documents(id),
     )
 
 

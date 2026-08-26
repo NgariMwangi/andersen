@@ -156,6 +156,90 @@
 </div>
 {% endfor %}
 
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 bg-white">
+        <span>
+            <i class="bi bi-calendar2-heart me-1"></i>
+            Leave supporting documents
+        </span>
+        <span class="badge text-bg-light border">{{ leave_documents|length }} item{{ 's' if leave_documents|length != 1 else '' }}</span>
+    </div>
+    <div class="card-body">
+        <p class="small text-muted mb-3 mb-md-2">
+            Supporting files attached to leave requests (e.g. sick notes). These are stored with leave, separate from the category folders above.
+        </p>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Leave type</th>
+                        <th>Period</th>
+                        <th>Leave status</th>
+                        <th>Document</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ld in leave_documents %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ ld.leave_type_name }}</div>
+                            {% if ld.filename %}
+                            <div class="small text-muted text-truncate" style="max-width:14rem;">{{ ld.filename }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap small">
+                            {{ ld.start_date.strftime('%d %b %Y') if ld.start_date else '—' }}
+                            –
+                            {{ ld.end_date.strftime('%d %b %Y') if ld.end_date else '—' }}
+                        </td>
+                        <td>
+                            {% set st = (ld.status or '')|lower %}
+                            <span class="badge bg-{% if st == 'approved' %}success{% elif st == 'booked' %}info{% elif st in ('pending', 'pending_hr') %}warning text-dark{% elif st == 'rejected' %}danger{% else %}secondary{% endif %}">
+                                {{ ld.status_label }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if ld.document_status == 'uploaded' %}
+                            <span class="badge bg-success-subtle text-success"><i class="bi bi-paperclip"></i> Uploaded</span>
+                            {% elif ld.document_status == 'missing' %}
+                            <span class="badge bg-danger-subtle text-danger"><i class="bi bi-exclamation-triangle"></i> Missing</span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary">Not uploaded</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('leave.view_request', id=ld.id) }}" title="Open leave request">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                            {% if ld.document_status == 'uploaded' %}
+                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('leave.leave_request_document', id=ld.id) }}" target="_blank" rel="noopener" title="View document">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('leave.leave_request_document', id=ld.id, download=1) }}" title="Download">
+                                <i class="bi bi-download"></i>
+                            </a>
+                            {% elif can_manage_leave_docs %}
+                            <a class="btn btn-sm btn-primary" href="{{ url_for('leave.reupload_document', id=ld.id) }}" title="{% if ld.document_status == 'missing' %}Re-upload{% else %}Upload{% endif %}">
+                                <i class="bi bi-upload"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-muted small py-3">
+                            No leave supporting documents for this employee yet
+                            (sick leave and other requests that need a medical note or attachment will appear here).
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="documentPreviewModal" tabindex="-1" aria-labelledby="documentPreviewTitle" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-lg-down">
         <div class="modal-content">
