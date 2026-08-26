@@ -402,6 +402,14 @@ def _render_leave_requests_page(cid: int, requests, *, list_mode: str):
     request_groups = _group_leave_requests_by_type(filtered)
     type_filter_options = _group_leave_requests_by_type(requests)
     total_request_count = len(requests)
+    document_status = {}
+    for r in filtered:
+        if not r.document_path:
+            document_status[r.id] = 'none'
+        elif leave_document_is_missing(r.document_path):
+            document_status[r.id] = 'missing'
+        else:
+            document_status[r.id] = 'uploaded'
 
     show_team_tab = user_can_access_team_leave(current_user, cid)
     return render_template(
@@ -412,6 +420,7 @@ def _render_leave_requests_page(cid: int, requests, *, list_mode: str):
         total_request_count=total_request_count,
         active_type_filter=type_filter.upper() if type_filter else '',
         remaining_days=_leave_remaining_days_map(filtered, cid),
+        document_status=document_status,
         leave_statistics=leave_statistics,
         stats_year=stats_year,
         list_mode=list_mode,

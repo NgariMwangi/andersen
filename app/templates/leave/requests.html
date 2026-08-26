@@ -120,9 +120,24 @@
 <p class="text-muted small mb-3">Leave requests from employees who report to you. Use <strong>Review</strong> to approve or decline.</p>
 {% endif %}
 
+{% macro leave_document_cell(r) %}
+{% set doc = document_status.get(r.id, 'none') %}
+{% if doc == 'uploaded' %}
+<span class="badge bg-success-subtle text-success" title="Supporting document on file">
+    <i class="bi bi-paperclip"></i> Yes
+</span>
+{% elif doc == 'missing' %}
+<span class="badge bg-danger-subtle text-danger" title="Recorded but file missing from storage">
+    <i class="bi bi-exclamation-triangle"></i> Missing
+</span>
+{% else %}
+<span class="badge bg-secondary-subtle text-secondary" title="No supporting document uploaded">No</span>
+{% endif %}
+{% endmacro %}
+
 {% set show_employee_column = list_mode in ('team', 'all') %}
 {% set show_supervisor_column = has_permission('approve_leave') and list_mode == 'all' %}
-{% set leave_table_cols = 8 + (1 if show_employee_column else 0) + (1 if show_supervisor_column else 0) %}
+{% set leave_table_cols = 9 + (1 if show_employee_column else 0) + (1 if show_supervisor_column else 0) %}
 {% set list_endpoint = {
     'all': 'leave.index',
     'mine': 'leave.index',
@@ -164,11 +179,28 @@
     <td>{{ r.end_date.strftime('%d %b %Y') if r.end_date else '-' }}</td>
     <td class="text-center">{{ r.days_requested | fmt_days }}</td>
     <td class="text-center align-middle">{{ leave_remaining_cell(r) }}</td>
+    <td class="text-center align-middle">{{ leave_document_cell(r) }}</td>
     <td>{{ leave_status_badge(r) }}</td>
     {% if show_supervisor_column %}<td>{{ supervisor_status_badge(r) }}</td>{% endif %}
     <td class="text-nowrap">{{ leave_request_actions(r) }}</td>
 </tr>
 {% endfor %}
+{% endmacro %}
+
+{% macro leave_table_head() %}
+<tr>
+    {% if show_employee_column %}<th>Employee</th>{% endif %}
+    <th>Type</th>
+    <th>Handover to</th>
+    <th>Start</th>
+    <th>End</th>
+    <th class="text-center">Days</th>
+    <th class="text-center">Remaining</th>
+    <th class="text-center">Document</th>
+    <th>Status</th>
+    {% if show_supervisor_column %}<th>Supervisor</th>{% endif %}
+    <th></th>
+</tr>
 {% endmacro %}
 
 <div class="d-none d-md-block">
@@ -182,18 +214,7 @@
             <div class="table-responsive leave-requests-table-wrap">
                 <table class="table leave-requests-table mb-0">
                     <thead>
-                        <tr>
-                            {% if show_employee_column %}<th>Employee</th>{% endif %}
-                            <th>Type</th>
-                            <th>Handover to</th>
-                            <th>Start</th>
-                            <th>End</th>
-                            <th class="text-center">Days</th>
-                            <th class="text-center">Remaining</th>
-                            <th>Status</th>
-                            {% if show_supervisor_column %}<th>Supervisor</th>{% endif %}
-                            <th></th>
-                        </tr>
+                        {{ leave_table_head() }}
                     </thead>
                     <tbody>
                         {{ leave_request_table_rows(g.requests) }}
@@ -206,18 +227,7 @@
     <div class="table-responsive leave-requests-table-wrap">
         <table class="table leave-requests-table mb-0">
             <thead>
-                <tr>
-                    {% if show_employee_column %}<th>Employee</th>{% endif %}
-                    <th>Type</th>
-                    <th>Handover to</th>
-                    <th>Start</th>
-                    <th>End</th>
-                    <th class="text-center">Days</th>
-                    <th class="text-center">Remaining</th>
-                    <th>Status</th>
-                    {% if show_supervisor_column %}<th>Supervisor</th>{% endif %}
-                    <th></th>
-                </tr>
+                {{ leave_table_head() }}
             </thead>
             <tbody>
             <tr><td colspan="{{ leave_table_cols }}" class="text-muted">
@@ -256,6 +266,8 @@
                     <dd>{{ r.days_requested | fmt_days }}</dd>
                     <dt>Remaining</dt>
                     <dd>{{ leave_remaining_cell(r) }}</dd>
+                    <dt>Document</dt>
+                    <dd>{{ leave_document_cell(r) }}</dd>
                     {% if show_supervisor_column %}
                     <dt>Supervisor</dt>
                     <dd>{{ supervisor_status_badge(r) }}</dd>
@@ -279,5 +291,6 @@
 <p class="text-muted small mb-0">
     When a <strong>manager</strong> is set on the employee, they normally approve first; HR can still approve or reject anytime and will see supervisor status (Awaiting / Done).
     <strong>Remaining</strong> is for <strong>approved</strong> or <strong>booked</strong> leave: days still to run in the period (from today through the end date), using the same rule as the leave type — <em>working days</em> (Mon–Fri) or <em>calendar days</em>.
+    <strong>Document</strong>: Yes = file on storage, Missing = recorded but file lost, No = not uploaded.
 </p>
 {% endblock %}
