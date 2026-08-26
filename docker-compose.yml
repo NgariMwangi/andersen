@@ -17,10 +17,18 @@ services:
       BREVO_SENDER_NAME: Andersen HRMS
       SALARY_BASIS: annual
       SESSION_LIFETIME_HOURS: "2"
+      # Persistent document roots (host folders must exist beside the repo)
       EMPLOYEE_UPLOADS_ROOT: /employeeuploads
+      UPLOAD_FOLDER: /app/uploads
+      LOG_DIR: /app/logs
     ports:
       - "5002:5002"
     volumes:
+      # Employee profile documents (contracts, IDs, employee self-uploads)
       - ../employeeuploads:/employeeuploads
+      # Leave supporting docs, local employee photos, legacy upload paths
+      - ../hrms_uploads:/app/uploads
+      # App logs (optional but survives rebuilds)
+      - ../hrms_logs:/app/logs
     # Optional: mount app/static to provide logo.jpg without rebuilding
     #   - ./app/static:/app/app/static:ro
