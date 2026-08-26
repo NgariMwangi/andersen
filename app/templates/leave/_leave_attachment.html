@@ -1,9 +1,15 @@
 {# Optional supporting document for any leave type. #}
 <div class="col-12">
-    {% if document_missing is defined and document_missing %}
+    {% set urgent_upload = (document_missing is defined and document_missing) or (document_needed is defined and document_needed) %}
+    {% if urgent_upload %}
     <div class="alert alert-danger py-2 small mb-2">
         <i class="bi bi-exclamation-triangle me-1"></i>
-        Re-uploading is <strong>urgent</strong> — the previous file is missing from storage.
+        Uploading a supporting document is <strong>urgent</strong>
+        {% if document_needed is defined and document_needed %}
+        — HR has requested this file.
+        {% else %}
+        — the previous file is missing from storage.
+        {% endif %}
     </div>
     {% else %}
     <div class="alert alert-warning py-2 small mb-2">
@@ -15,7 +21,7 @@
     {% endif %}
     <label class="form-label" for="supporting_document">
         Supporting document or image
-        {% if document_missing is defined and document_missing %}
+        {% if urgent_upload %}
         <span class="text-danger">*</span>
         {% else %}
         <span class="text-muted">(optional)</span>
@@ -27,7 +33,7 @@
         id="supporting_document"
         class="form-control"
         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.heic,image/*,application/pdf"
-        {% if document_missing is defined and document_missing %}required{% endif %}
+        {% if urgent_upload %}required{% endif %}
     />
     <div class="form-text">PDF, Word, or image (JPG, PNG, etc.). Max size: {{ leave_max_attachment_mb }} MB.</div>
     {% if existing_document and not (document_missing is defined and document_missing) %}

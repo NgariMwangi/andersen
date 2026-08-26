@@ -59,7 +59,7 @@ from app.services.leave_bulk_entry_service import (
     record_bulk_historical_leave,
 )
 from app.services.leave_notification_service import (
-    notify_leave_document_reupload_requested,
+    notify_leave_document_upload_requested,
     notify_leave_responded,
     notify_leave_submitted,
     resend_supervisor_leave_alerts,
@@ -347,6 +347,34 @@ def _leave_remaining_days_map(requests, cid: int) -> dict:
     return remaining_days
 
 
+def _group_leave_requests_by_type(requests) -> list[dict]:
+    """Preserve type order by first appearance; group rows under each leave type."""
+    groups: list[dict] = []
+    index_by_key: dict = {}
+    for r in requests:
+        lt = r.leave_type
+        key = lt.id if lt else 0
+        if key not in index_by_key:
+            index_by_key[key] = len(groups)
+            groups.append(
+                {
+                    'leave_type_id': key or None,
+                    'code': (lt.code or '').upper() if lt else '',
+                    'name': (lt.name if lt else 'Other / unknown'),
+                    'requests': [],
+                }
+            )
+        groups[index_by_key[key]]['requests'].append(r)
+    # Stable, readable order: Annual, Sick, then alphabetical by name
+    preferred = {'ANNUAL': 0, 'SICK': 1, 'MATERNITY': 2, 'PATERNITY': 3, 'COMPASSIONATE': 4, 'UNPAID': 5}
+
+    def sort_key(g):
+        return (preferred.get(g['code'], 50), (g['name'] or '').lower())
+
+    groups.sort(key=sort_key)
+    return groups
+
+
 def _render_leave_requests_page(cid: int, requests, *, list_mode: str):
     from app.services.leave_mandatory_service import migrate_mandatory_leave_status_to_booked
 
@@ -355,11 +383,35 @@ def _render_leave_requests_page(cid: int, requests, *, list_mode: str):
     stats_year = date.today().year
     if list_mode in ('mine', 'all') and current_user.employee_id:
         leave_statistics = statistics_for_employee(current_user.employee_id, stats_year)
+
+    type_filter = (request.args.get('type') or '').strip()
+    filtered = requests
+    if type_filter:
+        type_filter_upper = type_filter.upper()
+        type_filter_id = int(type_filter) if type_filter.isdigit() else None
+        filtered = [
+            r
+            for r in requests
+            if r.leave_type
+            and (
+                (type_filter_id is not None and r.leave_type_id == type_filter_id)
+                or (r.leave_type.code or '').upper() == type_filter_upper
+            )
+        ]
+
+    request_groups = _group_leave_requests_by_type(filtered)
+    type_filter_options = _group_leave_requests_by_type(requests)
+    total_request_count = len(requests)
+
     show_team_tab = user_can_access_team_leave(current_user, cid)
     return render_template(
         'leave/requests.html',
-        requests=requests,
-        remaining_days=_leave_remaining_days_map(requests, cid),
+        requests=filtered,
+        request_groups=request_groups,
+        type_filter_options=type_filter_options,
+        total_request_count=total_request_count,
+        active_type_filter=type_filter.upper() if type_filter else '',
+        remaining_days=_leave_remaining_days_map(filtered, cid),
         leave_statistics=leave_statistics,
         stats_year=stats_year,
         list_mode=list_mode,
@@ -771,10 +823,9 @@ def view_request(id):
         and sup.get('state') == 'awaiting'
     )
     document_missing = leave_document_is_missing(lr.document_path)
-    can_request_document_reupload = (
-        current_user.has_permission('approve_leave') and bool(lr.document_path)
-    )
-    can_reupload_document = can_manage and bool(lr.document_path)
+    can_request_document = current_user.has_permission('approve_leave')
+    can_upload_document = can_manage
+    document_needed = not bool(lr.document_path)
 
     return render_template(
         'leave/view_request.html',
@@ -789,8 +840,9 @@ def view_request(id):
         can_review=bool(stage),
         can_resend_supervisor_alert=can_resend_supervisor_alert,
         document_missing=document_missing,
-        can_request_document_reupload=can_request_document_reupload,
-        can_reupload_document=can_reupload_document,
+        document_needed=document_needed,
+        can_request_document=can_request_document,
+        can_upload_document=can_upload_document,
     )
 
 
@@ -830,33 +882,44 @@ def resend_supervisor_alert(id):
 @login_required
 @permission_required('approve_leave')
 def request_document_reupload(id):
-    """HR: email the employee to urgently re-upload a missing supporting document."""
+    """HR: email the leave owner to upload or re-upload a supporting document."""
     cid = require_company_id()
     lr = _leave_requests_visible_query(cid).filter(LeaveRequest.id == id).first()
     if not lr:
         abort(404)
     if not _can_view_leave_request(lr, cid):
         abort(403)
-    if not lr.document_path:
-        flash('This leave request has no supporting document on record.', 'warning')
-        return redirect(url_for('leave.view_request', id=lr.id))
 
-    result = notify_leave_document_reupload_requested(lr.id)
-    if result.get('sent'):
-        flash(
-            f'Re-upload request emailed to {result.get("email")}. '
-            'Ask the employee to upload the document again from the link in that email.',
-            'success',
-        )
+    if lr.document_path and leave_document_is_missing(lr.document_path):
+        reason = 'missing'
+    elif lr.document_path:
+        reason = 'missing'  # HR forcing a fresh copy
     else:
-        flash(result.get('error') or 'Could not send re-upload email.', 'danger')
+        reason = 'needed'
+
+    result = notify_leave_document_upload_requested(lr.id, reason=reason)
+    if result.get('sent'):
+        if reason == 'needed':
+            flash(
+                f'Document request emailed to {result.get("email")}. '
+                'The employee can upload from the link in that email.',
+                'success',
+            )
+        else:
+            flash(
+                f'Re-upload request emailed to {result.get("email")}. '
+                'Ask the employee to upload the document again from the link in that email.',
+                'success',
+            )
+    else:
+        flash(result.get('error') or 'Could not send document request email.', 'danger')
     return redirect(url_for('leave.view_request', id=lr.id))
 
 
 @leave_bp.route('/<int:id>/reupload-document', methods=['GET', 'POST'])
 @login_required
 def reupload_document(id):
-    """Employee (or HR) replaces a missing supporting document without editing the leave dates."""
+    """Employee (or HR) uploads/replaces a supporting document without editing leave dates."""
     cid = require_company_id()
     lr = _leave_requests_visible_query(cid).filter(LeaveRequest.id == id).first()
     if not lr:
@@ -868,11 +931,9 @@ def reupload_document(id):
     is_hr = current_user.has_permission('approve_leave')
     if not is_owner and not is_hr:
         abort(403)
-    if not lr.document_path:
-        flash('This leave request has no supporting document on record to replace.', 'warning')
-        return redirect(url_for('leave.view_request', id=lr.id))
 
-    document_missing = leave_document_is_missing(lr.document_path)
+    document_needed = not bool(lr.document_path)
+    document_missing = bool(lr.document_path) and leave_document_is_missing(lr.document_path)
     attachment_ctx = _leave_attachment_template_ctx(lr)
 
     if request.method == 'POST':
@@ -883,6 +944,7 @@ def reupload_document(id):
                 'leave/reupload_document.html',
                 leave_request=lr,
                 document_missing=document_missing,
+                document_needed=document_needed,
                 **attachment_ctx,
             )
         ok, upload_err, attached = _process_leave_supporting_upload(lr, lr.employee_id)
@@ -893,6 +955,7 @@ def reupload_document(id):
                 'leave/reupload_document.html',
                 leave_request=lr,
                 document_missing=document_missing,
+                document_needed=document_needed,
                 **attachment_ctx,
             )
         if not attached:
@@ -901,6 +964,7 @@ def reupload_document(id):
                 'leave/reupload_document.html',
                 leave_request=lr,
                 document_missing=document_missing,
+                document_needed=document_needed,
                 **attachment_ctx,
             )
         db.session.commit()
@@ -911,6 +975,7 @@ def reupload_document(id):
         'leave/reupload_document.html',
         leave_request=lr,
         document_missing=document_missing,
+        document_needed=document_needed,
         **attachment_ctx,
     )
 

@@ -174,17 +174,10 @@
 </div>
 {% endif %}
 
-{% if request.document_path %}
 <div class="card mb-4 border-0 shadow-sm">
     <div class="card-body">
         <h2 class="h6 mb-2">Supporting document</h2>
-        {% if document_missing %}
-        <div class="alert alert-danger py-2 small mb-3">
-            <i class="bi bi-exclamation-triangle me-1"></i>
-            The file recorded for this request is <strong>missing from storage</strong>.
-            Ask the employee to re-upload it urgently.
-        </div>
-        {% else %}
+        {% if request.document_path and not document_missing %}
         <p class="mb-3">
             <a href="{{ url_for('leave.leave_request_document', id=request.id) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
                 <i class="bi bi-eye me-1"></i>View
@@ -193,33 +186,50 @@
                 <i class="bi bi-download me-1"></i>Download
             </a>
         </p>
+        {% elif document_missing and request.document_path %}
+        <div class="alert alert-danger py-2 small mb-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            The file recorded for this request is <strong>missing from storage</strong>.
+            Ask the employee to re-upload it urgently.
+        </div>
+        {% else %}
+        <div class="alert alert-warning py-2 small mb-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            No supporting document has been uploaded yet
+            {% if request.leave_type and (request.leave_type.code or '')|upper == 'SICK' %}
+            (recommended for sick leave / medical certificate)
+            {% endif %}.
+        </div>
         {% endif %}
         <div class="d-flex flex-wrap gap-2">
-            {% if can_request_document_reupload %}
+            {% if can_request_document %}
             <form method="post" action="{{ url_for('leave.request_document_reupload', id=request.id) }}" class="d-inline"
-                  onsubmit="return confirm('Email this employee to re-upload their supporting document urgently?');">
+                  onsubmit="return confirm('{% if document_needed %}Email this employee to upload a supporting document urgently?{% else %}Email this employee to re-upload their supporting document urgently?{% endif %}');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <button type="submit" class="btn btn-sm btn-warning">
-                    <i class="bi bi-envelope-exclamation me-1"></i>Ask for re-upload
+                    <i class="bi bi-envelope-exclamation me-1"></i>
+                    {% if document_needed %}Ask for document{% else %}Ask for re-upload{% endif %}
                 </button>
             </form>
             {% endif %}
-            {% if can_reupload_document %}
+            {% if can_upload_document %}
             <a href="{{ url_for('leave.reupload_document', id=request.id) }}" class="btn btn-sm btn-primary">
-                <i class="bi bi-upload me-1"></i>Re-upload document
+                <i class="bi bi-upload me-1"></i>
+                {% if document_needed %}Upload document{% else %}Re-upload document{% endif %}
             </a>
             {% endif %}
         </div>
-        {% if can_request_document_reupload %}
+        {% if can_request_document %}
         <p class="small text-muted mt-2 mb-0">
-            “Ask for re-upload” emails the employee that there was a storage issue and the document must be uploaded again urgently.
+            {% if document_needed %}
+            “Ask for document” emails the leave owner that HR needs a supporting file urgently (e.g. sick note).
+            {% else %}
+            “Ask for re-upload” emails the leave owner that the document must be uploaded again urgently.
+            {% endif %}
         </p>
         {% endif %}
     </div>
 </div>
-{% else %}
-<p class="alert alert-light border py-2 small mb-4">No supporting document was attached to this request.</p>
-{% endif %}
 
 <div class="d-flex flex-wrap gap-2">
     <a href="{{ url_for('leave.index') }}" class="btn btn-outline-secondary">Back to list</a>

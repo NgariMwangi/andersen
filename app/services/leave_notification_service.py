@@ -885,9 +885,17 @@ def notify_supervisor_response_confirmation(
     )
 
 
-def notify_leave_document_reupload_requested(leave_request_id: int) -> dict:
+def notify_leave_document_upload_requested(
+    leave_request_id: int,
+    *,
+    reason: str = 'needed',
+) -> dict:
     """
-    Email the employee that their supporting document is missing and must be re-uploaded urgently.
+    Email the leave owner to upload (or re-upload) a supporting document.
+
+    reason:
+      - 'needed': no document was attached yet (HR requesting upload)
+      - 'missing': a document was recorded but the file is gone from storage
     Returns {sent: bool, email: str|None, error: str|None}.
     """
     lr = _load_leave_request(leave_request_id)
@@ -907,44 +915,81 @@ def notify_leave_document_reupload_requested(leave_request_id: int) -> dict:
 
     app_name = _app_name()
     dates = _dates_phrase(lr)
-    reupload_url = _portal_base() + url_for('leave.reupload_document', id=lr.id)
+    upload_url = _portal_base() + url_for('leave.reupload_document', id=lr.id)
     lt_name = lr.leave_type.name if lr.leave_type else 'leave'
     first = escape(emp.first_name or emp.full_name)
+    is_missing = (reason or '').strip().lower() == 'missing'
 
-    subject = f'{app_name} — Urgent: re-upload leave supporting document'
-    detail_html = (
-        f'There was a storage issue with the supporting document you uploaded for your '
-        f'<strong>{escape(lt_name)}</strong> request ({escape(dates)}). '
-        f'The file is no longer available and <strong>must be re-uploaded urgently</strong>.'
-    )
+    if is_missing:
+        subject = f'{app_name} — Urgent: re-upload leave supporting document'
+        detail_html = (
+            f'There was a storage issue with the supporting document you uploaded for your '
+            f'<strong>{escape(lt_name)}</strong> request ({escape(dates)}). '
+            f'The file is no longer available and <strong>must be re-uploaded urgently</strong>.'
+        )
+        guidance = (
+            'Please open the portal and upload the document again as soon as possible '
+            'so HR can complete review of your leave request.'
+        )
+        button_label = 'Re-upload document now'
+        title = 'Re-upload required'
+        subtitle = 'Urgent — supporting document missing'
+        preheader = f'Urgent: re-upload document for {lt_name} leave'
+        text_detail = (
+            f'There was a storage issue with the supporting document you uploaded for your '
+            f'{lt_name} request ({dates}). The file is no longer available and must be '
+            f're-uploaded urgently.'
+        )
+    else:
+        subject = f'{app_name} — Urgent: upload leave supporting document'
+        detail_html = (
+            f'HR has requested a supporting document for your '
+            f'<strong>{escape(lt_name)}</strong> request ({escape(dates)}). '
+            f'Please upload it <strong>urgently</strong> (for example a medical certificate for sick leave).'
+        )
+        guidance = (
+            'Please open the portal and upload the document as soon as possible '
+            'so HR can complete review of your leave request.'
+        )
+        button_label = 'Upload document now'
+        title = 'Document required'
+        subtitle = 'Urgent — supporting document needed'
+        preheader = f'Urgent: upload document for {lt_name} leave'
+        text_detail = (
+            f'HR has requested a supporting document for your {lt_name} request ({dates}). '
+            f'Please upload it urgently.'
+        )
+
     body = (
         f'<p style="margin:0 0 16px;font-size:17px;color:{BRAND_SLATE};">'
         f'Hello <strong>{first}</strong>,</p>'
         f'{_highlight_box(detail_html, tone="danger")}'
-        f'<p style="margin:0 0 16px;">Please open the portal and upload the document again as soon as possible '
-        f'so HR can complete review of your leave request.</p>'
+        f'<p style="margin:0 0 16px;">{guidance}</p>'
         f'{_leave_summary_html(lr, include_employee=False)}'
-        f'{_email_button("Re-upload document now", reupload_url)}'
+        f'{_email_button(button_label, upload_url)}'
         f'<p style="margin:16px 0 0;font-size:13px;color:#64748b;text-align:center;">'
-        f'Or open: <a href="{escape(reupload_url)}" style="color:{BRAND_PRIMARY};">{escape(reupload_url)}</a></p>'
+        f'Or open: <a href="{escape(upload_url)}" style="color:{BRAND_PRIMARY};">{escape(upload_url)}</a></p>'
     )
     text = (
         f'Hello {emp.first_name or emp.full_name},\n\n'
-        f'There was a storage issue with the supporting document you uploaded for your '
-        f'{lt_name} request ({dates}). The file is no longer available and must be '
-        f're-uploaded urgently.\n\n'
-        f'Re-upload here: {reupload_url}\n'
+        f'{text_detail}\n\n'
+        f'Upload here: {upload_url}\n'
     )
     _send_leave_email(
         [inbox],
         subject,
         _wrap_email(
-            title='Re-upload required',
-            subtitle='Urgent — supporting document missing',
+            title=title,
+            subtitle=subtitle,
             body_html=body,
-            preheader=f'Urgent: re-upload document for {lt_name} leave',
+            preheader=preheader,
             employee=emp,
         ),
         text,
     )
     return {'sent': True, 'email': inbox, 'error': None}
+
+
+def notify_leave_document_reupload_requested(leave_request_id: int) -> dict:
+    """Backward-compatible alias for missing-file re-upload emails."""
+    return notify_leave_document_upload_requested(leave_request_id, reason='missing')

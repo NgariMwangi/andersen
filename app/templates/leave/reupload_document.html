@@ -1,8 +1,8 @@
 {% extends "layouts/base.html" %}
-{% block title %}Re-upload leave document - {{ app_name }}{% endblock %}
+{% block title %}{% if document_needed %}Upload{% else %}Re-upload{% endif %} leave document - {{ app_name }}{% endblock %}
 {% block content %}
 <div class="mb-3">
-    <h1 class="h4 mb-1">Re-upload supporting document</h1>
+    <h1 class="h4 mb-1">{% if document_needed %}Upload supporting document{% else %}Re-upload supporting document{% endif %}</h1>
     <p class="text-muted small mb-0">
         {{ leave_request.employee.full_name if leave_request.employee else 'Employee' }}
         · {{ leave_request.leave_type.name if leave_request.leave_type else 'Leave' }}
@@ -12,7 +12,15 @@
     </p>
 </div>
 
-{% if document_missing %}
+{% if document_needed %}
+<div class="alert alert-warning">
+    <strong>Urgent:</strong> HR has requested a supporting document for this leave request
+    {% if leave_request.leave_type and (leave_request.leave_type.code or '')|upper == 'SICK' %}
+    (e.g. medical / sick note)
+    {% endif %}.
+    Please upload it now.
+</div>
+{% elif document_missing %}
 <div class="alert alert-danger">
     <strong>Urgent:</strong> The previous supporting document for this leave request is missing from storage
     (for example after a server update). Please upload the file again now.

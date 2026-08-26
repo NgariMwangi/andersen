@@ -123,91 +123,158 @@
 {% set show_employee_column = list_mode in ('team', 'all') %}
 {% set show_supervisor_column = has_permission('approve_leave') and list_mode == 'all' %}
 {% set leave_table_cols = 8 + (1 if show_employee_column else 0) + (1 if show_supervisor_column else 0) %}
+{% set list_endpoint = {
+    'all': 'leave.index',
+    'mine': 'leave.index',
+    'team': 'leave.team_requests',
+}.get(list_mode, 'leave.index') %}
 {% if current_user.employee_id and list_mode != 'team' %}
 <a href="{{ url_for('leave.request_leave') }}" class="btn btn-primary mb-3">New Request</a>
 {% endif %}
-<div class="d-none d-md-block table-responsive leave-requests-table-wrap">
-    <table class="table leave-requests-table mb-0">
-        <thead>
-            <tr>
-                {% if show_employee_column %}<th>Employee</th>{% endif %}
-                <th>Type</th>
-                <th>Handover to</th>
-                <th>Start</th>
-                <th>End</th>
-                <th class="text-center">Days</th>
-                <th class="text-center">Remaining</th>
-                <th>Status</th>
-                {% if show_supervisor_column %}<th>Supervisor</th>{% endif %}
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for r in requests %}
-        <tr>
-            {% if show_employee_column %}
-            <td>{{ r.employee.full_name if r.employee else '-' }}</td>
-            {% endif %}
-            <td>{{ r.leave_type.name if r.leave_type else '-' }}</td>
-            <td>{{ r.handover_to.full_name if r.handover_to else '-' }}</td>
-            <td>{{ r.start_date.strftime('%d %b %Y') if r.start_date else '-' }}</td>
-            <td>{{ r.end_date.strftime('%d %b %Y') if r.end_date else '-' }}</td>
-            <td class="text-center">{{ r.days_requested | fmt_days }}</td>
-            <td class="text-center align-middle">{{ leave_remaining_cell(r) }}</td>
-            <td>{{ leave_status_badge(r) }}</td>
-            {% if show_supervisor_column %}<td>{{ supervisor_status_badge(r) }}</td>{% endif %}
-            <td class="text-nowrap">{{ leave_request_actions(r) }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="{{ leave_table_cols }}" class="text-muted">
-            {% if list_mode == 'team' %}No team leave requests.{% else %}No leave requests.{% endif %}
-        </td></tr>
+
+{% if type_filter_options and type_filter_options|length > 1 %}
+<ul class="nav nav-pills flex-wrap gap-2 mb-3">
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if not active_type_filter else '' }}" href="{{ url_for(list_endpoint) }}">
+            All types
+            <span class="badge text-bg-light text-muted ms-1">{{ total_request_count }}</span>
+        </a>
+    </li>
+    {% for g in type_filter_options %}
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_type_filter == g.code or (g.leave_type_id and active_type_filter == (g.leave_type_id|string)) else '' }}"
+           href="{{ url_for(list_endpoint, type=g.code or g.leave_type_id) }}">
+            {{ g.name }}
+            <span class="badge text-bg-light text-muted ms-1">{{ g.requests|length }}</span>
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% macro leave_request_table_rows(rows) %}
+{% for r in rows %}
+<tr>
+    {% if show_employee_column %}
+    <td>{{ r.employee.full_name if r.employee else '-' }}</td>
+    {% endif %}
+    <td>{{ r.leave_type.name if r.leave_type else '-' }}</td>
+    <td>{{ r.handover_to.full_name if r.handover_to else '-' }}</td>
+    <td>{{ r.start_date.strftime('%d %b %Y') if r.start_date else '-' }}</td>
+    <td>{{ r.end_date.strftime('%d %b %Y') if r.end_date else '-' }}</td>
+    <td class="text-center">{{ r.days_requested | fmt_days }}</td>
+    <td class="text-center align-middle">{{ leave_remaining_cell(r) }}</td>
+    <td>{{ leave_status_badge(r) }}</td>
+    {% if show_supervisor_column %}<td>{{ supervisor_status_badge(r) }}</td>{% endif %}
+    <td class="text-nowrap">{{ leave_request_actions(r) }}</td>
+</tr>
+{% endfor %}
+{% endmacro %}
+
+<div class="d-none d-md-block">
+    {% if request_groups %}
+        {% for g in request_groups %}
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+                <h2 class="h6 mb-0">{{ g.name }}</h2>
+                <span class="small text-muted">{{ g.requests|length }} request{{ 's' if g.requests|length != 1 else '' }}</span>
+            </div>
+            <div class="table-responsive leave-requests-table-wrap">
+                <table class="table leave-requests-table mb-0">
+                    <thead>
+                        <tr>
+                            {% if show_employee_column %}<th>Employee</th>{% endif %}
+                            <th>Type</th>
+                            <th>Handover to</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th class="text-center">Days</th>
+                            <th class="text-center">Remaining</th>
+                            <th>Status</th>
+                            {% if show_supervisor_column %}<th>Supervisor</th>{% endif %}
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ leave_request_table_rows(g.requests) }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
         {% endfor %}
-        </tbody>
-    </table>
+    {% else %}
+    <div class="table-responsive leave-requests-table-wrap">
+        <table class="table leave-requests-table mb-0">
+            <thead>
+                <tr>
+                    {% if show_employee_column %}<th>Employee</th>{% endif %}
+                    <th>Type</th>
+                    <th>Handover to</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th class="text-center">Days</th>
+                    <th class="text-center">Remaining</th>
+                    <th>Status</th>
+                    {% if show_supervisor_column %}<th>Supervisor</th>{% endif %}
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            <tr><td colspan="{{ leave_table_cols }}" class="text-muted">
+                {% if list_mode == 'team' %}No team leave requests.{% else %}No leave requests.{% endif %}
+            </td></tr>
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
 </div>
 
 <div class="d-md-none leave-request-cards">
-    {% for r in requests %}
-    <div class="card border-0 shadow-sm mb-3 leave-request-card">
-        <div class="card-body p-3">
-            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                <div class="min-w-0">
-                    <div class="fw-semibold">{{ r.leave_type.name if r.leave_type else 'Leave' }}</div>
-                    {% if show_employee_column %}
-                    <div class="small text-muted text-truncate">{{ r.employee.full_name if r.employee else '—' }}</div>
-                    {% endif %}
+    {% if request_groups %}
+        {% for g in request_groups %}
+        <h2 class="h6 text-muted text-uppercase mt-3 mb-2">{{ g.name }} <span class="fw-normal">({{ g.requests|length }})</span></h2>
+        {% for r in g.requests %}
+        <div class="card border-0 shadow-sm mb-3 leave-request-card">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div class="min-w-0">
+                        <div class="fw-semibold">{{ r.leave_type.name if r.leave_type else 'Leave' }}</div>
+                        {% if show_employee_column %}
+                        <div class="small text-muted text-truncate">{{ r.employee.full_name if r.employee else '—' }}</div>
+                        {% endif %}
+                    </div>
+                    {{ leave_status_badge(r) }}
                 </div>
-                {{ leave_status_badge(r) }}
-            </div>
-            <dl class="leave-request-card-details mb-3">
-                <dt>Period</dt>
-                <dd>
-                    {{ r.start_date.strftime('%d %b %Y') if r.start_date else '—' }}
-                    –
-                    {{ r.end_date.strftime('%d %b %Y') if r.end_date else '—' }}
-                </dd>
-                <dt>Days</dt>
-                <dd>{{ r.days_requested | fmt_days }}</dd>
-                <dt>Remaining</dt>
-                <dd>{{ leave_remaining_cell(r) }}</dd>
-                {% if show_supervisor_column %}
-                <dt>Supervisor</dt>
-                <dd>{{ supervisor_status_badge(r) }}</dd>
-                {% endif %}
-                {% if r.handover_to %}
-                <dt>Handover</dt>
-                <dd>{{ r.handover_to.full_name }}</dd>
-                {% endif %}
-            </dl>
-            <div class="leave-request-card-actions d-flex flex-wrap gap-2">
-                {{ leave_request_actions(r) }}
+                <dl class="leave-request-card-details mb-3">
+                    <dt>Period</dt>
+                    <dd>
+                        {{ r.start_date.strftime('%d %b %Y') if r.start_date else '—' }}
+                        –
+                        {{ r.end_date.strftime('%d %b %Y') if r.end_date else '—' }}
+                    </dd>
+                    <dt>Days</dt>
+                    <dd>{{ r.days_requested | fmt_days }}</dd>
+                    <dt>Remaining</dt>
+                    <dd>{{ leave_remaining_cell(r) }}</dd>
+                    {% if show_supervisor_column %}
+                    <dt>Supervisor</dt>
+                    <dd>{{ supervisor_status_badge(r) }}</dd>
+                    {% endif %}
+                    {% if r.handover_to %}
+                    <dt>Handover</dt>
+                    <dd>{{ r.handover_to.full_name }}</dd>
+                    {% endif %}
+                </dl>
+                <div class="leave-request-card-actions d-flex flex-wrap gap-2">
+                    {{ leave_request_actions(r) }}
+                </div>
             </div>
         </div>
-    </div>
+        {% endfor %}
+        {% endfor %}
     {% else %}
     <p class="text-muted mb-0">{% if list_mode == 'team' %}No team leave requests.{% else %}No leave requests.{% endif %}</p>
-    {% endfor %}
+    {% endif %}
 </div>
 <p class="text-muted small mb-0">
     When a <strong>manager</strong> is set on the employee, they normally approve first; HR can still approve or reject anytime and will see supervisor status (Awaiting / Done).
