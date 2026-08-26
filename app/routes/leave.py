@@ -852,6 +852,7 @@ def view_request(id):
         document_needed=document_needed,
         can_request_document=can_request_document,
         can_upload_document=can_upload_document,
+        is_leave_owner=is_owner,
     )
 
 

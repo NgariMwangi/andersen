@@ -189,16 +189,32 @@
         {% elif document_missing and request.document_path %}
         <div class="alert alert-danger py-2 small mb-3">
             <i class="bi bi-exclamation-triangle me-1"></i>
+            {% if is_leave_owner and not can_request_document %}
+            Your supporting document is <strong>missing from storage</strong> (for example after a system update).
+            Please <strong>re-upload it urgently</strong> using the button below.
+            {% elif is_leave_owner %}
+            The supporting document for this request is <strong>missing from storage</strong>.
+            Please re-upload it urgently, or use “Ask for re-upload” to email a reminder.
+            {% else %}
             The file recorded for this request is <strong>missing from storage</strong>.
             Ask the employee to re-upload it urgently.
+            {% endif %}
         </div>
         {% else %}
         <div class="alert alert-warning py-2 small mb-3">
             <i class="bi bi-exclamation-triangle me-1"></i>
+            {% if is_leave_owner and not can_request_document %}
+            No supporting document has been uploaded yet
+            {% if request.leave_type and (request.leave_type.code or '')|upper == 'SICK' %}
+            (e.g. medical / sick note)
+            {% endif %}.
+            Please upload one if HR has requested it.
+            {% else %}
             No supporting document has been uploaded yet
             {% if request.leave_type and (request.leave_type.code or '')|upper == 'SICK' %}
             (recommended for sick leave / medical certificate)
             {% endif %}.
+            {% endif %}
         </div>
         {% endif %}
         <div class="d-flex flex-wrap gap-2">
