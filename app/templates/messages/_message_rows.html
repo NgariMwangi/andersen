@@ -32,7 +32,7 @@
 
             <div class="chat-bubble-content">
                 <div class="chat-body">
-                    {{ msg.body | e | replace('\n', '<br>') | safe }}<span class="chat-meta"><time datetime="{{ msg.created_at.isoformat() }}">{{ msg.created_at.strftime('%H:%M') }}</time>{% if is_mine %}{% include 'messages/_read_receipt.html' %}{% endif %}</span>
+                    {{ msg.body | e | replace('\n', '<br>') | safe }}<span class="chat-meta"><time datetime="{{ (msg.created_at|as_local).isoformat() }}">{{ msg.created_at|local_dt('%H:%M') }}</time>{% if is_mine %}{% include 'messages/_read_receipt.html' %}{% endif %}</span>
                 </div>
             </div>
             <button

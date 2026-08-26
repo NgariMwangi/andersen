@@ -5,7 +5,13 @@ from sqlalchemy.orm import joinedload
 
 def register_template_filters(app):
     """Jinja filters used across templates."""
-    from app.utils.formatters import format_currency, mask_bank_account
+    from app.utils.formatters import (
+        DEFAULT_DATETIME_FORMAT,
+        format_currency,
+        format_local_datetime,
+        mask_bank_account,
+        to_local_datetime,
+    )
 
     @app.template_filter('mask_bank_account')
     def mask_bank_account_filter(number, visible=4):
@@ -29,6 +35,16 @@ def register_template_filters(app):
         if abs(f - round(f)) < 1e-9:
             return str(int(round(f)))
         return '%g' % f
+
+    @app.template_filter('local_dt')
+    def local_dt(value, fmt=DEFAULT_DATETIME_FORMAT):
+        """Display DB datetimes in local time (+3h / Africa/Nairobi)."""
+        return format_local_datetime(value, fmt)
+
+    @app.template_filter('as_local')
+    def as_local(value):
+        """Shift a DB datetime to local time for further template formatting."""
+        return to_local_datetime(value)
 
 
 def inject_permissions():

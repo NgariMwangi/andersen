@@ -22,6 +22,7 @@ from app.models.leave import LeaveRequest
 from app.models.overtime import OvertimeRequest
 from app.services.p9_service import MONTH_NAMES, row_for_employee, rows_for_csv
 from app.services.p9_template_service import build_p9a_overlay_context, fill_p9a_template_pdf
+from app.utils.formatters import format_local_datetime
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet
@@ -939,7 +940,7 @@ def executive_summary_pdf():
         Paragraph('Executive Summary Report', styles['Title']),
         Paragraph(f'Company: {_xml_escape(employer_name)}', styles['Normal']),
         Paragraph(f'KRA PIN: {_xml_escape(employer_pin)}', styles['Normal']),
-        Paragraph(f'Generated: {_xml_escape(s["generated_at"].strftime("%d/%m/%Y %H:%M"))}', styles['Normal']),
+        Paragraph(f'Generated: {_xml_escape(format_local_datetime(s["generated_at"], "%d/%m/%Y %H:%M"))}', styles['Normal']),
         Spacer(1, 12),
     ]
     table_data = [

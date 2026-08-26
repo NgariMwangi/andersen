@@ -107,10 +107,10 @@
     <div class="card-body py-2">
         <div class="small text-muted">
             {% if run.finance_reviewed_at %}
-            Finance reviewed at {{ run.finance_reviewed_at.strftime('%Y-%m-%d %H:%M') }}{% if run.finance_reviewed_by_id %} (user #{{ run.finance_reviewed_by_id }}){% endif %}.
+            Finance reviewed at {{ run.finance_reviewed_at|local_dt('%Y-%m-%d %H:%M') }}{% if run.finance_reviewed_by_id %} (user #{{ run.finance_reviewed_by_id }}){% endif %}.
             {% endif %}
             {% if run.paid_at %}
-            Paid at {{ run.paid_at.strftime('%Y-%m-%d %H:%M') }}{% if run.paid_by_id %} (user #{{ run.paid_by_id }}){% endif %}{% if run.payment_reference %} · Ref: {{ run.payment_reference }}{% endif %}.
+            Paid at {{ run.paid_at|local_dt('%Y-%m-%d %H:%M') }}{% if run.paid_by_id %} (user #{{ run.paid_by_id }}){% endif %}{% if run.payment_reference %} · Ref: {{ run.payment_reference }}{% endif %}.
             {% endif %}
         </div>
     </div>

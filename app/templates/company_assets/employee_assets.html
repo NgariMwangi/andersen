@@ -37,8 +37,8 @@
                     <td><a href="{{ url_for('company_assets.view', id=asset.id) }}">{{ asset.asset_tag }}</a></td>
                     <td>{{ asset.name or (asset.brand ~ ' ' ~ asset.model if asset.brand or asset.model else '—') }}</td>
                     <td>{{ asset.category.name if asset.category else '—' }}</td>
-                    <td>{{ row.assigned_at.strftime('%d %b %Y') }}</td>
-                    <td>{{ row.returned_at.strftime('%d %b %Y') if row.returned_at else '—' }}</td>
+                    <td>{{ row.assigned_at|local_dt('%d %b %Y') }}</td>
+                    <td>{{ row.returned_at|local_dt('%d %b %Y') if row.returned_at else '—' }}</td>
                     <td>{{ status_labels.get(asset.status, asset.status) }}</td>
                 </tr>
                 {% else %}

@@ -101,7 +101,7 @@
 
             <dt class="col-sm-3 text-muted">Submitted</dt>
             <dd class="col-sm-9">
-                {{ request.created_at.strftime('%d %b %Y %H:%M') if request.created_at else '—' }}
+                {{ request.created_at|local_dt('%d %b %Y %H:%M') if request.created_at else '—' }}
             </dd>
         </dl>
     </div>
@@ -130,7 +130,7 @@
         {% elif supervisor_summary.state == 'completed' %}
         <p class="small mb-1">
             <span class="badge bg-success">Supervisor approved</span>
-            {% if supervisor_summary.reviewed_at %} {{ supervisor_summary.reviewed_at.strftime('%d %b %Y %H:%M') }}{% endif %}
+            {% if supervisor_summary.reviewed_at %} {{ supervisor_summary.reviewed_at|local_dt('%d %b %Y %H:%M') }}{% endif %}
         </p>
         <p class="small mb-0 text-muted">
             Manager: {{ supervisor_summary.manager_name or '—' }}
@@ -139,7 +139,7 @@
         {% if supervisor_summary.notes %}<p class="small mb-0 mt-1"><strong>Supervisor notes:</strong> {{ supervisor_summary.notes }}</p>{% endif %}
         {% elif supervisor_summary.state == 'rejected' %}
         <p class="small mb-1"><span class="badge bg-danger">{{ supervisor_summary.label }}</span>
-            {% if supervisor_summary.reviewed_at %} {{ supervisor_summary.reviewed_at.strftime('%d %b %Y %H:%M') }}{% endif %}
+            {% if supervisor_summary.reviewed_at %} {{ supervisor_summary.reviewed_at|local_dt('%d %b %Y %H:%M') }}{% endif %}
         </p>
         {% if supervisor_summary.notes %}<p class="small mb-0"><strong>Notes:</strong> {{ supervisor_summary.notes }}</p>{% endif %}
         {% else %}
@@ -162,7 +162,7 @@
             {% else %}
             <span class="badge bg-secondary">{{ leave_status_label(request.status) }}</span>
             {% endif %}
-            {% if request.reviewed_at %} {{ request.reviewed_at.strftime('%d %b %Y %H:%M') }}{% endif %}
+            {% if request.reviewed_at %} {{ request.reviewed_at|local_dt('%d %b %Y %H:%M') }}{% endif %}
         </p>
         {% if request.reviewed_by and request.reviewed_by.email %}
         <p class="small mb-1 text-muted">By {{ request.reviewed_by.email }}</p>

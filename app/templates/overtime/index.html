@@ -42,7 +42,7 @@
                     {{ r.status }}
                 </span>
             </td>
-            <td class="small text-muted">{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '—' }}</td>
+            <td class="small text-muted">{{ r.created_at|local_dt('%Y-%m-%d %H:%M') if r.created_at else '—' }}</td>
             <td class="text-end text-nowrap">
                 {% if r.status == 'pending' %}
                     {% set subject = r.employee %}

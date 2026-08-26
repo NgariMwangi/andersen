@@ -2012,13 +2012,15 @@ def _can_delete_employee_document(doc: EmployeeDocument, employee_id: int) -> bo
 
 
 def _document_json(doc: EmployeeDocument, employee_id: int) -> dict:
+    from app.utils.formatters import format_local_datetime
+
     return {
         'id': doc.id,
         'name': doc.display_filename,
         'original_filename': doc.original_filename or doc.display_filename,
         'extension': doc.file_extension,
         'file_size': doc.file_size,
-        'created_at': doc.created_at.strftime('%d %b %Y') if doc.created_at else '',
+        'created_at': format_local_datetime(doc.created_at, '%d %b %Y') if doc.created_at else '',
         'approval_status': doc.approval_status,
         'approval_status_label': doc.approval_status_label,
         'review_notes': doc.review_notes,

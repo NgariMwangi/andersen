@@ -111,7 +111,7 @@
                         </td>
                         {% endif %}
                         <td>{% if d.file_size %}{{ (d.file_size / 1024)|round(1) }} KB{% else %}—{% endif %}</td>
-                        <td>{{ d.created_at.strftime('%d %b %Y') if d.created_at else '—' }}</td>
+                        <td>{{ d.created_at|local_dt('%d %b %Y') if d.created_at else '—' }}</td>
                         <td class="text-end text-nowrap">
                             <button type="button" class="btn btn-sm btn-outline-primary doc-preview-btn"
                                     title="View"

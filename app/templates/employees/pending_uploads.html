@@ -50,7 +50,7 @@
                             </div>
                         </td>
                         <td>
-                            {{ doc.created_at.strftime('%d %b %Y %H:%M') if doc.created_at else '—' }}
+                            {{ doc.created_at|local_dt('%d %b %Y %H:%M') if doc.created_at else '—' }}
                         </td>
                         <td class="text-end text-nowrap">
                             <button type="button" class="btn btn-sm btn-outline-primary doc-preview-btn"

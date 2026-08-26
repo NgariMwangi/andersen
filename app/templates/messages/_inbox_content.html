@@ -18,7 +18,7 @@
                 <span class="chat-inbox-name text-truncate">{{ item.label }}</span>
                 <span class="chat-inbox-time">
                     {% if item.last_message %}
-                    {{ item.last_message.created_at.strftime('%d %b %H:%M') }}
+                    {{ item.last_message.created_at|local_dt('%d %b %H:%M') }}
                     {% endif %}
                 </span>
             </div>

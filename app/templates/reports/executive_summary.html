@@ -20,7 +20,7 @@
                 <div class="small text-muted">KRA PIN: {{ employer_pin }}</div>
             </div>
             <div class="col-md-6 text-md-end">
-                <div class="small text-muted">Report generated: {{ summary.generated_at.strftime('%d %b %Y at %H:%M') }}</div>
+                <div class="small text-muted">Report generated: {{ summary.generated_at|local_dt('%d %b %Y at %H:%M') }}</div>
             </div>
         </div>
     </div>

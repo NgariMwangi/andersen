@@ -160,7 +160,7 @@
 </div>
 
 <p class="small text-muted mb-0">
-    Generated {{ report.generated_at.strftime('%d %b %Y at %H:%M') }} UTC.
+    Generated {{ report.generated_at|local_dt('%d %b %Y at %H:%M') }}.
     Used days are approved leave overlapping the calendar year.
 </p>
 {% endblock %}

@@ -210,7 +210,7 @@
                     <a href="{{ url_for('company_assets.view', id=asset.id) }}" class="fw-500 text-decoration-none">{{ asset.asset_tag }}</a>
                     <span class="text-muted"> — {{ asset.name or (asset.category.name if asset.category else 'Asset') }}</span>
                 </div>
-                <span class="small text-muted">Since {{ row.assigned_at.strftime('%d %b %Y') }}</span>
+                <span class="small text-muted">Since {{ row.assigned_at|local_dt('%d %b %Y') }}</span>
             </li>
             {% endfor %}
         </ul>

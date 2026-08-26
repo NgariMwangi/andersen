@@ -38,7 +38,7 @@
                             {{ comment.author.email }}
                             {% else %}User{% endif %}
                         </strong>
-                        <span class="small text-muted">{{ comment.created_at.strftime('%d %b %Y %H:%M') }}</span>
+                        <span class="small text-muted">{{ comment.created_at|local_dt('%d %b %Y %H:%M') }}</span>
                     </div>
                     <p class="mb-0 small" style="white-space: pre-wrap;">{{ comment.body }}</p>
                 </div>
@@ -106,9 +106,9 @@
                         {% endif %}
                     </dd>
                     <dt class="col-sm-5">Created</dt>
-                    <dd class="col-sm-7">{{ ticket.created_at.strftime('%d %b %Y %H:%M') }}</dd>
+                    <dd class="col-sm-7">{{ ticket.created_at|local_dt('%d %b %Y %H:%M') }}</dd>
                     <dt class="col-sm-5">Updated</dt>
-                    <dd class="col-sm-7">{{ ticket.updated_at.strftime('%d %b %Y %H:%M') }}</dd>
+                    <dd class="col-sm-7">{{ ticket.updated_at|local_dt('%d %b %Y %H:%M') }}</dd>
                 </dl>
             </div>
         </div>

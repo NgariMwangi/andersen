@@ -60,7 +60,7 @@
                             {{ status_labels.get(ticket.status, ticket.status) }}
                         </span>
                     </td>
-                    <td class="small text-muted">{{ ticket.updated_at.strftime('%d %b %Y %H:%M') }}</td>
+                    <td class="small text-muted">{{ ticket.updated_at|local_dt('%d %b %Y %H:%M') }}</td>
                     <td class="text-end">
                         <a href="{{ url_for('it_tickets.view', id=ticket.id) }}" class="btn btn-sm btn-outline-primary">View</a>
                     </td>
