@@ -399,7 +399,7 @@ def _render_leave_requests_page(cid: int, requests, *, list_mode: str):
             )
         ]
 
-    request_groups = _group_leave_requests_by_type(filtered)
+    request_groups = _group_leave_requests_by_type(filtered) if type_filter else []
     type_filter_options = _group_leave_requests_by_type(requests)
     total_request_count = len(requests)
     document_status = {}
@@ -416,6 +416,7 @@ def _render_leave_requests_page(cid: int, requests, *, list_mode: str):
         'leave/requests.html',
         requests=filtered,
         request_groups=request_groups,
+        group_by_type=bool(type_filter),
         type_filter_options=type_filter_options,
         total_request_count=total_request_count,
         active_type_filter=type_filter.upper() if type_filter else '',
