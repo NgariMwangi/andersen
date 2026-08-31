@@ -254,6 +254,7 @@
                 <h2 class="h6 mb-0">{{ g.name }}</h2>
                 <span class="small text-muted">{{ g.requests|length }} request{{ 's' if g.requests|length != 1 else '' }}</span>
             </div>
+            <div class="leave-list-table-scroll">
             <div class="table-responsive leave-requests-table-wrap">
                 <table class="table leave-requests-table mb-0">
                     <thead>
@@ -264,9 +265,11 @@
                     </tbody>
                 </table>
             </div>
+            </div>
         </div>
         {% endfor %}
     {% elif requests %}
+    <div class="leave-list-table-scroll border rounded bg-white shadow-sm">
     <div class="table-responsive leave-requests-table-wrap">
         <table class="table leave-requests-table mb-0">
             <thead>
@@ -277,7 +280,9 @@
             </tbody>
         </table>
     </div>
+    </div>
     {% else %}
+    <div class="leave-list-table-scroll border rounded bg-white shadow-sm">
     <div class="table-responsive leave-requests-table-wrap">
         <table class="table leave-requests-table mb-0">
             <thead>
@@ -289,6 +294,7 @@
             </td></tr>
             </tbody>
         </table>
+    </div>
     </div>
     {% endif %}
 </div>

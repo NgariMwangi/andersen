@@ -745,6 +745,65 @@ body.app-body {
 
 .app-content .table-responsive .table {
   margin-bottom: 0;
+  width: max-content;
+  min-width: 100%;
+}
+
+/* Leave list — force horizontal scroll on narrow screens */
+.leave-list-table-scroll {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: scroll;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #adb5bd #f1f3f5;
+}
+
+.leave-list-table-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 12px;
+}
+
+.leave-list-table-scroll::-webkit-scrollbar-track {
+  background: #e9ecef;
+  border-radius: 6px;
+}
+
+.leave-list-table-scroll::-webkit-scrollbar-thumb {
+  background: #868e96;
+  border-radius: 6px;
+}
+
+.leave-list-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #495057;
+}
+
+.leave-list-table-scroll .table-responsive {
+  overflow: visible;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.leave-requests-table-wrap .leave-requests-table,
+.leave-list-table-scroll .leave-requests-table {
+  width: max-content;
+  min-width: 72rem;
+}
+
+.leave-requests-table th,
+.leave-requests-table td {
+  white-space: nowrap;
+}
+
+.app-content .card:has(> .leave-list-table-scroll) {
+  overflow: visible;
+}
+
+.app-content .card > .leave-list-table-scroll {
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 /* —— Buttons —— */
@@ -1179,10 +1238,6 @@ body.app-body {
 
 .leave-request-card-actions form .btn {
   width: 100%;
-}
-
-.leave-requests-table-wrap .leave-requests-table {
-  min-width: 72rem;
 }
 
 @media (max-width: 767.98px) {

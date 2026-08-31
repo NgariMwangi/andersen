@@ -67,15 +67,34 @@ def _leave_index_url() -> str:
     return _portal_base() + url_for('leave.index')
 
 
+def _is_deliverable_email(address: str | None) -> bool:
+    """Skip auto-generated login placeholders that cannot receive mail."""
+    email = (address or '').strip().lower()
+    if not email or '@' not in email:
+        return False
+    local, _, domain = email.rpartition('@')
+    if not local or not domain:
+        return False
+    if domain.endswith('.hrms.local') or domain == 'hrms.local':
+        return False
+    return True
+
+
 def _employee_inbox(employee: Employee | None) -> str | None:
+    """
+    Best email for employee notifications.
+
+    Prefer work contact addresses over sign-in email. Login emails may be
+    auto-generated placeholders (e.g. emp123@company1.hrms.local) that bounce.
+    """
     if not employee:
         return None
-    user = getattr(employee, 'user', None)
-    if user and (user.email or '').strip():
-        return user.email.strip().lower()
     for addr in (employee.email, employee.secondary_email):
-        if addr and str(addr).strip():
+        if _is_deliverable_email(addr):
             return str(addr).strip().lower()
+    user = getattr(employee, 'user', None)
+    if user and _is_deliverable_email(user.email):
+        return user.email.strip().lower()
     return None
 
 

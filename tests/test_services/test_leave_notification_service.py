@@ -25,8 +25,18 @@ class _Emp:
         self.supervisor_links = supervisor_links or []
 
 
-def test_employee_inbox_prefers_login_email():
+def test_employee_inbox_prefers_work_email_over_login_email():
     emp = _Emp(email='work@co.com', user=_User('login@co.com'))
+    assert _employee_inbox(emp) == 'work@co.com'
+
+
+def test_employee_inbox_skips_placeholder_login_email():
+    emp = _Emp(email='work@co.com', user=_User('emp123@company1.hrms.local'))
+    assert _employee_inbox(emp) == 'work@co.com'
+
+
+def test_employee_inbox_falls_back_to_login_when_no_work_email():
+    emp = _Emp(user=_User('login@co.com'))
     assert _employee_inbox(emp) == 'login@co.com'
 
 
