@@ -246,7 +246,7 @@
 
 {% set display_groups = request_groups if group_by_type|default(false) else [{'requests': requests}] %}
 
-<div class="d-none d-md-block">
+<div class="leave-requests-desktop d-none d-md-block">
     {% if group_by_type|default(false) and request_groups %}
         {% for g in request_groups %}
         <div class="card border-0 shadow-sm mb-3">
@@ -255,7 +255,6 @@
                 <span class="small text-muted">{{ g.requests|length }} request{{ 's' if g.requests|length != 1 else '' }}</span>
             </div>
             <div class="leave-list-table-scroll">
-            <div class="table-responsive leave-requests-table-wrap">
                 <table class="table leave-requests-table mb-0">
                     <thead>
                         {{ leave_table_head() }}
@@ -265,12 +264,10 @@
                     </tbody>
                 </table>
             </div>
-            </div>
         </div>
         {% endfor %}
     {% elif requests %}
     <div class="leave-list-table-scroll border rounded bg-white shadow-sm">
-    <div class="table-responsive leave-requests-table-wrap">
         <table class="table leave-requests-table mb-0">
             <thead>
                 {{ leave_table_head() }}
@@ -280,10 +277,8 @@
             </tbody>
         </table>
     </div>
-    </div>
     {% else %}
     <div class="leave-list-table-scroll border rounded bg-white shadow-sm">
-    <div class="table-responsive leave-requests-table-wrap">
         <table class="table leave-requests-table mb-0">
             <thead>
                 {{ leave_table_head() }}
@@ -294,7 +289,6 @@
             </td></tr>
             </tbody>
         </table>
-    </div>
     </div>
     {% endif %}
 </div>
