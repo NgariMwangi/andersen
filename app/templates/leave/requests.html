@@ -123,9 +123,9 @@
 {% macro leave_document_cell(r) %}
 {% set doc = document_status.get(r.id, 'none') %}
 {% if doc == 'uploaded' %}
-<span class="badge bg-success-subtle text-success" title="Supporting document on file">
-    <i class="bi bi-paperclip"></i> Yes
-</span>
+<a href="{{ url_for('leave.leave_request_document', id=r.id) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" title="View supporting document">
+    View
+</a>
 {% elif doc == 'missing' %}
 <span class="badge bg-danger-subtle text-danger" title="Recorded but file missing from storage">
     <i class="bi bi-exclamation-triangle"></i> Missing
@@ -310,6 +310,6 @@
 <p class="text-muted small mb-0">
     When a <strong>manager</strong> is set on the employee, they normally approve first; HR can still approve or reject anytime and will see supervisor status (Awaiting / Done).
     <strong>Remaining</strong> is for <strong>approved</strong> or <strong>booked</strong> leave: days still to run in the period (from today through the end date), using the same rule as the leave type — <em>working days</em> (Mon–Fri) or <em>calendar days</em>.
-    <strong>Document</strong>: Yes = file on storage, Missing = recorded but file lost, No = not uploaded.
+    <strong>Document</strong>: <strong>View</strong> opens the uploaded file, Missing = recorded but file lost, No = not uploaded.
 </p>
 {% endblock %}
