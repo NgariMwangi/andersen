@@ -589,6 +589,8 @@ body.app-body {
 .app-content .table {
   border-collapse: separate;
   border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
 }
 
 .app-content .table thead th {
@@ -813,8 +815,10 @@ body.app-sticky-hscroll-active .app-footer {
 }
 
 .app-hscroll-host {
-  overflow-x: auto;
+  overflow-x: auto !important;
   overflow-y: visible;
+  max-width: 100%;
+  min-width: 0;
   -webkit-overflow-scrolling: touch;
 }
 

@@ -1,5 +1,5 @@
 /**
- * Fixed horizontal scrollbar at the bottom of the viewport.
+ * Fixed horizontal scrollbar at the bottom of the viewport on every page.
  * Lets a normal mouse (vertical wheel only) move wide tables sideways.
  */
 (function () {
@@ -12,7 +12,8 @@
     '.table-responsive',
     '.app-hscroll',
     '.leave-requests-table-wrap',
-    '.p9-table-wrap'
+    '.p9-table-wrap',
+    '.p9-header-wrap'
   ].join(', ');
   var HOST_CLASS = 'app-hscroll-host';
   var STEP = 280;
@@ -35,36 +36,39 @@
     return el && el.scrollWidth > el.clientWidth + 1;
   }
 
-  function overflowXScrollable(el) {
-    var ox = window.getComputedStyle(el).overflowX;
-    return ox === 'auto' || ox === 'scroll' || ox === 'overlay';
+  function hostCandidateForTable(table) {
+    var preferred = table.closest(HOST_SELECTOR);
+    if (preferred) {
+      return preferred;
+    }
+    preferred = table.closest('.card-body, .modal-body, .tab-pane');
+    if (preferred) {
+      return preferred;
+    }
+    return table.parentElement;
   }
 
   function discoverHosts() {
     var hosts = [];
     var seen = new Set();
-    var roots = document.querySelectorAll('.app-content, .modal.show');
 
     function addHost(el) {
-      if (!el || seen.has(el) || !hasHorizontalOverflow(el)) {
+      if (!el || seen.has(el) || el === document.body || el === document.documentElement) {
+        return;
+      }
+      el.classList.add(HOST_CLASS);
+      if (!hasHorizontalOverflow(el)) {
         return;
       }
       seen.add(el);
       hosts.push(el);
     }
 
-    roots.forEach(function (scope) {
+    var scopes = document.querySelectorAll('.app-content, .modal.show');
+    scopes.forEach(function (scope) {
       scope.querySelectorAll(HOST_SELECTOR).forEach(addHost);
-
       scope.querySelectorAll('table').forEach(function (table) {
-        var el = table.parentElement;
-        while (el && el !== scope && el !== document.body) {
-          if (overflowXScrollable(el) && hasHorizontalOverflow(el)) {
-            addHost(el);
-            break;
-          }
-          el = el.parentElement;
-        }
+        addHost(hostCandidateForTable(table));
       });
     });
 
