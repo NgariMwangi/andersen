@@ -7,6 +7,7 @@ from app.extensions import db
 from app.models.employee import Employee
 from app.models.employee_relations import EmployeeNextOfKin, EmployeeSupervisor
 from app.services.employee_status_service import employee_is_operational
+from app.utils.validators import normalize_phone
 
 
 def employee_supervisor_ids(employee: Employee | None) -> list[int]:
