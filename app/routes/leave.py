@@ -1298,6 +1298,9 @@ def tracker():
     cid = require_company_id()
     today = date.today()
     year = request.args.get('year', type=int) or today.year
+    if not 2 <= year <= 9998:
+        abort(400)
+    employee_id = request.args.get('employee_id', type=int)
     q = (request.args.get('q') or '').strip()
     y0 = date(year, 1, 1)
     y1 = date(year, 12, 31)
@@ -1313,6 +1316,11 @@ def tracker():
             )
         )
     employees = emp_q.order_by(Employee.last_name, Employee.first_name).all()
+    employee_choices = employees
+    if employee_id is not None:
+        employees = [e for e in employees if e.id == employee_id]
+        if not employees:
+            abort(404)
     leave_types = (
         db.session.query(LeaveType)
         .filter(LeaveType.company_id == cid, LeaveType.is_active.is_(True))
@@ -1360,6 +1368,7 @@ def tracker():
         )
 
     employee_day_marks: dict[int, dict[date, list[str]]] = defaultdict(lambda: defaultdict(list))
+    employee_day_details = defaultdict(lambda: defaultdict(list))
     for r in requests:
         lt = lt_by_id.get(r.leave_type_id)
         if not lt:
@@ -1386,8 +1395,14 @@ def tracker():
                 is_leave_day = dd.weekday() < 5 and dd not in excl
             else:
                 is_leave_day = dd not in excl
-            if is_leave_day and code not in employee_day_marks[emp.id][dd]:
-                employee_day_marks[emp.id][dd].append(code)
+            # Explicit single-day historical entries retain their recorded date,
+            # including exceptions entered on weekends or public holidays.
+            if r.start_date == r.end_date:
+                is_leave_day = True
+            if is_leave_day:
+                if code not in employee_day_marks[emp.id][dd]:
+                    employee_day_marks[emp.id][dd].append(code)
+                employee_day_details[emp.id][dd].append(r)
             dd += timedelta(days=1)
 
     rows = []
@@ -1417,11 +1432,15 @@ def tracker():
                 'used_by_type': used_by_type,
                 'remaining_by_type': remaining_by_type,
                 'day_marks': employee_day_marks.get(emp.id, {}),
+                'day_details': employee_day_details.get(emp.id, {}),
             }
         )
 
     return render_template(
-        'leave/tracker.html',
+        'leave/employee_calendar.html' if employee_id else 'leave/tracker.html',
+        employee_choices=employee_choices,
+        selected_employee_id=employee_id,
+        today=today,
         year=year,
         q=q,
         year_choices=[year - 1, year, year + 1],

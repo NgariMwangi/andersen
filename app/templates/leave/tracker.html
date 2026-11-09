@@ -55,7 +55,7 @@
         <tbody>
             {% for row in rows %}
             <tr>
-                <td class="fw-semibold text-nowrap sticky-employee-col">{{ row.employee.employee_number or 'No Number' }} — {{ row.employee.full_name }}</td>
+                <td class="fw-semibold text-nowrap sticky-employee-col">{{ row.employee.employee_number or 'No Number' }} — {{ row.employee.full_name }}<br><a class="btn btn-sm btn-outline-primary mt-2" href="{{ url_for('leave.tracker', employee_id=row.employee.id, year=year) }}">View leave calendar</a></td>
                 {% if leave_carry_forward_enabled %}
                 <td class="text-end">{{ row.carry_forward_total|fmt_days }}</td>
                 {% endif %}

@@ -1,0 +1,64 @@
+{% extends "layouts/base.html" %}
+{% block title %}Employee leave calendar - {{ app_name }}{% endblock %}
+{% block content %}
+{% set row = rows[0] %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1 class="h4 mb-1">{{ row.employee.full_name }} — Leave calendar</h1>
+        <p class="text-muted mb-0">{{ year }} · Approved and booked leave. Select a leave entry to view its details.</p>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('leave.tracker', year=year) }}">All employees</a>
+</div>
+<form method="get" class="d-flex flex-wrap gap-3 align-items-end mb-4">
+    <div><label for="calendar-employee" class="form-label">Employee</label>
+        <select id="calendar-employee" name="employee_id" class="form-select">
+            {% for employee in employee_choices %}
+            <option value="{{ employee.id }}" {% if employee.id == selected_employee_id %}selected{% endif %}>{{ employee.full_name }}{% if employee.employee_number %} ({{ employee.employee_number }}){% endif %}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div><label for="calendar-year" class="form-label">Year</label><input id="calendar-year" type="number" name="year" min="2" max="9998" value="{{ year }}" class="form-control" required></div>
+    <button class="btn btn-primary" type="submit">Show calendar</button>
+</form>
+<div class="d-flex flex-wrap gap-2 mb-3" aria-label="Calendar legend">
+    <span class="badge bg-success">Approved</span><span class="badge bg-info text-dark">Booked / scheduled</span>
+    <span class="small text-muted">Single-day entries show the recorded number of days; multi-day entries show the request total.</span>
+</div>
+<div class="employee-calendar-grid">
+{% for month in months %}
+<section class="card shadow-sm" aria-label="{{ month.name }} {{ year }}">
+    <h2 class="h6 card-header mb-0">{{ month.name }}</h2>
+    <div class="table-responsive"><table class="table table-bordered mb-0 employee-calendar-month">
+        <thead><tr>{% for name in weekday_names %}<th scope="col">{{ name }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for week in month.weeks %}<tr>
+            {% for day in week %}
+            {% set entries = row.day_details.get(day, []) if day else [] %}
+            <td class="{% if entries %}leave-date{% elif day and day.weekday() >= 5 %}bg-light{% endif %} {% if day == today %}calendar-today{% endif %}">
+                {% if day %}
+                <time datetime="{{ day.isoformat() }}" class="small fw-semibold">{{ day.day }}</time>
+                {% for entry in entries %}
+                <a href="{{ url_for('leave.view_request', id=entry.id) }}" class="calendar-entry badge bg-{{ 'info text-dark' if entry.status == 'booked' else 'success' }}" title="{{ entry.leave_type.name }}: {{ entry.start_date }} to {{ entry.end_date }}; {{ entry.days_requested|fmt_days }} days total; {{ leave_status_label(entry.status) }}">
+                    {{ entry.leave_type.code or entry.leave_type.name }}<br>
+                    {{ entry.days_requested|fmt_days }} {{ 'day(s)' if entry.start_date == entry.end_date else 'total' }}<br>
+                    {{ leave_status_label(entry.status) }}
+                </a>
+                {% endfor %}
+                {% endif %}
+            </td>{% endfor %}
+        </tr>{% endfor %}</tbody>
+    </table></div>
+</section>
+{% endfor %}
+</div>
+{% if not row.day_details %}<p class="text-muted mt-3" role="status">No approved or booked leave recorded for this employee in {{ year }}.</p>{% endif %}
+<style>
+.employee-calendar-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr)); gap:1rem; }
+.employee-calendar-month { table-layout:fixed; }
+.employee-calendar-month th { font-size:.7rem; text-align:center; }
+.employee-calendar-month td { height:78px; padding:.25rem; vertical-align:top; }
+.employee-calendar-month .leave-date { background:#edf7f0; }
+.employee-calendar-month .calendar-today { outline:2px solid #0d6efd; outline-offset:-2px; }
+.calendar-entry { display:block; white-space:normal; overflow-wrap:anywhere; font-size:.6rem; line-height:1.4; margin-top:.2rem; text-decoration:none; }
+.calendar-entry:hover,.calendar-entry:focus { text-decoration:underline; outline:2px solid currentColor; }
+</style>
+{% endblock %}
