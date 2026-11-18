@@ -213,6 +213,7 @@ def _leave_utilization_filters():
         'department_id': request.args.get('department_id', type=int),
         'leave_type_id': request.args.get('leave_type_id', type=int),
         'branch_id': request.args.get('branch_id', type=int),
+        'employee_search': request.args.get('employee_search', '').strip(),
     }
 
 

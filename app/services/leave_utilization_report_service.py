@@ -47,6 +47,7 @@ def build_leave_utilization_report(
     department_id: int | None = None,
     leave_type_id: int | None = None,
     branch_id: int | None = None,
+    employee_search: str | None = None,
 ) -> dict:
     """
     Aggregate leave utilization for active employees in a company/year.
@@ -78,6 +79,10 @@ def build_leave_utilization_report(
     if branch_id:
         emp_q = emp_q.filter(Employee.branch_id == branch_id)
     employees = emp_q.order_by(Employee.last_name, Employee.first_name).all()
+    search = (employee_search or '').strip().casefold()
+    if search:
+        employees = [emp for emp in employees if search in emp.full_name.casefold()
+                     or search in (emp.employee_number or '').casefold()]
 
     by_type: dict[int, dict] = defaultdict(_empty_bucket)
     by_dept: dict[str, dict] = defaultdict(_empty_bucket)
@@ -98,7 +103,7 @@ def build_leave_utilization_report(
         if not visible:
             continue
 
-        stats = statistics_for_employee(emp.id, year)
+        stats = statistics_for_employee(emp.id, year, allow_negative=True)
         stat_map = {row['leave_type_id']: row for row in stats}
 
         emp_used = Decimal('0.00')
@@ -202,6 +207,8 @@ def build_leave_utilization_report(
     today = date.today()
 
     for lr in backlog_requests:
+        if search and lr.employee_id not in {emp.id for emp in employees}:
+            continue
         status = (lr.status or '').strip().lower()
         days = _d(lr.days_requested)
         pending_days += days
@@ -290,6 +297,7 @@ def build_leave_utilization_report(
             'department_id': department_id,
             'leave_type_id': leave_type_id,
             'branch_id': branch_id,
+            'employee_search': employee_search,
         },
         'summary': {
             'active_employees': len(employees),

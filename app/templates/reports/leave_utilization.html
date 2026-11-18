@@ -84,6 +84,19 @@
             </div>
             {% endif %}
             <div class="col-md-3 col-lg-2">
+                <label class="form-label small text-muted mb-1" for="department_id">Department</label>
+                <select id="department_id" name="department_id" class="form-select form-select-sm">
+                    <option value="">All departments</option>
+                    {% for d in departments %}
+                    <option value="{{ d.id }}" {% if filters.department_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label small text-muted mb-1" for="employee_search">Employee name or number</label>
+                <input id="employee_search" name="employee_search" type="search" class="form-control form-control-sm" value="{{ filters.employee_search }}" placeholder="Name or number">
+            </div>
+            <div class="col-md-3 col-lg-2">
                 <label class="form-label small text-muted mb-1">Leave type</label>
                 <select name="leave_type_id" class="form-select form-select-sm">
                     <option value="">All leave types</option>
@@ -134,7 +147,7 @@
                             <span class="metric-label">Used</span>
                             <span class="metric-value used-value">{{ balance.used | fmt_days }}</span>
                             <span class="metric-label">Remaining</span>
-                            <span class="metric-value balance-value">{% if balance.remaining is not none %}{{ balance.remaining | fmt_days }}{% else %}—{% endif %}</span>
+                            <span class="metric-value {% if balance.remaining is not none and balance.remaining < 0 %}text-danger{% else %}balance-value{% endif %}">{% if balance.remaining is not none %}{{ balance.remaining | fmt_days }}{% else %}—{% endif %}</span>
                         </div>
                         {% else %}
                         <span class="text-muted">—</span>

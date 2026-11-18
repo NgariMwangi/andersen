@@ -85,7 +85,7 @@ def _used_days_approved_in_year(employee_id: int, leave_type_id: int, year: int)
     return Decimal(str(total or 0)).quantize(Decimal("0.01"))
 
 
-def statistics_for_employee(employee_id: int, year: int | None = None) -> list[dict]:
+def statistics_for_employee(employee_id: int, year: int | None = None, *, allow_negative: bool = False) -> list[dict]:
     """
     For each applicable leave type: entitlement (if any), used (YTD approved), remaining.
 
@@ -116,7 +116,7 @@ def statistics_for_employee(employee_id: int, year: int | None = None) -> list[d
             snap = compute_balance_snapshot(employee_id, lt.id, year)
             if snap:
                 total_book = snap["opening_balance"] + snap["accrued"] + snap["adjusted"]
-                remaining = max(Decimal("0"), snap["closing_balance"])
+                remaining = snap["closing_balance"] if allow_negative else max(Decimal("0"), snap["closing_balance"])
                 deduct = snap.get("days_deducted") or deduction_days_from_adjusted(snap["adjusted"])
                 effective = snap.get("effective_entitlement_per_year")
                 if effective is None and entitled_per_year is not None:
@@ -155,7 +155,7 @@ def statistics_for_employee(employee_id: int, year: int | None = None) -> list[d
             effective = effective_entitlement_for_year(lt, deduct)
             base = effective if effective is not None else entitlement
             remaining = base - used
-            if remaining < 0:
+            if remaining < 0 and not allow_negative:
                 remaining = Decimal("0")
         else:
             entitlement = None

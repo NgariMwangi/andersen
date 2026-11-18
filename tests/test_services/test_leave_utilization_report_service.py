@@ -154,3 +154,28 @@ def test_leave_utilization_filters_by_department_and_type(leave_report_seed):
     assert all(r['department'] == 'Engineering' for r in report['employee_rows'])
     assert len(report['employee_balance_rows']) == 1
     assert set(report['employee_balance_rows'][0]['balances_by_type']) == {seed['annual_id']}
+
+
+def test_tracker_search_and_negative_balance(leave_report_seed, monkeypatch):
+    from app.services import leave_stats_service
+
+    seed = leave_report_seed
+    original = leave_stats_service._used_days_approved_in_year
+    def used_days(employee_id, leave_type_id, year):
+        if employee_id == seed['alice_id'] and leave_type_id == seed['sick_id']:
+            return Decimal('20.00')
+        return original(employee_id, leave_type_id, year)
+    monkeypatch.setattr(leave_stats_service, '_used_days_approved_in_year', used_days)
+
+    for search in ('alice ngugi', 'e001'):
+        report = build_leave_utilization_report(
+            seed['company_id'], year=seed['year'], employee_search=search,
+            department_id=seed['dept_eng_id'],
+        )
+        assert len(report['employee_balance_rows']) == 1
+        assert report['employee_balance_rows'][0]['balances_by_type'][seed['sick_id']]['remaining'] == Decimal('-6.00')
+        assert not report['backlog']
+    assert not build_leave_utilization_report(
+        seed['company_id'], year=seed['year'], employee_search='E001',
+        department_id=seed['dept_hr_id'],
+    )['employee_balance_rows']
