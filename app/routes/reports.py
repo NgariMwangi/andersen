@@ -431,7 +431,7 @@ def leave_utilization_employee_balances_csv():
             [
                 f'{name} - Entitled',
                 f'{name} - Used',
-                f'{name} - Balance',
+                f'{name} - Remaining',
             ]
         )
     w.writerow(header)
@@ -471,7 +471,7 @@ def _add_employee_balances_sheet(workbook, report):
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
-    ws = workbook.create_sheet('Employee Leave Utilization')
+    ws = workbook.create_sheet('Leave Tracker')
     leave_types = list(report['by_leave_type'])
     employees = report['employee_balance_rows']
 
@@ -488,7 +488,7 @@ def _add_employee_balances_sheet(workbook, report):
         + [
             value
             for _leave_type in leave_types
-            for value in ['Entitled', 'Used', 'Balance']
+            for value in ['Entitled', 'Used', 'Remaining']
         ]
     )
 

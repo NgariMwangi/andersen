@@ -280,7 +280,7 @@ def build_leave_utilization_report(
         key=lambda r: (r['department'], r['employee_name'].lower(), r['leave_type'])
     )
     employee_balance_rows.sort(
-        key=lambda r: (r['department'], r['employee_name'].lower())
+        key=lambda r: (r['employee_name'].lower(), r['employee_id'])
     )
 
     return {

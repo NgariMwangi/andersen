@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
-{% block title %}Employee Leave Utilization - {{ app_name }}{% endblock %}
+{% block title %}Leave Tracker - {{ app_name }}{% endblock %}
 {% block page_nav_section %}Reports{% endblock %}
-{% block page_nav_title %}Employee leave utilization{% endblock %}
+{% block page_nav_title %}Leave tracker{% endblock %}
 {% block extra_css %}
 <style>
     .employee-balance-table {
@@ -53,7 +53,7 @@
 {% block content %}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
     <div>
-        <h1 class="h3 mb-1">Employee Leave Utilization</h1>
+        <h1 class="h3 mb-1">Leave Tracker</h1>
         <p class="text-muted mb-0">Entitled, used, and remaining leave days by employee and leave type.</p>
     </div>
     <a class="btn btn-outline-primary btn-sm" href="{{ url_for('reports.leave_utilization_employee_balances_xlsx', **request.args) }}">
@@ -84,15 +84,6 @@
             </div>
             {% endif %}
             <div class="col-md-3 col-lg-2">
-                <label class="form-label small text-muted mb-1">Department</label>
-                <select name="department_id" class="form-select form-select-sm">
-                    <option value="">All departments</option>
-                    {% for d in departments %}
-                    <option value="{{ d.id }}" {% if filters.department_id == d.id %}selected{% endif %}>{{ d.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3 col-lg-2">
                 <label class="form-label small text-muted mb-1">Leave type</label>
                 <select name="leave_type_id" class="form-select form-select-sm">
                     <option value="">All leave types</option>
@@ -113,7 +104,7 @@
 
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-        <h2 class="h6 mb-0">Employee Leave Utilization</h2>
+        <h2 class="h6 mb-0">Leave Tracker</h2>
         <span class="small text-muted">{{ report.employee_balance_rows|length }} employee{{ 's' if report.employee_balance_rows|length != 1 else '' }}</span>
     </div>
     <div class="table-responsive">
@@ -142,7 +133,7 @@
                             <span class="metric-value">{% if balance.entitlement is not none %}{{ balance.entitlement | fmt_days }}{% else %}—{% endif %}</span>
                             <span class="metric-label">Used</span>
                             <span class="metric-value used-value">{{ balance.used | fmt_days }}</span>
-                            <span class="metric-label">Balance</span>
+                            <span class="metric-label">Remaining</span>
                             <span class="metric-value balance-value">{% if balance.remaining is not none %}{{ balance.remaining | fmt_days }}{% else %}—{% endif %}</span>
                         </div>
                         {% else %}
@@ -152,7 +143,7 @@
                     {% endfor %}
                 </tr>
                 {% else %}
-                <tr><td colspan="{{ 1 + report.by_leave_type|length }}" class="text-muted text-center py-4">No employee leave utilization data for this filter.</td></tr>
+                <tr><td colspan="{{ 1 + report.by_leave_type|length }}" class="text-muted text-center py-4">No employee leave tracker data for this filter.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
